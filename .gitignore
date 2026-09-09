@@ -3,8 +3,7 @@
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
-data/raw/
-data/generated/
+data/
 runs/
 wandb/
 *.safetensors
