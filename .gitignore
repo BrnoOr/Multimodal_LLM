@@ -1,9 +1,16 @@
+## Ambiente
+
 .venv/
 .env
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
-data/
+## Datos
+
+data/raw/
+data/generated/
+## Otros
+
 runs/
 wandb/
 *.safetensors
