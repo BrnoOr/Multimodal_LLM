@@ -21,6 +21,8 @@ dependencies = [
     "omegaconf",
     "python-dotenv",
     "tqdm",
+    "matplotlib>=3.11.1",
+    "seaborn>=0.13.2",
 ]
 
 [project.optional-dependencies]

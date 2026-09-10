@@ -1,0 +1,59 @@
+# Catalogo de prompts para la Etapa 1.
+#
+# Estan ordenados de menor a mayor especificacion. El contraste entre p0 y p4 es
+# lo que separa "el modelo no percibe el atributo" de "el modelo no sabe decirlo
+# en el formato del dataset": si p4 mejora mucho sobre p0, el error inicial era
+# de formato, no de conocimiento.
+#
+# Los prompts se congelan al terminar la Etapa 1 y no se vuelven a tocar.
+
+p0_minimal:
+  id: p0_minimal
+  text: "Describe the image."
+  rationale: >
+    Linea base absoluta. Mide que produce el modelo sin ninguna guia, y expone el
+    desajuste entre el dominio de preentrenamiento (imagenes web) y el sintetico.
+
+p1_attributes:
+  id: p1_attributes
+  text: >
+    Describe the object in this image. State its shape, its color, and its position
+    in the image.
+  rationale: >
+    Nombra los atributos de interes sin imponer formato. Separa "no lo menciona
+    espontaneamente" de "no lo percibe".
+
+p2_constrained:
+  id: p2_constrained
+  text: >
+    Look at the 3D object in this image. Answer with a single sentence of the form:
+    "A <color> <shape> is at the <vertical>-<horizontal> of the image."
+    Use one of these shapes: teapot, hare, dragon, cow, armadillo, head, horse.
+    Use vertical in {top, mid, bottom} and horizontal in {left, center, right}.
+  rationale: >
+    Impone el vocabulario cerrado de forma y posicion, y la plantilla del dataset.
+    El color queda libre a proposito: aisla el efecto del vocabulario de color.
+
+p3_json:
+  id: p3_json
+  text: >
+    Look at the 3D object in this image. Respond only with JSON, no other text:
+    {"shape": <one of: teapot, hare, dragon, cow, armadillo, head, horse>,
+     "color": <a common color name>,
+     "vertical": <top, mid or bottom>,
+     "horizontal": <left, center or right>}
+  rationale: >
+    Salida estructurada. Elimina casi por completo el error de extraccion y da un
+    techo de lo que el modelo percibe. Util como referencia: la brecha entre p3 y
+    p0 es atribuible a formato, no a percepcion.
+
+p4_dataset_format:
+  id: p4_dataset_format
+  text: >
+    Describe this rendered scene exactly in the style of the dataset, for example:
+    A "tab:blue" horse is at the bottom-right of the image.
+    Put the color name in double quotes. Answer with one sentence only.
+  rationale: >
+    Replica el formato exacto de la referencia, incluidas las comillas. Es el unico
+    prompt bajo el cual la exactitud sobre el nombre literal de color puede ser
+    distinta de cero antes del fine-tuning.
