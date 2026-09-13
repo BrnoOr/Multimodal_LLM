@@ -38,6 +38,13 @@ MODELS = {
     "llava": ModelSpec(name="llava-1.5-7b", hf_id="llava-hf/llava-1.5-7b-hf"),
     "qwen": ModelSpec(name="qwen2.5-vl-7b", hf_id="Qwen/Qwen2.5-VL-7B-Instruct",
                       extra={"min_visual_tokens": 64, "max_visual_tokens": 256}),
+    "internvl": ModelSpec(name="internvl3.5-8b", hf_id="OpenGVLab/InternVL3_5-8B-HF",
+                          extra={"max_patches": 4}),
+    "vljepa": ModelSpec(name="vljepa", hf_id="cun-bjy/open-vljepa",
+                        quantization="none",
+                        extra={"repo": "external/open-vljepa",
+                               "ckpt": "external/open-vljepa/checkpoints_msrvtt/best.pt",
+                               "quoted_pool": False}),
 }
 
 
@@ -69,8 +76,13 @@ def git_commit() -> str:
 
 
 def run_one(model_key: str, prompt_id: str, prompt_text: str, df: pl.DataFrame,
-            batch_size: int, cfg: GenConfig, out_root: Path, quant: str) -> Path:
-    exp_id = f"e1_{model_key}_{prompt_id}" + ("" if quant == "nf4" else f"_{quant}")
+            batch_size: int, cfg: GenConfig, out_root: Path, quant: str,
+            dataset_name: str) -> Path:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    exp_id = f"e1_{dataset_name}_{model_key}_{prompt_id}_n{df.height}"
+    if quant != "nf4":
+        exp_id += f"_{quant}"
+    exp_id += f"_{stamp}"
     out_dir = out_root / exp_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -111,7 +123,9 @@ def run_one(model_key: str, prompt_id: str, prompt_text: str, df: pl.DataFrame,
     infer_s = time.time() - t0
 
     meta = {
-        "exp_id": exp_id, "stage": 1, "model": spec.name, "hf_id": spec.hf_id,
+        "exp_id": exp_id, "stage": 1, "dataset": dataset_name,
+        "manifest": str(args.manifest) if False else None,  # ver nota abajo
+        "model": spec.name, "hf_id": spec.hf_id,
         "quantization": quant, "prompt_id": prompt_id, "prompt_text": prompt_text,
         "n_examples": len(rows), "batch_size": batch_size,
         "generation": vars(cfg),
@@ -138,7 +152,7 @@ def main() -> None:
     ap.add_argument("--manifest", type=Path, default=Path("data/manifests/m3di_val.parquet"))
     ap.add_argument("--prompts-file", type=Path,
                     default=Path("configs/prompt/prompts.yaml"))
-    ap.add_argument("-n", type=int, default=1000, help="tamano del subconjunto estratificado")
+    ap.add_argument("-n", type=int, default=None, help="tamano del subconjunto estratificado")
     ap.add_argument("--batch-size", type=int, default=8)
     ap.add_argument("--max-new-tokens", type=int, default=64)
     ap.add_argument("--quant", default="nf4", choices=["nf4", "none"])
@@ -154,7 +168,9 @@ def main() -> None:
     model_keys = list(MODELS) if "all" in args.model else args.model
 
     df = pl.read_parquet(args.manifest)
-    sub = stratified_sample(df, args.n, args.seed)
+    n = args.n if args.n is not None else df.height
+    sub = stratified_sample(df, n, args.seed)
+    dataset_name = args.manifest.stem
     print(f"manifiesto {args.manifest.name}: {df.height} -> subconjunto {sub.height}")
     print(f"modelos: {model_keys} | prompts: {prompt_ids}")
 
@@ -164,7 +180,7 @@ def main() -> None:
     for mk in model_keys:
         for pid in prompt_ids:
             run_one(mk, pid, " ".join(catalogue[pid]["text"].split()),
-                    sub, args.batch_size, cfg, args.out, args.quant)
+                    sub, args.batch_size, cfg, args.out, args.quant, dataset_name)
 
 
 if __name__ == "__main__":

@@ -119,6 +119,15 @@ Con `HF_HOME` ya apuntando al disco correcto:
 ```bash
 uv run hf download llava-hf/llava-1.5-7b-hf
 uv run hf download Qwen/Qwen2.5-VL-7B-Instruct
+
+#vl-JEPA
+git clone https://github.com/dion-jy/open-vljepa
+cd open-vljepa
+uv pip install webdataset decord pyyaml huggingface-hub
+
+# Download ckpt
+uv run hf download cun-bjy/open-vljepa best.pt --local-dir checkpoints_msrvtt
+
 # VL-JEPA: seguir las instrucciones del submodule para sus checkpoints
 # Multimodal3DIdent: script de descarga del repo original (data/raw/, ignorado por git)
 ```

@@ -12,12 +12,12 @@ p0_minimal:
   text: "Describe the image."
   rationale: >
     Linea base absoluta. Mide que produce el modelo sin ninguna guia, y expone el
-    desajuste entre el dominio de preentrenamiento (imagenes web) y el sintetico.
+    desajuste entre el dominio de preentrenamiento y el sintetico.
 
 p1_attributes:
   id: p1_attributes
   text: >
-    Describe the object in this image. State its shape, its color, and its position
+    Describe the object in this image. State its shape, its color, and its vertical and horizontal position
     in the image.
   rationale: >
     Nombra los atributos de interes sin imponer formato. Separa "no lo menciona
@@ -37,9 +37,9 @@ p2_constrained:
 p3_json:
   id: p3_json
   text: >
-    Look at the 3D object in this image. Respond only with JSON, no other text:
+    Look at the 3D object in this image. Respond only with JSON format, no other text:
     {"shape": <one of: teapot, hare, dragon, cow, armadillo, head, horse>,
-     "color": <a common color name>,
+     "color": <a common color name, should be from these color pallets: TABLEAU_COLORS, CSS4_COLORS, XKCD_COLORS>,
      "vertical": <top, mid or bottom>,
      "horizontal": <left, center or right>}
   rationale: >
@@ -50,7 +50,7 @@ p3_json:
 p4_dataset_format:
   id: p4_dataset_format
   text: >
-    Describe this rendered scene exactly in the style of the dataset, for example:
+    Describe this rendered scene exactly in the next style:
     A "tab:blue" horse is at the bottom-right of the image.
     Put the color name in double quotes. Answer with one sentence only.
   rationale: >

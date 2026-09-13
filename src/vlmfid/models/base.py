@@ -85,4 +85,8 @@ def build(spec: ModelSpec) -> Describer:
         from vlmfid.models.vljepa import VLJepaDescriber
 
         return VLJepaDescriber(spec)
+    if key.startswith("internvl"):
+        from vlmfid.models.internvl import InternVLDescriber
+
+        return InternVLDescriber(spec)
     raise ValueError(f"modelo desconocido: {spec.name}")

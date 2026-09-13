@@ -1,0 +1,18 @@
+nohup: ignoring input
+manifiesto m3di_test.parquet: 10000 -> subconjunto 10000
+modelos: ['vljepa'] | prompts: ['p0_minimal', 'p1_attributes', 'p2_constrained', 'p3_json', 'p4_dataset_format']
+
+=== e1_m3di_test_vljepa_p0_minimal_n10000_20260911-153859 ===
+Traceback (most recent call last):
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/scripts/infer.py", line 187, in <module>
+    main()
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/scripts/infer.py", line 182, in main
+    run_one(mk, pid, " ".join(catalogue[pid]["text"].split()),
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/scripts/infer.py", line 93, in run_one
+    model = build(spec)
+            ^^^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/src/vlmfid/models/base.py", line 85, in build
+    from vlmfid.models.vljepa import VLJepaDescriber
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/src/vlmfid/models/vljepa.py", line 40, in <module>
+    from vlmfid.eval.caption_pool import PoolEntry, build_pool
+ModuleNotFoundError: No module named 'vlmfid.eval.caption_pool'
