@@ -4,7 +4,8 @@ open-vljepa NO genera tokens: predice un embedding y se entrena con InfoNCE
 bidireccional contra los embeddings del Y-Encoder (EmbeddingGemma). No hay
 decodificador de texto.
 
-`describe()` se implementa por RECUPERACION sobre un pool enumerado de captions:
+`describe()` se implementa por RECUPERACION sobre un pool enumerado de captions
+(ver vlmfid.eval.caption_pool):
   1. se codifica el pool una sola vez con el Y-Encoder            -> (P, 1536)
   2. cada imagen + query pasa por X-Encoder + Predictor           -> (B, 1536)
   3. argmax de similitud coseno devuelve el caption recuperado
@@ -17,15 +18,21 @@ Arquitectura (segun el README del repo):
 
 Notas:
   - Las imagenes de M3DI son estaticas y el encoder espera video: se replica la
-    imagen en la dimension temporal. Es un modo de uso previsto — el Stage A del
+    imagen en la dimension temporal. Es un modo de uso previsto: el Stage A del
     repo entreno con CC3M alimentando cada imagen como "video" de 1 frame.
-  - ~1.1B parametros ≈ 2.2 GiB en bf16: no se cuantiza. LLaVA y Qwen (7B) si van
+  - ~1.1B parametros ~ 2.2 GiB en bf16: no se cuantiza. LLaVA/Qwen/InternVL van
     en NF4. Declararlo en el informe.
   - Llama-3.2-1B y EmbeddingGemma-300m son gated: aceptar licencias y exportar
     HF_TOKEN antes de cargar.
+  - El prompt NO controla el formato de salida (lo fija el pool); solo actua
+    como query del predictor. Bajo p0..p4 lo unico que cambia es la query.
 
-VERIFICAR: la normalizacion de frames se replica de openvljepa/data/msrvtt.py.
-Comparar con las lineas 80-140 de ese archivo y ajustar MEAN/STD si difieren.
+VERIFICAR contra el repo instalado:
+  (a) normalizacion de frames: openvljepa/data/msrvtt.py, lineas ~80-140;
+      ajustar MEAN/STD si difieren.
+  (b) firma de OpenVLJEPA.forward(video, query_ids, query_mask) -> (B, D) y de
+      y_encoder(input_ids, attention_mask) -> (B, D). Si el forward devuelve una
+      tupla o un dict, tomar el embedding predicho.
 """
 
 from __future__ import annotations
@@ -33,6 +40,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import polars as pl
 import torch
 import torch.nn.functional as F
 from PIL import Image
@@ -40,7 +48,7 @@ from PIL import Image
 from vlmfid.eval.caption_pool import PoolEntry, build_pool
 from vlmfid.models.base import Describer, GenConfig, ModelSpec
 
-# Normalizacion estandar de V-JEPA2 / ImageNet. VERIFICAR contra msrvtt.py.
+# Normalizacion estandar de V-JEPA2 / ImageNet. VERIFICAR (a).
 MEAN = (0.485, 0.456, 0.406)
 STD = (0.229, 0.224, 0.225)
 
@@ -68,6 +76,11 @@ class VLJepaDescriber(Describer):
         self.device = torch.device(spec.device)
         ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
         cfg = ckpt["config"]
+        # permite sustituir el repo gated de Meta por una replica publica con
+        # pesos identicos (p. ej. unsloth/Llama-3.2-1B) mientras se aprueba el
+        # acceso; el tokenizador lee el mismo campo, asi que queda cubierto
+        if "llama_name" in spec.extra:
+            cfg["predictor"]["llama_name"] = spec.extra["llama_name"]
         self.cfg = cfg
 
         self.model = OpenVLJEPA(cfg["encoder"], cfg["y_encoder"], cfg["predictor"],
@@ -98,20 +111,35 @@ class VLJepaDescriber(Describer):
         self.pool: list[PoolEntry] = []
         self.pool_embeds: torch.Tensor | None = None
         self.last_entries: list[PoolEntry] = []
+        self._query_cache: dict[str, tuple[torch.Tensor, torch.Tensor]] = {}
 
     # ------------------------------------------------------------------ pool
 
     @torch.no_grad()
-    def build_caption_pool(self, pool: list[PoolEntry] | None = None,
-                           batch_size: int = 64, quiet: bool = False) -> None:
-        """Codifica el pool con el Y-Encoder. Se hace una vez y se reutiliza."""
-        self.pool = pool if pool is not None else build_pool(
-            quoted=self.spec.extra.get("quoted_pool", False))
+    def build_caption_pool(self, pool: list[PoolEntry] | None = None, *,
+                           manifest: pl.DataFrame | str | Path | None = None,
+                           batch_size: int = 256, quiet: bool = False) -> None:
+        """Codifica el pool con el Y-Encoder. Se hace una vez y se reutiliza.
+
+        Prioridad: `pool` explicito > `manifest` > spec.extra["manifest"] >
+        modo canonico sin dataset (solo pruebas).
+        """
+        if pool is None:
+            src = manifest if manifest is not None else self.spec.extra.get("manifest")
+            pool = build_pool(src,
+                              quoted=self.spec.extra.get("quoted_pool", True),
+                              colors=self.spec.extra.get("pool_colors", "manifest"))
+        self.pool = pool
+
+        # padding="longest": los captions tienen ~15-25 tokens; rellenar a 512
+        # multiplicaria el coste x20 sin cambiar el embedding (mean-pooling con
+        # mascara). Si el y_encoder del repo NO enmascara el padding, volver a
+        # padding="max_length" para replicar exactamente el entrenamiento.
         embeds = []
         for i in range(0, len(self.pool), batch_size):
             texts = [e.text for e in self.pool[i:i + batch_size]]
             enc = self.t_tok(texts, max_length=self.max_caption_len,
-                             padding="max_length", truncation=True,
+                             padding="longest", truncation=True,
                              return_tensors="pt").to(self.device)
             with torch.amp.autocast("cuda", dtype=torch.bfloat16):
                 t = self.model.y_encoder(enc["input_ids"], enc["attention_mask"])
@@ -119,7 +147,7 @@ class VLJepaDescriber(Describer):
             embeds.append(t.cpu())
         self.pool_embeds = torch.cat(embeds).to(self.device)
         if not quiet:
-            print(f"  pool codificado: {self.pool_embeds.shape}")
+            print(f"  pool codificado: {tuple(self.pool_embeds.shape)}")
 
     # ---------------------------------------------------------------- imagen
 
@@ -135,56 +163,55 @@ class VLJepaDescriber(Describer):
         frames = torch.stack([tf(im.convert("RGB")) for im in images])  # (B,C,H,W)
         return frames.unsqueeze(1).repeat(1, self.num_frames, 1, 1, 1)
 
-    # -------------------------------------------------------------- describe
+    def _query(self, prompt: str, B: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """Tokeniza la query una vez por prompt y la expande al batch."""
+        key = prompt or DEFAULT_QUERY
+        if key not in self._query_cache:
+            q = self.q_tok([key], max_length=self.max_query_len,
+                           padding="max_length", truncation=True,
+                           return_tensors="pt").to(self.device)
+            self._query_cache[key] = (q["input_ids"], q["attention_mask"])
+        ids, mask = self._query_cache[key]
+        return ids.expand(B, -1), mask.expand(B, -1)
 
     @torch.inference_mode()
+    def _predict(self, images: list[Image.Image], prompt: str) -> torch.Tensor:
+        """Embedding predicho, normalizado. (B, D)."""
+        pv = self._pixel_values(images).to(self.device)
+        q_ids, q_mask = self._query(prompt, pv.shape[0])
+        with torch.amp.autocast("cuda", dtype=torch.bfloat16):
+            pred = self.model(pv, q_ids, q_mask)          # VERIFICAR (b)
+            if isinstance(pred, (tuple, list)):
+                pred = pred[0]
+            elif isinstance(pred, dict):
+                pred = pred.get("pred", next(iter(pred.values())))
+        return F.normalize(pred.float(), dim=-1)
+
+    # -------------------------------------------------------------- describe
+
     def describe(self, images: list[Image.Image], prompt: str,
                  cfg: GenConfig | None = None) -> list[str]:
         """Recupera del pool el caption mas similar al embedding predicho.
 
-        `prompt` se usa como query del predictor, no como instruccion de formato:
-        VL-JEPA no puede cambiar el formato de su salida, que lo fija el pool.
-        Esta asimetria respecto a LLaVA y Qwen debe declararse en el informe.
+        `cfg` se ignora: no hay decodificacion. `prompt` es la query del
+        predictor, no una instruccion de formato.
         """
         if self.pool_embeds is None:
             self.build_caption_pool()
-
-        pv = self._pixel_values(images).to(self.device)
-        q = self.q_tok([prompt or DEFAULT_QUERY], max_length=self.max_query_len,
-                       padding="max_length", truncation=True,
-                       return_tensors="pt").to(self.device)
-        B = pv.shape[0]
-        q_ids = q["input_ids"].expand(B, -1)
-        q_mask = q["attention_mask"].expand(B, -1)
-
-        with torch.amp.autocast("cuda", dtype=torch.bfloat16):
-            pred = self.model(pv, q_ids, q_mask)          # (B, 1536)
-            pred = F.normalize(pred.float(), dim=-1)
-
-        sim = pred @ self.pool_embeds.T                    # (B, P)
+        sim = self._predict(images, prompt) @ self.pool_embeds.T   # (B, P)
         idx = sim.argmax(dim=1).tolist()
         self.last_entries = [self.pool[i] for i in idx]
-        return [self.pool[i].text for i in idx]
+        return [e.text for e in self.last_entries]
 
-    @torch.inference_mode()
     def describe_topk(self, images: list[Image.Image], prompt: str, k: int = 5
-                      ) -> list[list[tuple[str, float]]]:
-        """Top-k con similitud. Util para diagnostico: si el correcto esta en el
-        top-5 pero no en el top-1, el modelo percibe pero no discrimina."""
+                      ) -> list[list[tuple[PoolEntry, float]]]:
+        """Top-k con similitud. Diagnostico: si el correcto esta en el top-5 pero
+        no en el top-1, el modelo percibe pero no discrimina."""
         if self.pool_embeds is None:
             self.build_caption_pool()
-        pv = self._pixel_values(images).to(self.device)
-        q = self.q_tok([prompt or DEFAULT_QUERY], max_length=self.max_query_len,
-                       padding="max_length", truncation=True,
-                       return_tensors="pt").to(self.device)
-        B = pv.shape[0]
-        with torch.amp.autocast("cuda", dtype=torch.bfloat16):
-            pred = self.model(pv, q["input_ids"].expand(B, -1),
-                              q["attention_mask"].expand(B, -1))
-            pred = F.normalize(pred.float(), dim=-1)
-        sim = pred @ self.pool_embeds.T
-        vals, idx = sim.topk(k, dim=1)
-        return [[(self.pool[j].text, float(v)) for j, v in zip(ii, vv)]
+        sim = self._predict(images, prompt) @ self.pool_embeds.T
+        vals, idx = sim.topk(min(k, len(self.pool)), dim=1)
+        return [[(self.pool[j], float(v)) for j, v in zip(ii, vv)]
                 for ii, vv in zip(idx.tolist(), vals.tolist())]
 
     def memory_footprint_gib(self) -> float:

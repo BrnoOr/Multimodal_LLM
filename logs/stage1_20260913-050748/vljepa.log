@@ -1,0 +1,75 @@
+[run.sh] GPU=1  commit=022a7eb  2026-09-13T07:50:34-07:00
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+manifiesto m3di_test.parquet: 10000 -> subconjunto 10000
+modelos: ['vljepa'] | prompts: ['p0_minimal', 'p1_attributes', 'p2_constrained', 'p3_json', 'p4_dataset_format']
+
+=== e1_m3di_test_vljepa_p0_minimal_n10000_none_20260913-145036 ===
+Loading weights:   0%|          | 0/587 [00:00<?, ?it/s]Loading weights: 100%|██████████| 587/587 [00:00<00:00, 6215.16it/s]
+httpx.HTTPStatusError: Client error '401 Unauthorized' for url 'https://huggingface.co/google/embeddinggemma-300m/resolve/main/config.json'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/.venv/lib/python3.12/site-packages/transformers/utils/hub.py", line 438, in cached_files
+    hf_hub_download(
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/.venv/lib/python3.12/site-packages/huggingface_hub/utils/_validators.py", line 88, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/.venv/lib/python3.12/site-packages/huggingface_hub/file_download.py", line 1028, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/.venv/lib/python3.12/site-packages/huggingface_hub/file_download.py", line 1175, in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/.venv/lib/python3.12/site-packages/huggingface_hub/file_download.py", line 1915, in _raise_on_head_call_error
+    raise head_call_error
+huggingface_hub.errors.GatedRepoError: 401 Client Error. (Request ID: Root=1-6aa6b85a-1841d90219a923d90fa0949e;9eabe750-9b2c-416e-a504-ae5b516ef88d)
+
+Cannot access gated repo for url https://huggingface.co/google/embeddinggemma-300m/resolve/main/config.json.
+Access to model google/embeddinggemma-300m is restricted. You must have access to it and be authenticated to access it. Please log in.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/scripts/infer.py", line 234, in <module>
+    main()
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/scripts/infer.py", line 228, in main
+    run_one(mk, pid, " ".join(catalogue[pid]["text"].split()),
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/scripts/infer.py", line 107, in run_one
+    model = build(spec)
+            ^^^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/src/vlmfid/models/base.py", line 87, in build
+    return VLJepaDescriber(spec)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/src/vlmfid/models/vljepa.py", line 81, in __init__
+    self.model = OpenVLJEPA(cfg["encoder"], cfg["y_encoder"], cfg["predictor"],
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/external/open-vljepa/openvljepa/models/vljepa.py", line 34, in __init__
+    self.y_encoder = YEncoder(
+                     ^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/external/open-vljepa/openvljepa/models/y_encoder.py", line 22, in __init__
+    self.model = AutoModel.from_pretrained(model_name, torch_dtype=torch_dtype)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/.venv/lib/python3.12/site-packages/transformers/models/auto/auto_factory.py", line 336, in from_pretrained
+    config, kwargs = AutoConfig.from_pretrained(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/.venv/lib/python3.12/site-packages/transformers/models/auto/configuration_auto.py", line 388, in from_pretrained
+    config_dict, unused_kwargs = PreTrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/.venv/lib/python3.12/site-packages/transformers/configuration_utils.py", line 747, in get_config_dict
+    config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/.venv/lib/python3.12/site-packages/transformers/configuration_utils.py", line 802, in _get_config_dict
+    resolved_config_file = cached_file(
+                           ^^^^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/.venv/lib/python3.12/site-packages/transformers/utils/hub.py", line 294, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/home2/t7-vLLM/Multimodal_LLM/.venv/lib/python3.12/site-packages/transformers/utils/hub.py", line 511, in cached_files
+    raise OSError(
+OSError: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/google/embeddinggemma-300m.
+401 Client Error. (Request ID: Root=1-6aa6b85a-1841d90219a923d90fa0949e;9eabe750-9b2c-416e-a504-ae5b516ef88d)
+
+Cannot access gated repo for url https://huggingface.co/google/embeddinggemma-300m/resolve/main/config.json.
+Access to model google/embeddinggemma-300m is restricted. You must have access to it and be authenticated to access it. Please log in.

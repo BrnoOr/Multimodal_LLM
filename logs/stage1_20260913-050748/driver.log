@@ -1,0 +1,8 @@
+[05:07:48] GPU1 -> qwen
+[05:07:48] GPU0 -> llava
+[05:07:48] FALLO llava (rc=0, ver logs/stage1_20260913-050748/llava.log)
+[05:07:48] GPU0 -> internvl
+[05:07:48] FALLO internvl (rc=0, ver logs/stage1_20260913-050748/internvl.log)
+[07:50:34] GPU1 -> vljepa
+[07:51:07] FALLO vljepa (rc=0, ver logs/stage1_20260913-050748/vljepa.log)
+[07:51:07] Etapa 1 completa
