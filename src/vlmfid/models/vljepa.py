@@ -83,10 +83,10 @@ class VLJepaDescriber(Describer):
             cfg["predictor"]["llama_name"] = spec.extra["llama_name"]
         self.cfg = cfg
 
-        self.model = OpenVLJEPA(cfg["encoder"], cfg["y_encoder"], cfg["predictor"],
-                                torch_dtype=torch.bfloat16)
-        missing, unexpected = self.model.load_state_dict(ckpt["model_state_dict"],
-                                                         strict=False)
+        self.model = OpenVLJEPA(
+            cfg["encoder"], cfg["y_encoder"], cfg["predictor"], torch_dtype=torch.bfloat16
+        )
+        missing, unexpected = self.model.load_state_dict(ckpt["model_state_dict"], strict=False)
         # las claves de x_encoder.model.* faltan a proposito: el encoder congelado
         # se recarga desde HF, no viaja en el checkpoint
         real_missing = [k for k in missing if not k.startswith("x_encoder.model.")]
@@ -98,9 +98,11 @@ class VLJepaDescriber(Describer):
 
         # dos tokenizadores distintos: query -> Llama (predictor), target -> Gemma
         self.q_tok = _ensure_pad_token(
-            AutoTokenizer.from_pretrained(cfg["predictor"]["llama_name"]))
+            AutoTokenizer.from_pretrained(cfg["predictor"]["llama_name"])
+        )
         self.t_tok = _ensure_pad_token(
-            AutoTokenizer.from_pretrained(cfg["y_encoder"]["model_name"]))
+            AutoTokenizer.from_pretrained(cfg["y_encoder"]["model_name"])
+        )
 
         data_cfg = cfg.get("data", {})
         self.num_frames = spec.extra.get("num_frames", data_cfg.get("num_frames", 16))
@@ -116,9 +118,14 @@ class VLJepaDescriber(Describer):
     # ------------------------------------------------------------------ pool
 
     @torch.no_grad()
-    def build_caption_pool(self, pool: list[PoolEntry] | None = None, *,
-                           manifest: pl.DataFrame | str | Path | None = None,
-                           batch_size: int = 256, quiet: bool = False) -> None:
+    def build_caption_pool(
+        self,
+        pool: list[PoolEntry] | None = None,
+        *,
+        manifest: pl.DataFrame | str | Path | None = None,
+        batch_size: int = 256,
+        quiet: bool = False,
+    ) -> None:
         """Codifica el pool con el Y-Encoder. Se hace una vez y se reutiliza.
 
         Prioridad: `pool` explicito > `manifest` > spec.extra["manifest"] >
@@ -126,9 +133,11 @@ class VLJepaDescriber(Describer):
         """
         if pool is None:
             src = manifest if manifest is not None else self.spec.extra.get("manifest")
-            pool = build_pool(src,
-                              quoted=self.spec.extra.get("quoted_pool", True),
-                              colors=self.spec.extra.get("pool_colors", "manifest"))
+            pool = build_pool(
+                src,
+                quoted=self.spec.extra.get("quoted_pool", True),
+                colors=self.spec.extra.get("pool_colors", "manifest"),
+            )
         self.pool = pool
 
         # padding="longest": los captions tienen ~15-25 tokens; rellenar a 512
@@ -137,10 +146,14 @@ class VLJepaDescriber(Describer):
         # padding="max_length" para replicar exactamente el entrenamiento.
         embeds = []
         for i in range(0, len(self.pool), batch_size):
-            texts = [e.text for e in self.pool[i:i + batch_size]]
-            enc = self.t_tok(texts, max_length=self.max_caption_len,
-                             padding="longest", truncation=True,
-                             return_tensors="pt").to(self.device)
+            texts = [e.text for e in self.pool[i : i + batch_size]]
+            enc = self.t_tok(
+                texts,
+                max_length=self.max_caption_len,
+                padding="longest",
+                truncation=True,
+                return_tensors="pt",
+            ).to(self.device)
             with torch.amp.autocast("cuda", dtype=torch.bfloat16):
                 t = self.model.y_encoder(enc["input_ids"], enc["attention_mask"])
                 t = F.normalize(t.float(), dim=-1)
@@ -155,11 +168,13 @@ class VLJepaDescriber(Describer):
         """(B, T, C, H, W). La imagen estatica se replica en el eje temporal."""
         import torchvision.transforms as T
 
-        tf = T.Compose([
-            T.Resize((self.image_size, self.image_size)),
-            T.ToTensor(),
-            T.Normalize(mean=MEAN, std=STD),
-        ])
+        tf = T.Compose(
+            [
+                T.Resize((self.image_size, self.image_size)),
+                T.ToTensor(),
+                T.Normalize(mean=MEAN, std=STD),
+            ]
+        )
         frames = torch.stack([tf(im.convert("RGB")) for im in images])  # (B,C,H,W)
         return frames.unsqueeze(1).repeat(1, self.num_frames, 1, 1, 1)
 
@@ -167,9 +182,13 @@ class VLJepaDescriber(Describer):
         """Tokeniza la query una vez por prompt y la expande al batch."""
         key = prompt or DEFAULT_QUERY
         if key not in self._query_cache:
-            q = self.q_tok([key], max_length=self.max_query_len,
-                           padding="max_length", truncation=True,
-                           return_tensors="pt").to(self.device)
+            q = self.q_tok(
+                [key],
+                max_length=self.max_query_len,
+                padding="max_length",
+                truncation=True,
+                return_tensors="pt",
+            ).to(self.device)
             self._query_cache[key] = (q["input_ids"], q["attention_mask"])
         ids, mask = self._query_cache[key]
         return ids.expand(B, -1), mask.expand(B, -1)
@@ -180,7 +199,7 @@ class VLJepaDescriber(Describer):
         pv = self._pixel_values(images).to(self.device)
         q_ids, q_mask = self._query(prompt, pv.shape[0])
         with torch.amp.autocast("cuda", dtype=torch.bfloat16):
-            pred = self.model(pv, q_ids, q_mask)          # VERIFICAR (b)
+            pred = self.model(pv, q_ids, q_mask)  # VERIFICAR (b)
             if isinstance(pred, (tuple, list)):
                 pred = pred[0]
             elif isinstance(pred, dict):
@@ -189,8 +208,9 @@ class VLJepaDescriber(Describer):
 
     # -------------------------------------------------------------- describe
 
-    def describe(self, images: list[Image.Image], prompt: str,
-                 cfg: GenConfig | None = None) -> list[str]:
+    def describe(
+        self, images: list[Image.Image], prompt: str, cfg: GenConfig | None = None
+    ) -> list[str]:
         """Recupera del pool el caption mas similar al embedding predicho.
 
         `cfg` se ignora: no hay decodificacion. `prompt` es la query del
@@ -198,22 +218,24 @@ class VLJepaDescriber(Describer):
         """
         if self.pool_embeds is None:
             self.build_caption_pool()
-        sim = self._predict(images, prompt) @ self.pool_embeds.T   # (B, P)
+        sim = self._predict(images, prompt) @ self.pool_embeds.T  # (B, P)
         idx = sim.argmax(dim=1).tolist()
         self.last_entries = [self.pool[i] for i in idx]
         return [e.text for e in self.last_entries]
 
-    def describe_topk(self, images: list[Image.Image], prompt: str, k: int = 5
-                      ) -> list[list[tuple[PoolEntry, float]]]:
+    def describe_topk(
+        self, images: list[Image.Image], prompt: str, k: int = 5
+    ) -> list[list[tuple[PoolEntry, float]]]:
         """Top-k con similitud. Diagnostico: si el correcto esta en el top-5 pero
         no en el top-1, el modelo percibe pero no discrimina."""
         if self.pool_embeds is None:
             self.build_caption_pool()
         sim = self._predict(images, prompt) @ self.pool_embeds.T
         vals, idx = sim.topk(min(k, len(self.pool)), dim=1)
-        return [[(self.pool[j], float(v)) for j, v in zip(ii, vv)]
-                for ii, vv in zip(idx.tolist(), vals.tolist())]
+        return [
+            [(self.pool[j], float(v)) for j, v in zip(ii, vv)]
+            for ii, vv in zip(idx.tolist(), vals.tolist())
+        ]
 
     def memory_footprint_gib(self) -> float:
-        return sum(p.numel() * p.element_size()
-                   for p in self.model.parameters()) / 2**30
+        return sum(p.numel() * p.element_size() for p in self.model.parameters()) / 2**30

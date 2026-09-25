@@ -41,17 +41,16 @@ class QwenDescriber(Describer):
         self.model.eval()
 
     def _build_inputs(self, images: list[Image.Image], prompt: str):
-        msgs = [{"role": "user",
-                 "content": [{"type": "image"}, {"type": "text", "text": prompt}]}]
-        text = self.processor.apply_chat_template(msgs, add_generation_prompt=True,
-                                                  tokenize=False)
+        msgs = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": prompt}]}]
+        text = self.processor.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False)
         return self.processor(
             text=[text] * len(images), images=images, return_tensors="pt", padding=True
         ).to(self.model.device)
 
     @torch.inference_mode()
-    def describe(self, images: list[Image.Image], prompt: str,
-                 cfg: GenConfig | None = None) -> list[str]:
+    def describe(
+        self, images: list[Image.Image], prompt: str, cfg: GenConfig | None = None
+    ) -> list[str]:
         cfg = cfg or GenConfig()
         inputs = self._build_inputs(images, prompt)
         out = self.model.generate(
@@ -63,9 +62,8 @@ class QwenDescriber(Describer):
             pad_token_id=self.processor.tokenizer.pad_token_id
             or self.processor.tokenizer.eos_token_id,
         )
-        gen = out[:, inputs["input_ids"].shape[1]:]
-        return [t.strip() for t in
-                self.processor.batch_decode(gen, skip_special_tokens=True)]
+        gen = out[:, inputs["input_ids"].shape[1] :]
+        return [t.strip() for t in self.processor.batch_decode(gen, skip_special_tokens=True)]
 
     def memory_footprint_gib(self) -> float:
         return self.model.get_memory_footprint() / 2**30

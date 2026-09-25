@@ -29,16 +29,16 @@ class LlavaDescriber(Describer):
         self.model.eval()
 
     def _build_inputs(self, images: list[Image.Image], prompt: str):
-        msgs = [{"role": "user",
-                 "content": [{"type": "image"}, {"type": "text", "text": prompt}]}]
+        msgs = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": prompt}]}]
         text = self.processor.apply_chat_template(msgs, add_generation_prompt=True)
         return self.processor(
             images=images, text=[text] * len(images), return_tensors="pt", padding=True
         ).to(self.model.device)
 
     @torch.inference_mode()
-    def describe(self, images: list[Image.Image], prompt: str,
-                 cfg: GenConfig | None = None) -> list[str]:
+    def describe(
+        self, images: list[Image.Image], prompt: str, cfg: GenConfig | None = None
+    ) -> list[str]:
         cfg = cfg or GenConfig()
         inputs = self._build_inputs(images, prompt)
         out = self.model.generate(
@@ -51,9 +51,8 @@ class LlavaDescriber(Describer):
             or self.processor.tokenizer.eos_token_id,
         )
         # recortar el prompt: solo interesa lo generado
-        gen = out[:, inputs["input_ids"].shape[1]:]
-        return [t.strip() for t in
-                self.processor.batch_decode(gen, skip_special_tokens=True)]
+        gen = out[:, inputs["input_ids"].shape[1] :]
+        return [t.strip() for t in self.processor.batch_decode(gen, skip_special_tokens=True)]
 
     def memory_footprint_gib(self) -> float:
         return self.model.get_memory_footprint() / 2**30

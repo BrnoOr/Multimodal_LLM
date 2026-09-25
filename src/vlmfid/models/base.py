@@ -29,13 +29,13 @@ class Describer(Protocol):
 
     name: str
 
-    def describe(self, images: list[Image.Image], prompt: str,
-                 cfg: GenConfig | None = None) -> list[str]:
+    def describe(
+        self, images: list[Image.Image], prompt: str, cfg: GenConfig | None = None
+    ) -> list[str]:
         """Una descripcion por imagen. La longitud de la salida iguala la de la entrada."""
         ...
 
-    def memory_footprint_gib(self) -> float:
-        ...
+    def memory_footprint_gib(self) -> float: ...
 
 
 @dataclass
@@ -44,7 +44,7 @@ class ModelSpec:
 
     name: str
     hf_id: str
-    quantization: str = "nf4"        # nf4 | none
+    quantization: str = "nf4"  # nf4 | none
     compute_dtype: str = "bfloat16"
     attn_implementation: str = "sdpa"
     device: str = "cuda:0"

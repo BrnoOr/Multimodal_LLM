@@ -3,6 +3,7 @@
 Uso: uv run python scripts/check_env.py
 Sale con codigo 1 si algo critico falla.
 """
+
 from __future__ import annotations
 
 import os
@@ -28,7 +29,7 @@ def check(cond: bool, msg: str, critical: bool = True) -> None:
 
 print(f"python {platform.python_version()} | {sys.platform} | {platform.node()}")
 
-import torch  # noqa: E402
+import torch
 
 print(f"torch {torch.__version__} | build CUDA {torch.version.cuda}")
 check(torch.cuda.is_available(), "CUDA disponible")
@@ -36,11 +37,20 @@ if torch.cuda.is_available():
     name = torch.cuda.get_device_name(0)
     cc = torch.cuda.get_device_capability(0)
     vram = torch.cuda.get_device_properties(0).total_memory / 2**30
-    print(f"GPU visible: {name} | cc {cc} | {vram:.1f} GiB | CUDA_VISIBLE_DEVICES={os.getenv('CUDA_VISIBLE_DEVICES')}")
+    print(
+        f"GPU visible: {name} | cc {cc} | {vram:.1f} GiB | CUDA_VISIBLE_DEVICES={os.getenv('CUDA_VISIBLE_DEVICES')}"
+    )
     exp = EXPECTED_CC.get(sys.platform)
-    check(cc == exp, f"compute capability esperada {exp} para {sys.platform} (obtenida {cc})", critical=False)
+    check(
+        cc == exp,
+        f"compute capability esperada {exp} para {sys.platform} (obtenida {cc})",
+        critical=False,
+    )
     if sys.platform == "win32":
-        check(torch.version.cuda and torch.version.cuda.startswith("12.8"), "build cu128 en laptop Blackwell")
+        check(
+            torch.version.cuda and torch.version.cuda.startswith("12.8"),
+            "build cu128 en laptop Blackwell",
+        )
     if sys.platform == "linux":
         check(not torch.version.cuda.startswith("12.8"), "build != cu128 en cluster con driver 550")
     check(torch.cuda.is_bf16_supported(), "bf16 soportado")
@@ -58,9 +68,13 @@ if torch.cuda.is_available():
     except Exception as e:  # noqa: BLE001
         check(False, f"bitsandbytes NF4: {e}")
 
-import transformers, peft, accelerate  # noqa: E402
+import accelerate
+import peft
+import transformers
 
-print(f"transformers {transformers.__version__} | peft {peft.__version__} | accelerate {accelerate.__version__}")
+print(
+    f"transformers {transformers.__version__} | peft {peft.__version__} | accelerate {accelerate.__version__}"
+)
 
 hf_home = os.getenv("HF_HOME") or os.path.expanduser("~/.cache/huggingface")
 os.makedirs(hf_home, exist_ok=True)

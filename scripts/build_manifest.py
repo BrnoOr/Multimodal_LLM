@@ -72,8 +72,12 @@ def build_split(raw: Path, split: str, variant: str) -> pl.DataFrame:
     captions = [c.strip() for c in captions if c.strip()]
     imgs = list_images(d)
 
-    n = {"latents_image": lat_img.height, "latents_text": lat_txt.height,
-         "captions": len(captions), "images": imgs.height}
+    n = {
+        "latents_image": lat_img.height,
+        "latents_text": lat_txt.height,
+        "captions": len(captions),
+        "images": imgs.height,
+    }
     print(f"  filas: {n}")
     if len(set(n.values())) != 1:
         raise ValueError(f"desalineacion en {split}: {n}")
@@ -126,7 +130,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--raw", type=Path, default=Path("data/raw/m3di"))
     ap.add_argument("--out", type=Path, default=Path("data/manifests"))
-    ap.add_argument("--variant", default="base", help="etiqueta de variante (base, ood_colors, ...)")
+    ap.add_argument(
+        "--variant", default="base", help="etiqueta de variante (base, ood_colors, ...)"
+    )
     ap.add_argument("--report-disagreement", action="store_true")
     args = ap.parse_args()
 

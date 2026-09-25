@@ -60,50 +60,59 @@ class InternVLDescriber(Describer):
                 setattr(ip, k, v)
             else:
                 print(f"  AVISO: image_processor no expone `{k}`; se ignora")
-        print(f"  tiling: crop_to_patches={getattr(ip, 'crop_to_patches', '?')} "
-              f"min={getattr(ip, 'min_patches', '?')} "
-              f"max={getattr(ip, 'max_patches', '?')}")
+        print(
+            f"  tiling: crop_to_patches={getattr(ip, 'crop_to_patches', '?')} "
+            f"min={getattr(ip, 'min_patches', '?')} "
+            f"max={getattr(ip, 'max_patches', '?')}"
+        )
 
         self.model = AutoModelForImageTextToText.from_pretrained(
             spec.hf_id,
             quantization_config=bnb_config(spec),
             dtype=getattr(torch, spec.compute_dtype),
             device_map=spec.device,
-            attn_implementation=spec.attn_implementation,   # sdpa: no hay flash-attn
+            attn_implementation=spec.attn_implementation,  # sdpa: no hay flash-attn
             low_cpu_mem_usage=True,
         )
         self.model.eval()
 
     def _build_inputs(self, images: list[Image.Image], prompt: str):
-        msgs = [{"role": "user",
-                 "content": [{"type": "image"}, {"type": "text", "text": prompt}]}]
-        text = self.processor.apply_chat_template(msgs, add_generation_prompt=True,
-                                                  tokenize=False)
+        msgs = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": prompt}]}]
+        text = self.processor.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False)
         kwargs = {k: v for k, v in self.tiling_kwargs.items()}
         try:
-            inputs = self.processor(text=[text] * len(images), images=images,
-                                    return_tensors="pt", padding=True, **kwargs)
+            inputs = self.processor(
+                text=[text] * len(images),
+                images=images,
+                return_tensors="pt",
+                padding=True,
+                **kwargs,
+            )
         except TypeError:
             # la version instalada no acepta kwargs de tiling por llamada;
             # quedan los atributos fijados en __init__
-            inputs = self.processor(text=[text] * len(images), images=images,
-                                    return_tensors="pt", padding=True)
+            inputs = self.processor(
+                text=[text] * len(images), images=images, return_tensors="pt", padding=True
+            )
         return inputs.to(self.model.device)
 
     @torch.inference_mode()
-    def describe(self, images: list[Image.Image], prompt: str,
-                 cfg: GenConfig | None = None) -> list[str]:
+    def describe(
+        self, images: list[Image.Image], prompt: str, cfg: GenConfig | None = None
+    ) -> list[str]:
         cfg = cfg or GenConfig()
         inputs = self._build_inputs(images, prompt)
-        gen_kwargs = dict(max_new_tokens=cfg.max_new_tokens, do_sample=cfg.do_sample,
-                          pad_token_id=self.processor.tokenizer.pad_token_id
-                          or self.processor.tokenizer.eos_token_id)
+        gen_kwargs = dict(
+            max_new_tokens=cfg.max_new_tokens,
+            do_sample=cfg.do_sample,
+            pad_token_id=self.processor.tokenizer.pad_token_id
+            or self.processor.tokenizer.eos_token_id,
+        )
         if cfg.do_sample:
             gen_kwargs.update(temperature=cfg.temperature, top_p=cfg.top_p)
         out = self.model.generate(**inputs, **gen_kwargs)
-        gen = out[:, inputs["input_ids"].shape[1]:]
-        return [t.strip() for t in
-                self.processor.batch_decode(gen, skip_special_tokens=True)]
+        gen = out[:, inputs["input_ids"].shape[1] :]
+        return [t.strip() for t in self.processor.batch_decode(gen, skip_special_tokens=True)]
 
     def memory_footprint_gib(self) -> float:
         return self.model.get_memory_footprint() / 2**30

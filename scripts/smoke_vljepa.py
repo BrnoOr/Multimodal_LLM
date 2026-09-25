@@ -3,16 +3,20 @@
 Uso:
     ./scripts/run.sh python scripts/smoke_vljepa.py
 """
-import sys, json
+
+import json
+import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-import polars as pl, torch
+import polars as pl
+import torch
 from PIL import Image
 
+from vlmfid.eval.caption_pool import build_pool, pool_stats
 from vlmfid.models.base import ModelSpec
 from vlmfid.models.vljepa import VLJepaDescriber
-from vlmfid.eval.caption_pool import build_pool, pool_stats
 
 REPO = "external/open-vljepa"
 CKPT = f"{REPO}/checkpoints_msrvtt/best.pt"
@@ -21,16 +25,22 @@ CKPT = f"{REPO}/checkpoints_msrvtt/best.pt"
 ck = torch.load(CKPT, map_location="cpu", weights_only=False)
 print("claves del checkpoint:", list(ck.keys()))
 print("config:")
-print(json.dumps({k: v for k, v in ck["config"].items()
-                  if isinstance(v, (dict, str, int, float))}, indent=2)[:1500])
+print(
+    json.dumps(
+        {k: v for k, v in ck["config"].items() if isinstance(v, (dict, str, int, float))}, indent=2
+    )[:1500]
+)
 
 # 2) construir el describer
-spec = ModelSpec(name="vljepa", hf_id="cun-bjy/open-vljepa", quantization="none",
-                 device="cuda:0", extra={"repo": REPO, "ckpt": CKPT,
-                                         "quoted_pool": False})
+spec = ModelSpec(
+    name="vljepa",
+    hf_id="cun-bjy/open-vljepa",
+    quantization="none",
+    device="cuda:0",
+    extra={"repo": REPO, "ckpt": CKPT, "quoted_pool": False},
+)
 m = VLJepaDescriber(spec)
-print(f"parametros: {m.memory_footprint_gib():.2f} GiB | "
-      f"frames={m.num_frames} size={m.image_size}")
+print(f"parametros: {m.memory_footprint_gib():.2f} GiB | frames={m.num_frames} size={m.image_size}")
 
 # 3) pool
 print(pool_stats(build_pool(quoted=False)))
