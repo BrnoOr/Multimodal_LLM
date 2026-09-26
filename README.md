@@ -39,7 +39,10 @@ Multimodal_LLM/
 ├── external/open-vljepa/     submodule fijado a un commit
 ├── notebooks/                ANÁLISIS INTERACTIVO (solo lee data/ y runs/)
 │   ├── 00_eda_m3di.ipynb
-│   └── 01_inspeccion_predicciones.ipynb
+│   ├── 01_inspeccion_predicciones.ipynb
+│   └── legacy/               EDA y evaluación de la etapa 1 anterior (rutas y exp_id antiguos)
+├── reports/                  figuras y tablas del informe (figures/, tables/)
+├── docs/                     contexto del proyecto y guía laptop -> GitHub -> cluster
 ├── scripts/                  PUNTOS DE ENTRADA (cómo se corre)
 │   ├── build_manifest.py     layout crudo -> Parquet (+ reporte de desacuerdo)
 │   ├── infer.py              inferencia reanudable (etapa 1 y modelos ajustados)
@@ -60,6 +63,8 @@ Multimodal_LLM/
 ├── logs/<job>/               salida de cada ejecución                      (git-ignored)
 └── runs/<exp_id>/            resultados de cada experimento                (git-ignored)
 ```
+
+El flujo de trabajo entre máquinas (editar en el laptop, subir a GitHub, ejecutar en el cluster) está en [`docs/GUIA_LAPTOP_CLUSTER.md`](docs/GUIA_LAPTOP_CLUSTER.md).
 
 La regla entre `scripts/` y `src/`: **la lógica vive en `src/vlmfid/`** (importable desde tests, notebooks y otros scripts) y **cada script solo parsea argumentos y llama a esa lógica**. Por ejemplo, `build_split` y `disagreement` están en `vlmfid.data`; `scripts/build_manifest.py` los invoca y escribe los archivos, y el notebook de EDA usa las mismas funciones.
 

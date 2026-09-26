@@ -87,6 +87,12 @@ class VLJEPADescriber(Describer):
         self.ckpt_path = self._checkpoint_path()
         ckpt = torch.load(self.ckpt_path, map_location="cpu", weights_only=False)
         self.arch = ckpt["config"]
+        # El checkpoint apunta a meta-llama/Llama-3.2-1B, repo con acceso restringido por Meta.
+        # `llama_name` permite usar una réplica sin restricción (mismos pesos y tokenizador): el
+        # predictor solo toma de ahí la arquitectura y el tokenizador de consultas, porque sus pesos
+        # se sobrescriben con los del checkpoint al hacer load_state_dict.
+        if c.get("llama_name"):
+            self.arch["predictor"]["llama_name"] = c.llama_name
 
         model = OpenVLJEPA(self.arch["encoder"], self.arch["y_encoder"], self.arch["predictor"],
                            torch_dtype=torch.bfloat16)

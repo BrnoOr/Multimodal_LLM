@@ -1,0 +1,3 @@
+[submodule "external/open-vljepa"]
+	path = external/open-vljepa
+	url = https://github.com/dion-jy/open-vljepa

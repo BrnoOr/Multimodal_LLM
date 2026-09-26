@@ -11,3 +11,4 @@ Análisis que requieren interpretación e interacción. Reglas:
 |---|---|
 | `00_eda_m3di.ipynb` | distribución de factores, vocabulario por valor de atributo (insumo del extractor) |
 | `01_inspeccion_predicciones.ipynb` | comparación cualitativa entre runs, longitud de respuestas, prototipos de VL-JEPA |
+| `legacy/` | notebooks de la etapa 1 anterior (EDA de predicciones, evaluación E2, métricas). Usan los manifiestos `m3di_<split>.parquet` y el formato de `exp_id` antiguos: sirven de referencia, no se ejecutan tal cual con los runs nuevos. |

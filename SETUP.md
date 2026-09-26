@@ -48,7 +48,7 @@ En Windows no hay `setsid`: los scripts `.sh` son para el cluster; en el laptop 
 
 ## 3. Modelos y licencias
 
-VL-JEPA depende de dos modelos con licencia que hay que **aceptar en la web de Hugging Face** con la cuenta del `HF_TOKEN`: `meta-llama/Llama-3.2-1B` y `google/embeddinggemma-300m`.
+VL-JEPA usa `google/embeddinggemma-300m`, cuya licencia hay que **aceptar en la web de Hugging Face** con la cuenta del `HF_TOKEN` (y el token debe tener permiso de lectura de repos con acceso restringido). La arquitectura del predictor se toma de `unsloth/Llama-3.2-1B` (`llama_name` en `configs/models/vljepa.yaml`), una réplica sin restricción de `meta-llama/Llama-3.2-1B` con los mismos pesos y tokenizador, así que no hace falta la aprobación de Meta.
 
 ```bash
 uv run hf download llava-hf/llava-onevision-qwen2-0.5b-ov-hf   # ~2 GB
@@ -57,7 +57,7 @@ uv run hf download Qwen/Qwen3.5-0.8B-Base                       # ~2 GB
 uv run hf download Qwen/Qwen3.5-0.8B                            # opcional: control Instruct
 uv run hf download cun-bjy/open-vljepa best.pt          # ~2 GB (predictor + Y-Encoder)
 uv run hf download facebook/vjepa2-vitl-fpc64-256       # X-Encoder congelado
-uv run hf download meta-llama/Llama-3.2-1B              # arquitectura del predictor
+uv run hf download unsloth/Llama-3.2-1B                 # arquitectura del predictor (sin restricción)
 uv run hf download google/embeddinggemma-300m           # Y-Encoder
 ```
 
@@ -82,7 +82,7 @@ Qwen3.5 requiere transformers ≥ 5.17. Sus capas Gated DeltaNet usan kernels r�
 | el log se ve vacío durante minutos | carga de pesos; `launch.sh` ya exporta `PYTHONUNBUFFERED=1` |
 | job en estado `DIED` | murió sin cerrar el wrapper (reinicio, SIGKILL, OOM del host): relanzar el mismo comando reanuda |
 | `RuntimeError: La configuración difiere` | se reanudó un run con otra configuración: usar otro `exp_id` o borrar el run |
-| `401/403` al cargar VL-JEPA | falta aceptar la licencia de Llama-3.2-1B o EmbeddingGemma, o `HF_TOKEN` no está en `.env` |
+| `401/403` al cargar VL-JEPA | falta aceptar la licencia de EmbeddingGemma, el token no puede leer repos restringidos (`canReadGatedRepos: false`) o `HF_TOKEN` no está en `.env` |
 | `check_env` reporta build 12.8 en el cluster | torch no vino de cu126: borrar `.venv` y repetir `uv sync` |
 | `bitsandbytes` no importa | `uv pip install -U bitsandbytes` y repetir el check |
 | `uv sync` llena `$HOME` | `UV_CACHE_DIR` no exportado: cargar `.env` antes |

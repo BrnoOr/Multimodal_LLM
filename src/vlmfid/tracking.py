@@ -23,7 +23,10 @@ from omegaconf import DictConfig, OmegaConf
 from .paths import ROOT
 
 # claves que pueden cambiar entre un intento y su reanudación sin invalidar las predicciones
-_RESUME_SAFE = {"infer", "data.num_workers"}
+# Claves que pueden cambiar al reanudar sin afectar las predicciones ya guardadas.
+# model.llama_name: réplica sin restricción de Llama-3.2-1B con los mismos pesos y tokenizador
+# (además, los pesos del predictor vienen del checkpoint de VL-JEPA).
+_RESUME_SAFE = {"infer", "data.num_workers", "model.llama_name"}
 
 
 def _now() -> str:
@@ -103,6 +106,10 @@ class RunTracker:
         """Al reanudar, la configuración relevante debe coincidir con la guardada."""
         old = self.dir / "config.yaml"
         if not old.exists():
+            return
+        # Un run que falló antes de guardar predicciones no tiene nada que proteger: se reanuda con
+        # la configuración nueva (p. ej. tras corregir un error de carga) en vez de exigir otro exp_id.
+        if not self.predictions_path.exists() or self.predictions_path.stat().st_size == 0:
             return
         prev = OmegaConf.to_container(OmegaConf.load(old), resolve=True)
         curr = OmegaConf.to_container(self.cfg, resolve=True)

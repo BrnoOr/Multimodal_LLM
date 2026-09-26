@@ -88,15 +88,17 @@ class HFGenerativeDescriber(Describer):
             self.model = PeftModel.from_pretrained(self.model, c.adapter_path).eval()
 
     def _ensure_chat_template(self) -> None:
-        """Garantiza una plantilla de chat, en este orden de preferencia:
+        """Garantiza una plantilla de chat en el processor, en este orden de preferencia:
 
-        1. la del processor del checkpoint;
-        2. la de su tokenizador (algunos repos la guardan solo ahí);
-        3. la del repo `chat_template_from` (p. ej. la versión Instruct de un modelo base).
+        1. la del processor del checkpoint (si existe, se usa y no se mira nada más);
+        2. la del repo `chat_template_from`, si la config lo define;
+        3. la del tokenizador del propio checkpoint.
 
-        Los modelos solo preentrenados (Qwen3.5-0.8B-Base) no traen plantilla. Tomar la de su
-        versión Instruct, con el mismo tokenizador, mantiene idéntico el formato de entrada en el
-        control Base vs Instruct: la única diferencia entre ambos runs son los pesos.
+        Qwen3.5-0.8B-Base trae plantilla solo en su tokenizador, no en el processor, y
+        `processor.apply_chat_template` no hace fallback al tokenizador. `chat_template_from` va
+        antes que el tokenizador a propósito: tomar la plantilla de la versión Instruct (mismo
+        tokenizador) mantiene idéntico el formato de entrada en el control Base vs Instruct, así la
+        única diferencia entre ambos runs son los pesos. El origen queda en `info()`.
         """
         if getattr(self.processor, "chat_template", None):
             self.chat_template_origin = "processor"

@@ -5,6 +5,9 @@ hf_id: cun-bjy/open-vljepa               # de aquí se descarga best.pt si ckpt_
 ckpt_file: best.pt
 ckpt_path: null
 revision: null
+# Arquitectura y tokenizador del predictor. null -> el del checkpoint (meta-llama/Llama-3.2-1B,
+# requiere aprobación de Meta). La réplica de unsloth tiene los mismos pesos y tokenizador.
+llama_name: unsloth/Llama-3.2-1B
 quant: nf4              # NF4 en las capas del predictor; X-Encoder e Y-Encoder en bf16
 batch_size: 32
 num_frames: null        # null -> el del checkpoint (8): imagen tratada como video estático

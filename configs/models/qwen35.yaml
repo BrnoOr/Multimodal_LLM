@@ -21,8 +21,9 @@ use_kernels: false
 # 256² px, así que las imágenes de 224 px se agrandan a 256 -> 8×8 = 64 tokens visuales.
 min_pixels: null
 max_pixels: null
-# El checkpoint Base no trae plantilla de chat: se toma la de la versión Instruct (mismo tokenizador).
-# Así el control Base vs Instruct usa exactamente el mismo formato de entrada.
+# El processor del checkpoint Base no trae plantilla de chat (solo su tokenizador la tiene).
+# Se toma la de la versión Instruct (mismo tokenizador): así el control Base vs Instruct usa
+# exactamente el mismo formato de entrada.
 chat_template_from: Qwen/Qwen3.5-0.8B
 chat_template_kwargs:
   enable_thinking: false    # sin bloque <think>: la respuesta es directamente la descripción
