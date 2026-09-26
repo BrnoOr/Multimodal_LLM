@@ -1,285 +1,172 @@
-"""Etapa 1: inferencia sin ajuste. Genera descripciones y las persiste como datos.
+"""Inferencia (etapa 1 zero-shot y, con `model.adapter_path`, modelos ajustados de la etapa 2).
 
-Las predicciones se guardan en JSONL, no se puntuan aqui: asi las metricas se
-recalculan sin re-inferir cuando el extractor de atributos mejore.
+    uv run --no-sync python scripts/infer.py model=llava_ov prompt=p0_minimal data.limit=200
+    uv run --no-sync python scripts/infer.py experiment=e01_zeroshot_llava_p0
 
-Uso:
-    # un modelo, un prompt
-    uv run python scripts/infer.py --model llava --prompt p0_minimal -n 1000
-
-    # barrido completo modelo x prompt
-    uv run python scripts/infer.py --model llava qwen internvl vljepa --prompt all -n 1000
-
-    # subconjunto reproducible: mismas escenas para todos los modelos
-    uv run python scripts/infer.py --model llava --prompt all --manifest data/manifests/m3di_val.parquet
-
-    # VL-JEPA con el universo completo de colores de matplotlib en el pool
-    uv run python scripts/infer.py --model vljepa --prompt all --pool-colors matplotlib
+Diseñado para correr desatendido en el cluster (ver scripts/launch.sh, logs en logs/<job>/):
+  * Reanudable: las predicciones se escriben por lote en predictions.jsonl (flush + fsync). Si el
+    proceso muere, relanzar el mismo comando continúa desde la última muestra escrita.
+  * Idempotente: si el run ya está completo, termina de inmediato (útil en colas).
+  * Robusto a OOM: si un lote no cabe (GPU compartida), se parte en mitades recursivamente.
+  * Apagado limpio: SIGTERM/SIGINT terminan el lote en curso, guardan y salen con código 143/130.
 """
 
 from __future__ import annotations
 
-import argparse
 import json
-import subprocess
+import os
+import random
+import signal
 import sys
 import time
-from datetime import UTC, datetime
-from pathlib import Path
 
-import polars as pl
+import numpy as np
 import torch
-import yaml
-from PIL import Image
-from tqdm import tqdm
+from torch.utils.data import DataLoader
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from vlmfid.config import compose, to_yaml
+from vlmfid.data.manifest import ImageRecordDataset, data_root, load_manifest
+from vlmfid.models import build_describer
+from vlmfid.paths import RUNS
+from vlmfid.prompts import render
+from vlmfid.tracking import RunTracker
 
-from vlmfid.models.base import GenConfig, ModelSpec, build
-
-MODELS = {
-    "llava": ModelSpec(name="llava-1.5-7b", hf_id="llava-hf/llava-1.5-7b-hf"),
-    "qwen": ModelSpec(
-        name="qwen2.5-vl-7b",
-        hf_id="Qwen/Qwen2.5-VL-7B-Instruct",
-        extra={"min_visual_tokens": 64, "max_visual_tokens": 256},
-    ),
-    "internvl": ModelSpec(
-        name="internvl3.5-8b",
-        hf_id="OpenGVLab/InternVL3_5-8B-HF",
-        extra={"crop_to_patches": True, "min_patches": 1, "max_patches": 4},
-    ),
-    "vljepa": ModelSpec(
-        name="vljepa",
-        hf_id="cun-bjy/open-vljepa",
-        quantization="none",
-        extra={
-            "repo": "external/open-vljepa",
-            "ckpt": "external/open-vljepa/checkpoints_msrvtt/best.pt",
-            "llama_name": "unsloth/Llama-3.2-1B",  # replica sin gating
-            "quoted_pool": True,
-            "pool_colors": "manifest",
-        },
-    ),
-}
-
-# modelos cuya cuantizacion NO se sobreescribe con --quant
-FIXED_QUANT = {"vljepa"}
+_STOP = {"flag": False, "signum": None}
 
 
-def stratified_sample(df: pl.DataFrame, n: int, seed: int = 0) -> pl.DataFrame:
-    """Subconjunto estratificado por forma x posicion: evita que el azar sesgue la
-    comparacion entre modelos. El mismo seed da el mismo subconjunto siempre."""
-    if n >= df.height:
-        return df
-    per = max(1, n // (df["object_shape"].n_unique() * 9))
-    out = (
-        df.with_columns(
-            (
-                pl.col("object_shape").cast(str)
-                + "_"
-                + pl.col("object_xpos").cast(str)
-                + "_"
-                + pl.col("object_ypos").cast(str)
-            ).alias("_stratum")
-        )
-        .filter(pl.int_range(pl.len()).shuffle(seed=seed).over("_stratum") < per)
-        .drop("_stratum")
-    )
-    return out.head(n) if out.height > n else out
+def _handle(signum, _frame):
+    _STOP.update(flag=True, signum=signum)
+    print(f"\n[infer] señal {signal.Signals(signum).name}: se termina el lote en curso y se guarda.", flush=True)
 
 
-def git_commit() -> str:
-    try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"], text=True, stderr=subprocess.DEVNULL
-        ).strip()
-    except Exception:
-        return "n/a"
-
-
-def run_one(
-    model_key: str,
-    prompt_id: str,
-    prompt_text: str,
-    df: pl.DataFrame,
-    full_df: pl.DataFrame,
-    manifest_path: Path,
-    batch_size: int,
-    cfg: GenConfig,
-    out_root: Path,
-    quant: str,
-    dataset_name: str,
-) -> Path:
-    spec = MODELS[model_key]
-    if model_key not in FIXED_QUANT:
-        spec.quantization = quant
-    eff_quant = spec.quantization
-
-    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-    exp_id = f"e1_{dataset_name}_{model_key}_{prompt_id}_n{df.height}"
-    if eff_quant != "nf4":
-        exp_id += f"_{eff_quant}"
-    exp_id += f"_{stamp}"
-    # salida plana: runs/<exp_id>.jsonl (+ .config.json, .pool.parquet), sin subcarpetas
-    out_root.mkdir(parents=True, exist_ok=True)
-    pred_path = out_root / f"{exp_id}.jsonl"
-    cfg_path = out_root / f"{exp_id}.config.json"
-    pool_path = out_root / f"{exp_id}.pool.parquet"
-
-    print(f"\n=== {exp_id} ===")
-    t0 = time.time()
-    model = build(spec)
-    pool_meta = None
-    if hasattr(model, "build_caption_pool"):
-        # el pool se construye sobre el manifiesto COMPLETO, no sobre el
-        # subconjunto: el universo de salida no debe depender de -n
-        model.build_caption_pool(manifest=full_df)
-        from vlmfid.eval.caption_pool import pool_to_frame
-
-        pool_to_frame(model.pool).write_parquet(pool_path)
-        pool_meta = {
-            "size": len(model.pool),
-            "templates": len({e.template_id for e in model.pool}),
-            "colors": len({e.color for e in model.pool}),
-            "quoted": spec.extra.get("quoted_pool", True),
-            "color_source": spec.extra.get("pool_colors", "manifest"),
-        }
-    load_s = time.time() - t0
-    print(f"cargado en {load_s:.0f}s | {model.memory_footprint_gib():.2f} GiB")
-
-    rows = df.to_dicts()
-    t0 = time.time()
-    with pred_path.open("w", encoding="utf-8") as fh:
-        for i in tqdm(range(0, len(rows), batch_size), desc=exp_id, unit="batch"):
-            chunk = rows[i : i + batch_size]
-            imgs = [Image.open(r["image_path"]).convert("RGB") for r in chunk]
+def _done_ids(path) -> set[str]:
+    if not path.exists():
+        return set()
+    done = set()
+    with path.open(encoding="utf-8") as f:
+        for line in f:
             try:
-                texts = model.describe(imgs, prompt_text, cfg)
-                entries = list(getattr(model, "last_entries", []))
-            except torch.cuda.OutOfMemoryError:
-                torch.cuda.empty_cache()
-                print(f"\nOOM con batch={batch_size}; reintentando de a uno")
-                texts, entries = [], []
-                for im in imgs:
-                    texts.append(model.describe([im], prompt_text, cfg)[0])
-                    entries.extend(getattr(model, "last_entries", []))
-            if len(entries) != len(chunk):
-                entries = [None] * len(chunk)
-            for r, t, e in zip(chunk, texts, entries):
-                rec = {
-                    "image_id": r["image_id"],
-                    "row_idx": r["row_idx"],
-                    "prediction": t,
-                    "caption_ref": r["caption_ref"],
-                    "object_shape": r["object_shape"],
-                    "object_xpos": r["object_xpos"],
-                    "object_ypos": r["object_ypos"],
-                    "object_color": r["object_color"],
-                    "text_object_color_name": r["text_object_color_name"],
-                    "text_phrasing": r["text_phrasing"],
-                }
-                if e is not None:
-                    # atributos del caption recuperado: exactitud por atributo
-                    # sin pasar por el extractor (solo modelos por recuperacion)
-                    rec["pred_attrs"] = e.attrs()
-                fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    infer_s = time.time() - t0
-
-    meta = {
-        "exp_id": exp_id,
-        "stage": 1,
-        "dataset": dataset_name,
-        "manifest": str(manifest_path),
-        "predictions": pred_path.name,
-        "pool_file": pool_path.name if pool_meta else None,
-        "model": spec.name,
-        "hf_id": spec.hf_id,
-        "quantization": eff_quant,
-        "prompt_id": prompt_id,
-        "prompt_text": prompt_text,
-        "n_examples": len(rows),
-        "batch_size": batch_size,
-        "generation": vars(cfg),
-        "output_mode": "retrieval" if pool_meta else "generation",
-        "caption_pool": pool_meta,
-        "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu",
-        "torch": torch.__version__,
-        "memory_gib": round(model.memory_footprint_gib(), 3),
-        "load_seconds": round(load_s, 1),
-        "infer_seconds": round(infer_s, 1),
-        "seconds_per_example": round(infer_s / max(len(rows), 1), 4),
-        "commit": git_commit(),
-        "timestamp": datetime.now(UTC).isoformat(),
-    }
-    cfg_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    print(f"-> {pred_path}  ({infer_s:.0f}s, {meta['seconds_per_example']:.3f}s/ej)")
-
-    del model
-    torch.cuda.empty_cache()
-    return pred_path
+                done.add(json.loads(line)["id"])
+            except (json.JSONDecodeError, KeyError):
+                pass  # línea truncada por una caída: se re-infiere esa muestra
+    return done
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--model", nargs="+", default=["llava"], choices=list(MODELS) + ["all"])
-    ap.add_argument("--prompt", nargs="+", default=["p0_minimal"])
-    ap.add_argument("--manifest", type=Path, default=Path("data/manifests/m3di_val.parquet"))
-    ap.add_argument("--prompts-file", type=Path, default=Path("configs/prompt/prompts.yaml"))
-    ap.add_argument("-n", type=int, default=None, help="tamano del subconjunto estratificado")
-    ap.add_argument("--batch-size", type=int, default=8)
-    ap.add_argument("--max-new-tokens", type=int, default=64)
-    ap.add_argument(
-        "--quant",
-        default="nf4",
-        choices=["nf4", "none"],
-        help="ignorado para modelos en FIXED_QUANT (vljepa)",
+def describe_safe(describer, images, prompts, depth: int = 0):
+    """describe() con partición recursiva del lote ante CUDA OOM."""
+    try:
+        return describer.describe(images, prompts)
+    except torch.cuda.OutOfMemoryError:
+        torch.cuda.empty_cache()
+        if len(images) == 1:
+            raise
+        h = len(images) // 2
+        print(f"[infer] OOM con lote {len(images)} -> {h}+{len(images) - h}", flush=True)
+        return (describe_safe(describer, images[:h], prompts[:h], depth + 1)
+                + describe_safe(describer, images[h:], prompts[h:], depth + 1))
+
+
+def _fmt(sec: float) -> str:
+    sec = int(sec)
+    return f"{sec // 3600:d}h{sec % 3600 // 60:02d}m{sec % 60:02d}s"
+
+
+def run(cfg) -> int:
+    seed = int(cfg.seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    tracker = RunTracker(RUNS / cfg.exp_id, cfg)
+    records = load_manifest(cfg.data.split, cfg.data.dataset, cfg.data.limit, cfg.data.subset_seed,
+                            variant=cfg.data.variant)
+    done = _done_ids(tracker.predictions_path)
+    todo = [r for r in records if r["id"] not in done]
+    print(f"[infer] exp_id={cfg.exp_id}  total={len(records)}  hechas={len(done)}  pendientes={len(todo)}")
+    if not todo:
+        tracker.check_compatible()
+        tracker.finish("completed", n_done=len(done), n_total=len(records))
+        print("[infer] nada pendiente: run completo.")
+        return 0
+
+    print(to_yaml(cfg))
+    tracker.start()
+    signal.signal(signal.SIGTERM, _handle)
+    signal.signal(signal.SIGINT, _handle)
+
+    t_load = time.time()
+    describer = build_describer(cfg.model)
+    describer.load()
+    info = describer.info()
+    info["load_seconds"] = round(time.time() - t_load, 1)
+    tracker.update(model_info=info)
+    print(f"[infer] modelo cargado: {json.dumps(info)}", flush=True)
+
+    loader = DataLoader(
+        ImageRecordDataset(todo, data_root(cfg.data.variant, cfg.data.get("root"))),
+        batch_size=int(cfg.infer.batch_size),
+        num_workers=int(cfg.data.num_workers),
+        collate_fn=ImageRecordDataset.collate,
+        shuffle=False,
     )
-    ap.add_argument(
-        "--pool-colors",
-        default=None,
-        choices=["manifest", "matplotlib"],
-        help="vljepa: vocabulario de color del pool de recuperacion",
-    )
-    ap.add_argument("--out", type=Path, default=Path("runs"))
-    ap.add_argument("--seed", type=int, default=0)
-    args = ap.parse_args()
+    emb_dir = tracker.dir / "embeddings"
+    if cfg.infer.get("save_embeddings"):
+        emb_dir.mkdir(exist_ok=True)
 
-    if args.pool_colors:
-        MODELS["vljepa"].extra["pool_colors"] = args.pool_colors
+    n_new, t0 = 0, time.time()
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
+    status = "completed"
+    try:
+        with tracker.predictions_path.open("a", encoding="utf-8") as f:
+            for b, (recs, imgs) in enumerate(loader):
+                prompts = [render(cfg.prompt, r) for r in recs]
+                outs = describe_safe(describer, imgs, prompts)
+                for r, p, o in zip(recs, prompts, outs):
+                    f.write(json.dumps({
+                        "id": r["id"], "variant": r["variant"], "image_path": r["image_path"], "exp_id": cfg.exp_id, "model": cfg.model.name,
+                        "prompt_id": cfg.prompt.id, "prompt": p,
+                        "prediction": o.text, "reference": r["caption"],
+                        "latents_text": r["latents_text"], "latents_image": r["latents_image"],
+                        "extra": o.extra,
+                    }, ensure_ascii=False) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+                embs = [o.embedding for o in outs if o.embedding is not None]
+                if embs and cfg.infer.get("save_embeddings"):
+                    np.savez(emb_dir / f"{len(done) + n_new:07d}.npz",
+                             ids=np.array([r["id"] for r in recs]), emb=np.stack(embs))
+                n_new += len(recs)
 
-    catalogue = yaml.safe_load(args.prompts_file.read_text(encoding="utf-8"))
-    prompt_ids = list(catalogue) if "all" in args.prompt else args.prompt
-    unknown = [p for p in prompt_ids if p not in catalogue]
-    if unknown:
-        sys.exit(f"prompts desconocidos: {unknown}\ndisponibles: {list(catalogue)}")
-    model_keys = list(MODELS) if "all" in args.model else args.model
+                if (b + 1) % int(cfg.infer.log_every) == 0 or n_new == len(todo):
+                    el = time.time() - t0
+                    rate = n_new / max(el, 1e-6)
+                    mem = torch.cuda.max_memory_allocated() / 2**30 if torch.cuda.is_available() else 0
+                    print(f"[infer] {len(done) + n_new}/{len(records)}  {rate:.2f} img/s  "
+                          f"ETA {_fmt((len(todo) - n_new) / max(rate, 1e-6))}  pico {mem:.1f} GB  "
+                          f"| {outs[0].text[:90]!r}", flush=True)
+                    tracker.update(n_done=len(done) + n_new, n_total=len(records), img_per_s=round(rate, 3))
+                if _STOP["flag"]:
+                    status = "interrupted"
+                    break
+    except Exception as e:  # se registra y se relanza: el log del job conserva el traceback
+        tracker.finish("failed", error=f"{type(e).__name__}: {e}", n_done=len(done) + n_new)
+        raise
 
-    df = pl.read_parquet(args.manifest)
-    n = args.n if args.n is not None else df.height
-    sub = stratified_sample(df, n, args.seed)
-    dataset_name = args.manifest.stem
-    print(f"manifiesto {args.manifest.name}: {df.height} -> subconjunto {sub.height}")
-    print(f"modelos: {model_keys} | prompts: {prompt_ids}")
+    el = time.time() - t0
+    peak = torch.cuda.max_memory_allocated() / 2**30 if torch.cuda.is_available() else 0
+    tracker.finish(status, n_done=len(done) + n_new, n_total=len(records),
+                   seconds_this_attempt=round(el, 1), peak_mem_gb=round(peak, 2),
+                   img_per_s=round(n_new / max(el, 1e-6), 3))
+    print(f"[infer] {status}: {n_new} nuevas en {_fmt(el)} -> {tracker.predictions_path}")
+    if status == "interrupted":
+        return 128 + (_STOP["signum"] or signal.SIGTERM)
+    return 0
 
-    cfg = GenConfig(max_new_tokens=args.max_new_tokens, do_sample=False, seed=args.seed)
-    torch.manual_seed(args.seed)
 
-    for mk in model_keys:
-        for pid in prompt_ids:
-            run_one(
-                mk,
-                pid,
-                " ".join(catalogue[pid]["text"].split()),
-                sub,
-                df,
-                args.manifest,
-                args.batch_size,
-                cfg,
-                args.out,
-                args.quant,
-                dataset_name,
-            )
+def main(argv=None) -> None:
+    cfg = compose(sys.argv[1:] if argv is None else argv)
+    sys.exit(run(cfg))
 
 
 if __name__ == "__main__":

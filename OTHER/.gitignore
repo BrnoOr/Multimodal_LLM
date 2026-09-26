@@ -1,0 +1,19 @@
+## Ambiente
+
+.venv/
+.env
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+## Datos
+
+data/raw/
+data/generated/
+## Otros
+
+runs/
+wandb/
+*.safetensors
+*.bin
+
+external/

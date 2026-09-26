@@ -1,0 +1,20 @@
+# LLaVA-OneVision-0.5B: SigLIP-SO400M (384 px, AnyRes) + proyector MLP + Qwen2-0.5B.
+# Línea base de la familia LLaVA: encoder visual congelado + proyector + decodificador.
+name: llava_ov_05b
+family: hf
+hf_id: llava-hf/llava-onevision-qwen2-0.5b-ov-hf
+revision: null
+model_class: AutoModelForImageTextToText     # -> LlavaOnevisionForConditionalGeneration
+quant: nf4              # nf4 | int8 | bf16
+# regex anclados al nombre completo del módulo (ver src/vlmfid/models/quant.py)
+quant_skip_modules: ['.*\.vision_tower', '.*\.multi_modal_projector', 'lm_head']
+vision_modules: [vision_tower, multi_modal_projector]
+attn_implementation: sdpa
+# AnyRes: una imagen de 224 px da ≈ 2×729 tokens visuales (vista global + 1 recorte)
+batch_size: 32
+generation:
+  max_new_tokens: 128
+  do_sample: false
+  num_beams: 1
+lora_target_modules: null   # null -> proyecciones de atención y MLP del language_model
+adapter_path: null          # etapa 2: ruta al adaptador LoRA

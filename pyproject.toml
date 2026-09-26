@@ -1,53 +1,45 @@
 [project]
-name = "vLLM"
-version = "0.1.0"
-description = "Fidelidad de descripciones de VLMs autorregresivos vs VL-JEPA sobre Multimodal3DIdent (EL7006, T7)"
-requires-python = ">=3.11,<3.13"
+name = "vlmfid"
+version = "0.2.0"
+description = "Fidelidad de descripciones de VLMs sobre Multimodal3DIdent (EL7006, UChile)"
+requires-python = ">=3.12,<3.13"
 dependencies = [
-    # PyTorch: el build (cu128 / cu126) se resuelve por plataforma en [tool.uv.sources]
     "torch>=2.7",
-    "torchvision",
-    # Modelos y adaptación
-    "transformers>=4.51",
-    "accelerate",
-    "peft",
-    "datasets",
+    "torchvision>=0.22",
+    # >= 5.17: Qwen3.5 (Qwen3_5ForConditionalGeneration). v5 también trae InternVL-HF,
+    # LLaVA-OneVision, V-JEPA 2 y EmbeddingGemma nativos; open-vljepa usa la firma de capas v5
+    "transformers>=5.17,<6",
+    "accelerate>=1.2",
+    "peft>=0.15",
+    "huggingface-hub>=0.34",
     "safetensors",
-    # Datos y configuración
-    "pillow",
-    "polars",
-    "pyarrow",
-    "hydra-core",
-    "omegaconf",
-    "python-dotenv",
+    "sentencepiece",
+    "omegaconf>=2.3",
+    "numpy>=1.26",
+    "polars>=1.0",          # manifiestos en Parquet
+    "pandas>=2.2",          # notebooks
+    "pillow>=10",
+    "pyyaml>=6",
     "tqdm",
-    "matplotlib>=3.11.1",
-    "seaborn>=0.13.2",
 ]
 
 [project.optional-dependencies]
-# NF4 (QLoRA). Tiene wheels para Windows y Linux; es el esquema de cuantización común a los tres modelos.
-quant = ["bitsandbytes>=0.45"]
-# AWQ: solo Linux y solo si la wheel precompilada resuelve sin compilar (el cluster no tiene nvcc).
-awq = ["autoawq; sys_platform == 'linux'"]
-qwen = ["qwen-vl-utils"]
-eval = ["evaluate", "sacrebleu", "rouge-score", "pycocoevalcap", "nltk"]
+quant = ["bitsandbytes>=0.46"]          # >=0.45 soporta Blackwell (sm_120)
+eval  = ["sacrebleu", "rouge-score", "pycocoevalcap"]
 track = ["wandb"]
-dev = ["pytest", "ruff", "ipykernel", "jupyter"]
+# Kernels Triton para las capas Gated DeltaNet de Qwen3.5 (sin compilar; sin él se usa PyTorch).
+# Fijado a 0.4.2: la 0.5.0 produce salidas corruptas ("!!!!") con entradas multimodales.
+linattn = ["flash-linear-attention==0.4.2"]
+dev   = ["pytest", "ruff", "ipykernel", "matplotlib", "seaborn", "nbformat"]
 
-[tool.uv.sources]
-# Laptop Windows: RTX 5090 (Blackwell, sm_120) -> requiere cu128 y driver >= 570.
-# Cluster Linux : RTX 4090 (Ada, sm_89), driver 550 (CUDA 12.4) -> cu126.
-# Si trabajas desde WSL2 en el laptop, este marcador te daria cu126: instala torch cu128 aparte (ver SETUP.md).
-torch = [
-    { index = "pytorch-cu128", marker = "sys_platform == 'win32'" },
-    { index = "pytorch-cu126", marker = "sys_platform == 'linux'" },
-]
-torchvision = [
-    { index = "pytorch-cu128", marker = "sys_platform == 'win32'" },
-    { index = "pytorch-cu126", marker = "sys_platform == 'linux'" },
-]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/vlmfid"]
+
+# --- Build de PyTorch por plataforma: laptop Windows (5090, sm_120) -> cu128; cluster Linux (driver 550) -> cu126
 [[tool.uv.index]]
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
@@ -58,16 +50,18 @@ name = "pytorch-cu126"
 url = "https://download.pytorch.org/whl/cu126"
 explicit = true
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/vlmfid"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py311"
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32'" },
+    { index = "pytorch-cu126", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32'" },
+    { index = "pytorch-cu126", marker = "sys_platform == 'linux'" },
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100

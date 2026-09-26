@@ -1,0 +1,37 @@
+# Qwen3.5-0.8B-Base: VLM nativo (encoder visual + Gated DeltaNet/atención híbrida 3:1, 24 capas).
+# Requiere transformers >= 5.17.
+#
+# OJO: es un modelo *solo preentrenado* (sin ajuste por instrucciones). En la etapa 1 su
+# desempeño zero-shot mezcla dos cosas: percepción y capacidad de seguir instrucciones. Para
+# separarlas existe qwen35_instruct.yaml (Qwen/Qwen3.5-0.8B): misma arquitectura, derivado del mismo preentrenamiento.
+name: qwen35_08b_base
+family: qwen_vl
+hf_id: Qwen/Qwen3.5-0.8B-Base
+revision: null
+model_class: AutoModelForImageTextToText     # -> Qwen3_5ForConditionalGeneration
+quant: nf4
+quant_skip_modules: ['.*\.visual', 'lm_head']
+vision_modules: [visual]
+attn_implementation: sdpa
+# Capas Gated DeltaNet: sin kernels rápidos se usa la implementación en PyTorch (más lenta,
+# mismo resultado). use_kernels: true descarga kernels precompilados del Hub (paquete `kernels`);
+# alternativa: extra `linattn` (flash-linear-attention==0.4.2; la 0.5.0 corrompe salidas multimodales).
+use_kernels: false
+# Resolución dinámica (32 px por token): null = valores del checkpoint. El mínimo del checkpoint es
+# 256² px, así que las imágenes de 224 px se agrandan a 256 -> 8×8 = 64 tokens visuales.
+min_pixels: null
+max_pixels: null
+# El checkpoint Base no trae plantilla de chat: se toma la de la versión Instruct (mismo tokenizador).
+# Así el control Base vs Instruct usa exactamente el mismo formato de entrada.
+chat_template_from: Qwen/Qwen3.5-0.8B
+chat_template_kwargs:
+  enable_thinking: false    # sin bloque <think>: la respuesta es directamente la descripción
+batch_size: 64
+generation:
+  max_new_tokens: 128
+  do_sample: false          # greedy por reproducibilidad (Qwen recomienda muestreo para chat)
+  num_beams: 1
+# LoRA: atención completa (q/k/v/o), Gated DeltaNet (in_proj_qkv, in_proj_z, out_proj) y MLP,
+# solo en el language_model (el encoder visual usa qkv/proj/linear_fc*: no calza).
+lora_target_modules: '.*language_model.*\.(q_proj|k_proj|v_proj|o_proj|in_proj_qkv|in_proj_z|out_proj|gate_proj|up_proj|down_proj)$'
+adapter_path: null

@@ -1,0 +1,25 @@
+name: vljepa_open_msrvtt
+family: vljepa
+repo_path: external/open-vljepa          # submodule fijado a un commit
+hf_id: cun-bjy/open-vljepa               # de aquí se descarga best.pt si ckpt_path es null
+ckpt_file: best.pt
+ckpt_path: null
+revision: null
+quant: nf4              # NF4 en las capas del predictor; X-Encoder e Y-Encoder en bf16
+batch_size: 32
+num_frames: null        # null -> el del checkpoint (8): imagen tratada como video estático
+image_size: null        # null -> 256
+max_query_len: null     # null -> el del checkpoint (64)
+max_caption_len: 96     # los captions de M3DI son más largos que los de MSRVTT
+# El checkpoint vio consultas tipo "Describe the video." en entrenamiento. Con null se usa el prompt
+# del experimento (mide la sensibilidad al prompt); fijarlo aísla el efecto del prompt.
+query_override: null
+topk: 3
+return_embeddings: true # se guardan en runs/<exp>/embeddings si infer.save_embeddings=true
+bank:                   # "decodificador" por recuperación y prototipos por atributo
+  split: train          # nunca test
+  max_captions: 20000   # filas muestreadas del split (determinista)
+  seed: 0
+  # auto = latentes de texto discretos detectados en el manifiesto; o una lista explícita
+  attributes: auto
+adapter_path: null

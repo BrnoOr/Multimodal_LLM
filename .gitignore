@@ -1,19 +1,23 @@
-## Ambiente
-
+# entorno
 .venv/
 .env
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
-## Datos
+.pytest_cache/
+.ruff_cache/
 
-data/raw/
-data/generated/
-## Otros
-
-runs/
-wandb/
+# datos y pesos (solo se versionan los manifiestos)
+data/raw/*
+data/generated/*
+data/cache/*
+!data/**/.gitkeep
+*.pt
 *.safetensors
 *.bin
 
-external/
+# resultados de experimentos y logs de ejecución
+runs/*
+!runs/.gitkeep
+logs/*
+!logs/.gitkeep

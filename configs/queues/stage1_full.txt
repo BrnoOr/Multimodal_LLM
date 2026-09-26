@@ -1,0 +1,28 @@
+# Etapa 1 completa sobre test, 4 modelos x 5 prompts.
+# Para medir el costo de NF4, duplicar las lineas con model.quant=bf16 (los tres modelos caben de sobra en bf16).
+model=vljepa           prompt=p0_minimal         infer.save_embeddings=true
+model=vljepa           prompt=p1_attributes      infer.save_embeddings=true
+model=vljepa           prompt=p2_constrained     infer.save_embeddings=true
+model=vljepa           prompt=p3_json            infer.save_embeddings=true
+model=vljepa           prompt=p4_dataset_format  infer.save_embeddings=true
+model=llava_ov         prompt=p0_minimal
+model=llava_ov         prompt=p1_attributes
+model=llava_ov         prompt=p2_constrained
+model=llava_ov         prompt=p3_json
+model=llava_ov         prompt=p4_dataset_format
+model=qwen35           prompt=p0_minimal
+model=qwen35           prompt=p1_attributes
+model=qwen35           prompt=p2_constrained
+model=qwen35           prompt=p3_json
+model=qwen35           prompt=p4_dataset_format
+model=internvl3        prompt=p0_minimal
+model=internvl3        prompt=p1_attributes
+model=internvl3        prompt=p2_constrained
+model=internvl3        prompt=p3_json
+model=internvl3        prompt=p4_dataset_format
+# Control Base vs Instruct de Qwen3.5 (descomentar para incluirlo):
+# model=qwen35_instruct  prompt=p0_minimal
+# model=qwen35_instruct  prompt=p1_attributes
+# model=qwen35_instruct  prompt=p2_constrained
+# model=qwen35_instruct  prompt=p3_json
+# model=qwen35_instruct  prompt=p4_dataset_format

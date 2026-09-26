@@ -1,241 +1,236 @@
-"""Adaptador de VL-JEPA (open-vljepa) al Protocol Describer.
+"""VL-JEPA (reimplementación abierta `open-vljepa`, checkpoint MSRVTT Stage B).
 
-open-vljepa NO genera tokens: predice un embedding y se entrena con InfoNCE
-bidireccional contra los embeddings del Y-Encoder (EmbeddingGemma). No hay
-decodificador de texto.
+Arquitectura (Chen et al., 2025, arXiv:2512.10942; reimpl. de J. Baek):
+    X-Encoder  V-JEPA 2 ViT-L (congelado)                     imagen -> tokens visuales
+    Predictor  últimas 8 capas de Llama-3.2-1B, no causal     (tokens visuales, consulta) -> ŝ_Y ∈ R^1536
+    Y-Encoder  EmbeddingGemma-300M + proyección               texto -> s_Y ∈ R^1536
 
-`describe()` se implementa por RECUPERACION sobre un pool enumerado de captions
-(ver vlmfid.eval.caption_pool):
-  1. se codifica el pool una sola vez con el Y-Encoder            -> (P, 1536)
-  2. cada imagen + query pasa por X-Encoder + Predictor           -> (B, 1536)
-  3. argmax de similitud coseno devuelve el caption recuperado
+El modelo NO genera tokens: predice un embedding continuo del texto objetivo. Para producir texto
+legible se usa un "decodificador" por recuperación, que es la opción ligera que el propio paradigma
+permite: se codifica con el Y-Encoder un banco de descripciones del split de *entrenamiento*
+(nunca de test) y se devuelve la más cercana a ŝ_Y en coseno. Además, con el mismo banco se
+construyen prototipos por valor de atributo (media normalizada de los embeddings de las
+descripciones con ese valor), lo que da una predicción por atributo sin pasar por texto.
 
-Arquitectura (segun el README del repo):
-    X-Encoder  facebook/vjepa2-vitl-fpc64-256   304M  congelado
-    Predictor  ultimas 8 capas de Llama-3.2-1B  490M  entrenable
-    Y-Encoder  google/embeddinggemma-300m       310M  entrenable
-    espacio compartido 1536-D, InfoNCE tau=0.07
-
-Notas:
-  - Las imagenes de M3DI son estaticas y el encoder espera video: se replica la
-    imagen en la dimension temporal. Es un modo de uso previsto: el Stage A del
-    repo entreno con CC3M alimentando cada imagen como "video" de 1 frame.
-  - ~1.1B parametros ~ 2.2 GiB en bf16: no se cuantiza. LLaVA/Qwen/InternVL van
-    en NF4. Declararlo en el informe.
-  - Llama-3.2-1B y EmbeddingGemma-300m son gated: aceptar licencias y exportar
-    HF_TOKEN antes de cargar.
-  - El prompt NO controla el formato de salida (lo fija el pool); solo actua
-    como query del predictor. Bajo p0..p4 lo unico que cambia es la query.
-
-VERIFICAR contra el repo instalado:
-  (a) normalizacion de frames: openvljepa/data/msrvtt.py, lineas ~80-140;
-      ajustar MEAN/STD si difieren.
-  (b) firma de OpenVLJEPA.forward(video, query_ids, query_mask) -> (B, D) y de
-      y_encoder(input_ids, attention_mask) -> (B, D). Si el forward devuelve una
-      tupla o un dict, tomar el embedding predicho.
+Nota de dominio: el checkpoint procesa *video* (tubelets temporales). Una imagen se trata como un
+video estático repitiendo el fotograma `num_frames` veces (8, como en Stage B).
 """
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 
-import polars as pl
+import numpy as np
 import torch
 import torch.nn.functional as F
+from omegaconf import DictConfig
 from PIL import Image
 
-from vlmfid.eval.caption_pool import PoolEntry, build_pool
-from vlmfid.models.base import Describer, GenConfig, ModelSpec
+from ..data.m3di import select_discrete_attributes
+from ..data.manifest import load_manifest
+from ..paths import CACHE, resolve
+from .base import Description, Describer
 
-# Normalizacion estandar de V-JEPA2 / ImageNet. VERIFICAR (a).
-MEAN = (0.485, 0.456, 0.406)
-STD = (0.229, 0.224, 0.225)
-
-DEFAULT_QUERY = "Describe the video."
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
+LLAMA32_PAD = "<|finetune_right_pad_id|>"
 
 
-class VLJepaDescriber(Describer):
-    """Describe por recuperacion sobre un pool finito de captions."""
+def _ensure_pad_token(tok):
+    """Igual que open-vljepa: Llama-3.2 no trae pad; usar su token reservado y no el EOS."""
+    if tok.pad_token is not None:
+        return tok
+    vocab = tok.get_vocab()
+    if LLAMA32_PAD in vocab:
+        tok.pad_token = LLAMA32_PAD
+    else:
+        tok.pad_token = tok.eos_token
+    return tok
 
-    name = "vljepa"
 
-    def __init__(self, spec: ModelSpec):
-        self.spec = spec
-        self.name = spec.name
+class VLJEPADescriber(Describer):
+    family = "vljepa"
+    generative = False
 
-        repo = Path(spec.extra.get("repo", "external/open-vljepa")).resolve()
-        ckpt_path = Path(spec.extra.get("ckpt", repo / "checkpoints_msrvtt/best.pt"))
-        if str(repo) not in sys.path:
-            sys.path.insert(0, str(repo))
+    def __init__(self, cfg: DictConfig):
+        super().__init__(cfg)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.bank_texts: list[str] = []
+        self.bank_emb: torch.Tensor | None = None
+        self.prototypes: dict[str, tuple[list, torch.Tensor]] = {}
 
-        from openvljepa.data.msrvtt import _ensure_pad_token
-        from openvljepa.models.vljepa import OpenVLJEPA
+    # ---------------------------------------------------------------- carga
+    def _checkpoint_path(self) -> Path:
+        c = self.cfg
+        if c.get("ckpt_path"):
+            return resolve(c.ckpt_path)
+        from huggingface_hub import hf_hub_download
+
+        return Path(hf_hub_download(repo_id=c.hf_id, filename=c.ckpt_file, revision=c.get("revision")))
+
+    def load(self) -> None:
+        from torchvision import transforms as T
         from transformers import AutoTokenizer
 
-        self.device = torch.device(spec.device)
-        ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
-        cfg = ckpt["config"]
-        # permite sustituir el repo gated de Meta por una replica publica con
-        # pesos identicos (p. ej. unsloth/Llama-3.2-1B) mientras se aprueba el
-        # acceso; el tokenizador lee el mismo campo, asi que queda cubierto
-        if "llama_name" in spec.extra:
-            cfg["predictor"]["llama_name"] = spec.extra["llama_name"]
-        self.cfg = cfg
-
-        self.model = OpenVLJEPA(
-            cfg["encoder"], cfg["y_encoder"], cfg["predictor"], torch_dtype=torch.bfloat16
-        )
-        missing, unexpected = self.model.load_state_dict(ckpt["model_state_dict"], strict=False)
-        # las claves de x_encoder.model.* faltan a proposito: el encoder congelado
-        # se recarga desde HF, no viaja en el checkpoint
-        real_missing = [k for k in missing if not k.startswith("x_encoder.model.")]
-        if real_missing:
-            print(f"  AVISO claves faltantes no congeladas: {real_missing[:5]}")
-        if unexpected:
-            print(f"  AVISO claves inesperadas: {list(unexpected)[:5]}")
-        self.model.eval().to(self.device)
-
-        # dos tokenizadores distintos: query -> Llama (predictor), target -> Gemma
-        self.q_tok = _ensure_pad_token(
-            AutoTokenizer.from_pretrained(cfg["predictor"]["llama_name"])
-        )
-        self.t_tok = _ensure_pad_token(
-            AutoTokenizer.from_pretrained(cfg["y_encoder"]["model_name"])
-        )
-
-        data_cfg = cfg.get("data", {})
-        self.num_frames = spec.extra.get("num_frames", data_cfg.get("num_frames", 16))
-        self.image_size = spec.extra.get("image_size", data_cfg.get("image_size", 256))
-        self.max_query_len = data_cfg.get("max_query_len", 512)
-        self.max_caption_len = data_cfg.get("max_caption_len", 512)
-
-        self.pool: list[PoolEntry] = []
-        self.pool_embeds: torch.Tensor | None = None
-        self.last_entries: list[PoolEntry] = []
-        self._query_cache: dict[str, tuple[torch.Tensor, torch.Tensor]] = {}
-
-    # ------------------------------------------------------------------ pool
-
-    @torch.no_grad()
-    def build_caption_pool(
-        self,
-        pool: list[PoolEntry] | None = None,
-        *,
-        manifest: pl.DataFrame | str | Path | None = None,
-        batch_size: int = 256,
-        quiet: bool = False,
-    ) -> None:
-        """Codifica el pool con el Y-Encoder. Se hace una vez y se reutiliza.
-
-        Prioridad: `pool` explicito > `manifest` > spec.extra["manifest"] >
-        modo canonico sin dataset (solo pruebas).
-        """
-        if pool is None:
-            src = manifest if manifest is not None else self.spec.extra.get("manifest")
-            pool = build_pool(
-                src,
-                quoted=self.spec.extra.get("quoted_pool", True),
-                colors=self.spec.extra.get("pool_colors", "manifest"),
+        c = self.cfg
+        repo = resolve(c.repo_path)
+        if not (repo / "openvljepa").is_dir():
+            raise FileNotFoundError(
+                f"No se encontró open-vljepa en {repo}. Ejecuta: git submodule update --init --recursive"
             )
-        self.pool = pool
+        if str(repo) not in sys.path:
+            sys.path.insert(0, str(repo))
+        from openvljepa.models.vljepa import OpenVLJEPA  # noqa: E402  (import tras ajustar sys.path)
 
-        # padding="longest": los captions tienen ~15-25 tokens; rellenar a 512
-        # multiplicaria el coste x20 sin cambiar el embedding (mean-pooling con
-        # mascara). Si el y_encoder del repo NO enmascara el padding, volver a
-        # padding="max_length" para replicar exactamente el entrenamiento.
-        embeds = []
-        for i in range(0, len(self.pool), batch_size):
-            texts = [e.text for e in self.pool[i : i + batch_size]]
-            enc = self.t_tok(
-                texts,
-                max_length=self.max_caption_len,
-                padding="longest",
-                truncation=True,
-                return_tensors="pt",
-            ).to(self.device)
-            with torch.amp.autocast("cuda", dtype=torch.bfloat16):
-                t = self.model.y_encoder(enc["input_ids"], enc["attention_mask"])
-                t = F.normalize(t.float(), dim=-1)
-            embeds.append(t.cpu())
-        self.pool_embeds = torch.cat(embeds).to(self.device)
-        if not quiet:
-            print(f"  pool codificado: {tuple(self.pool_embeds.shape)}")
+        self.ckpt_path = self._checkpoint_path()
+        ckpt = torch.load(self.ckpt_path, map_location="cpu", weights_only=False)
+        self.arch = ckpt["config"]
 
-    # ---------------------------------------------------------------- imagen
+        model = OpenVLJEPA(self.arch["encoder"], self.arch["y_encoder"], self.arch["predictor"],
+                           torch_dtype=torch.bfloat16)
+        missing, unexpected = model.load_state_dict(ckpt["model_state_dict"], strict=False)
+        bad = [k for k in missing if not k.startswith("x_encoder.model.")]
+        if bad or unexpected:
+            raise RuntimeError(f"Checkpoint incompatible. missing={bad[:5]} unexpected={unexpected[:5]}")
+        del ckpt
 
-    def _pixel_values(self, images: list[Image.Image]) -> torch.Tensor:
-        """(B, T, C, H, W). La imagen estatica se replica en el eje temporal."""
-        import torchvision.transforms as T
+        model = model.to(dtype=torch.bfloat16).eval()
+        if c.quant == "nf4":
+            from .quant import swap_linear_to_nf4
 
-        tf = T.Compose(
-            [
-                T.Resize((self.image_size, self.image_size)),
-                T.ToTensor(),
-                T.Normalize(mean=MEAN, std=STD),
-            ]
-        )
-        frames = torch.stack([tf(im.convert("RGB")) for im in images])  # (B,C,H,W)
-        return frames.unsqueeze(1).repeat(1, self.num_frames, 1, 1, 1)
+            n = swap_linear_to_nf4(model.predictor.layers, self.device)
+            print(f"[vljepa] NF4 aplicado a {n} capas lineales del predictor")
+        elif c.quant != "bf16":
+            raise ValueError("VL-JEPA admite quant = nf4 | bf16")
+        self.model = model.to(self.device)
+        if c.get("adapter_path"):
+            from peft import PeftModel
 
-    def _query(self, prompt: str, B: int) -> tuple[torch.Tensor, torch.Tensor]:
-        """Tokeniza la query una vez por prompt y la expande al batch."""
-        key = prompt or DEFAULT_QUERY
-        if key not in self._query_cache:
-            q = self.q_tok(
-                [key],
-                max_length=self.max_query_len,
-                padding="max_length",
-                truncation=True,
-                return_tensors="pt",
-            ).to(self.device)
-            self._query_cache[key] = (q["input_ids"], q["attention_mask"])
-        ids, mask = self._query_cache[key]
-        return ids.expand(B, -1), mask.expand(B, -1)
+            self.model = PeftModel.from_pretrained(self.model, c.adapter_path).eval()
+
+        data_cfg = self.arch.get("data", {})
+        self.max_query_len = int(c.get("max_query_len") or data_cfg.get("max_query_len", 64))
+        self.max_caption_len = int(c.get("max_caption_len") or data_cfg.get("max_caption_len", 64))
+        self.num_frames = int(c.get("num_frames") or data_cfg.get("num_frames", 8))
+        size = int(c.get("image_size") or data_cfg.get("image_size", 256))
+
+        self.query_tok = _ensure_pad_token(AutoTokenizer.from_pretrained(self.arch["predictor"]["llama_name"]))
+        self.target_tok = _ensure_pad_token(AutoTokenizer.from_pretrained(self.arch["y_encoder"]["model_name"]))
+        self.transform = T.Compose([
+            T.Resize(size, antialias=True), T.CenterCrop(size), T.ToTensor(),
+            T.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+        ])
+        self._build_bank()
+
+    # ------------------------------------------------------------- banco
+    def _tok(self, tok, texts: list[str], max_len: int):
+        enc = tok(texts, max_length=max_len, padding="max_length", truncation=True, return_tensors="pt")
+        return enc["input_ids"].to(self.device), enc["attention_mask"].to(self.device)
 
     @torch.inference_mode()
-    def _predict(self, images: list[Image.Image], prompt: str) -> torch.Tensor:
-        """Embedding predicho, normalizado. (B, D)."""
-        pv = self._pixel_values(images).to(self.device)
-        q_ids, q_mask = self._query(prompt, pv.shape[0])
-        with torch.amp.autocast("cuda", dtype=torch.bfloat16):
-            pred = self.model(pv, q_ids, q_mask)  # VERIFICAR (b)
-            if isinstance(pred, (tuple, list)):
-                pred = pred[0]
-            elif isinstance(pred, dict):
-                pred = pred.get("pred", next(iter(pred.values())))
+    def encode_texts(self, texts: list[str], batch_size: int = 256) -> torch.Tensor:
+        """Embeddings normalizados del Y-Encoder (espacio compartido de 1536 D)."""
+        out = []
+        for i in range(0, len(texts), batch_size):
+            ids, mask = self._tok(self.target_tok, texts[i:i + batch_size], self.max_caption_len)
+            with torch.autocast("cuda", dtype=torch.bfloat16, enabled=self.device.type == "cuda"):
+                e = self.model.y_encoder(ids, mask)
+            out.append(F.normalize(e.float(), dim=-1).half())
+        return torch.cat(out)
+
+    def _bank_key(self) -> str:
+        b = self.cfg.bank
+        st = self.ckpt_path.stat()
+        ident = (f"{self.ckpt_path.name}|{st.st_size}|{b.split}|{b.max_captions}|{b.seed}|"
+                 f"{self.max_caption_len}|{self.cfg.get('adapter_path')}")
+        return hashlib.sha1(ident.encode()).hexdigest()[:12]
+
+    def _build_bank(self) -> None:
+        b = self.cfg.bank
+        rows = load_manifest(b.split, limit=b.max_captions, subset_seed=b.seed)
+        cache = CACHE / f"vljepa_bank_{self._bank_key()}.pt"
+        if cache.exists():
+            blob = torch.load(cache, map_location="cpu", weights_only=False)
+            texts, emb = blob["texts"], blob["emb"]
+        else:
+            texts = sorted({r["caption"] for r in rows})
+            print(f"[vljepa] codificando banco: {len(texts)} descripciones únicas de '{b.split}'")
+            emb = self.encode_texts(texts).cpu()
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            torch.save({"texts": texts, "emb": emb}, cache)
+        self.bank_texts = texts
+        self.bank_emb = emb.to(self.device)
+
+        # prototipos por valor de atributo (factores discretos del texto)
+        index = {t: i for i, t in enumerate(texts)}
+        row_idx = torch.tensor([index[r["caption"]] for r in rows])
+        for attr in self._bank_attributes(rows):
+            vals = np.array([r["latents_text"][attr] for r in rows])
+            uniq = sorted(set(vals.tolist()))
+            protos = torch.stack([
+                F.normalize(emb[row_idx[torch.from_numpy(vals == v)]].float().mean(0), dim=-1) for v in uniq
+            ])
+            self.prototypes[attr] = (uniq, protos.half().to(self.device))
+
+    def _bank_attributes(self, rows: list[dict]) -> list[str]:
+        """`bank.attributes: auto` -> latentes de texto discretos según el criterio compartido con la
+        evaluación (vlmfid.data.select_discrete_attributes). Una lista explícita se respeta, pero los
+        atributos ausentes del manifiesto se omiten con aviso en vez de fallar."""
+        wanted = self.cfg.bank.attributes
+        keys = list(rows[0]["latents_text"]) if rows else []
+        if wanted in (None, "auto"):
+            out = select_discrete_attributes({k: [r["latents_text"][k] for r in rows] for k in keys})
+            print(f"[vljepa] atributos detectados para prototipos: {out}")
+            return out
+        missing = [a for a in wanted if a not in keys]
+        if missing:
+            print(f"[vljepa] aviso: atributos ausentes en el manifiesto, se omiten: {missing}")
+        return [a for a in wanted if a in keys]
+
+    # -------------------------------------------------------- inferencia
+    @torch.inference_mode()
+    def predict_embeddings(self, images: list[Image.Image], prompts: list[str]) -> torch.Tensor:
+        frames = torch.stack([self.transform(im) for im in images])                    # (B,3,H,W)
+        pv = frames.unsqueeze(1).repeat(1, self.num_frames, 1, 1, 1)                  # (B,T,3,H,W)
+        pv = pv.to(self.device, dtype=torch.bfloat16)
+        q = [self.cfg.get("query_override") or p for p in prompts]
+        ids, mask = self._tok(self.query_tok, q, self.max_query_len)
+        with torch.autocast("cuda", dtype=torch.bfloat16, enabled=self.device.type == "cuda"):
+            pred = self.model(pv, ids, mask)
         return F.normalize(pred.float(), dim=-1)
 
-    # -------------------------------------------------------------- describe
+    def describe(self, images: list[Image.Image], prompts: list[str]) -> list[Description]:
+        pred = self.predict_embeddings(images, prompts)
+        k = int(self.cfg.get("topk", 3))
+        sims = pred.half() @ self.bank_emb.T
+        top_s, top_i = sims.topk(k, dim=-1)
 
-    def describe(
-        self, images: list[Image.Image], prompt: str, cfg: GenConfig | None = None
-    ) -> list[str]:
-        """Recupera del pool el caption mas similar al embedding predicho.
+        attr_pred, attr_margin = [{} for _ in images], [{} for _ in images]
+        for attr, (vals, protos) in self.prototypes.items():
+            s = (pred.half() @ protos.T).float()
+            best = s.topk(min(2, len(vals)), dim=-1)
+            for j in range(len(images)):
+                attr_pred[j][attr] = vals[best.indices[j, 0].item()]
+                if best.values.shape[1] > 1:
+                    attr_margin[j][attr] = round((best.values[j, 0] - best.values[j, 1]).item(), 4)
 
-        `cfg` se ignora: no hay decodificacion. `prompt` es la query del
-        predictor, no una instruccion de formato.
-        """
-        if self.pool_embeds is None:
-            self.build_caption_pool()
-        sim = self._predict(images, prompt) @ self.pool_embeds.T  # (B, P)
-        idx = sim.argmax(dim=1).tolist()
-        self.last_entries = [self.pool[i] for i in idx]
-        return [e.text for e in self.last_entries]
+        outs = []
+        for j in range(len(images)):
+            topk = [[self.bank_texts[i], round(s, 4)] for i, s in zip(top_i[j].tolist(), top_s[j].float().tolist())]
+            outs.append(Description(
+                text=topk[0][0],
+                extra={"topk": topk, "attr_pred_proto": attr_pred[j], "attr_margin_proto": attr_margin[j]},
+                embedding=pred[j].cpu().numpy().astype(np.float16) if self.cfg.get("return_embeddings") else None,
+            ))
+        return outs
 
-    def describe_topk(
-        self, images: list[Image.Image], prompt: str, k: int = 5
-    ) -> list[list[tuple[PoolEntry, float]]]:
-        """Top-k con similitud. Diagnostico: si el correcto esta en el top-5 pero
-        no en el top-1, el modelo percibe pero no discrimina."""
-        if self.pool_embeds is None:
-            self.build_caption_pool()
-        sim = self._predict(images, prompt) @ self.pool_embeds.T
-        vals, idx = sim.topk(min(k, len(self.pool)), dim=1)
-        return [
-            [(self.pool[j], float(v)) for j, v in zip(ii, vv)]
-            for ii, vv in zip(idx.tolist(), vals.tolist())
-        ]
+    def lora_target_modules(self) -> str:
+        return r"predictor\.layers\.\d+\..*(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)$"
 
-    def memory_footprint_gib(self) -> float:
-        return sum(p.numel() * p.element_size() for p in self.model.parameters()) / 2**30
+    def info(self) -> dict:
+        out = super().info()
+        out.update({"ckpt": str(self.ckpt_path), "bank_size": len(self.bank_texts),
+                    "num_frames": self.num_frames, "attributes": list(self.prototypes)})
+        return out

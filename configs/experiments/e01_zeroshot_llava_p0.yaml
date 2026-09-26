@@ -1,0 +1,8 @@
+# Ejemplo de experimento declarativo. El mismo run se puede lanzar sin archivo:
+#   python scripts/infer.py model=llava_ov prompt=p0_minimal
+exp_id: e01_zeroshot_llava_p0
+stage: zeroshot
+model: llava_ov
+prompt: p0_minimal
+overrides:
+  data.split: test
