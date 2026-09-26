@@ -1,0 +1,4 @@
+model=qwen35 prompt=p0_minimal data.limit=500
+model=qwen35 prompt=p1_attributes data.limit=500
+model=qwen35 prompt=p2_constrained data.limit=500
+model=qwen35 prompt=p3_json data.limit=500

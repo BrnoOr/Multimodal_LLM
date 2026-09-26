@@ -1,93 +1,139 @@
 exp_id,attribute,disc,n
-e1_m3di_test_internvl_p0_minimal_n10000_20260913-182227,color objeto,0.9664,2500
-e1_m3di_test_internvl_p0_minimal_n10000_20260913-182227,forma,0.8956,2500
-e1_m3di_test_internvl_p0_minimal_n10000_20260913-182227,pos. x,0.5536,2500
-e1_m3di_test_internvl_p0_minimal_n10000_20260913-182227,pos. y,0.9,2500
-e1_m3di_test_internvl_p1_attributes_n10000_20260913-193704,color objeto,0.9824,2500
-e1_m3di_test_internvl_p1_attributes_n10000_20260913-193704,forma,0.8220000000000001,2500
-e1_m3di_test_internvl_p1_attributes_n10000_20260913-193704,pos. x,0.5472,2500
-e1_m3di_test_internvl_p1_attributes_n10000_20260913-193704,pos. y,0.7764,2500
-e1_m3di_test_internvl_p2_constrained_n10000_20260913-205052,color objeto,0.9736,2500
-e1_m3di_test_internvl_p2_constrained_n10000_20260913-205052,forma,0.43999999999999995,2500
-e1_m3di_test_internvl_p2_constrained_n10000_20260913-205052,pos. x,0.047599999999999976,2500
-e1_m3di_test_internvl_p2_constrained_n10000_20260913-205052,pos. y,0.12360000000000004,2500
-e1_m3di_test_internvl_p3_json_n10000_20260913-211300,color objeto,0.9596,2500
-e1_m3di_test_internvl_p3_json_n10000_20260913-211300,forma,0.3972,2500
-e1_m3di_test_internvl_p3_json_n10000_20260913-211300,pos. x,0.038799999999999946,2500
-e1_m3di_test_internvl_p3_json_n10000_20260913-211300,pos. y,1.0,2500
-e1_m3di_test_internvl_p4_dataset_format_n10000_20260913-215255,color objeto,0.9604,2500
-e1_m3di_test_internvl_p4_dataset_format_n10000_20260913-215255,forma,0.7796,2500
-e1_m3di_test_internvl_p4_dataset_format_n10000_20260913-215255,pos. x,0.118,2500
-e1_m3di_test_internvl_p4_dataset_format_n10000_20260913-215255,pos. y,0.21040000000000003,2500
-e1_m3di_test_llava_p0_minimal_n10000_20260913-150010,color objeto,0.9768,2500
-e1_m3di_test_llava_p0_minimal_n10000_20260913-150010,forma,0.6484,2500
-e1_m3di_test_llava_p0_minimal_n10000_20260913-150010,pos. x,0.4776,2500
-e1_m3di_test_llava_p0_minimal_n10000_20260913-150010,pos. y,0.7276,2500
-e1_m3di_test_llava_p1_attributes_n10000_20260913-155854,color objeto,0.9724,2500
-e1_m3di_test_llava_p1_attributes_n10000_20260913-155854,forma,0.6892,2500
-e1_m3di_test_llava_p1_attributes_n10000_20260913-155854,pos. x,0.7504,2500
-e1_m3di_test_llava_p1_attributes_n10000_20260913-155854,pos. y,0.8196,2500
-e1_m3di_test_llava_p2_constrained_n10000_20260913-165814,color objeto,0.9868,2500
-e1_m3di_test_llava_p2_constrained_n10000_20260913-165814,forma,0.498,2500
-e1_m3di_test_llava_p2_constrained_n10000_20260913-165814,pos. x,0.3376,2500
-e1_m3di_test_llava_p2_constrained_n10000_20260913-165814,pos. y,0.40559999999999996,2500
-e1_m3di_test_llava_p3_json_n10000_20260913-172317,color objeto,0.968,2500
-e1_m3di_test_llava_p3_json_n10000_20260913-172317,forma,0.25680000000000003,2500
-e1_m3di_test_llava_p3_json_n10000_20260913-172317,pos. x,0.29679999999999995,2500
-e1_m3di_test_llava_p3_json_n10000_20260913-172317,pos. y,1.0,2500
-e1_m3di_test_llava_p4_dataset_format_n10000_20260913-175707,color objeto,0.9952,2500
-e1_m3di_test_llava_p4_dataset_format_n10000_20260913-175707,forma,0.8244,2500
-e1_m3di_test_llava_p4_dataset_format_n10000_20260913-175707,pos. x,0.3056,2500
-e1_m3di_test_llava_p4_dataset_format_n10000_20260913-175707,pos. y,0.39559999999999995,2500
-e1_m3di_test_qwen_p0_minimal_n10000_20260913-120750,color objeto,0.9684,2500
-e1_m3di_test_qwen_p0_minimal_n10000_20260913-120750,forma,0.704,2500
-e1_m3di_test_qwen_p0_minimal_n10000_20260913-120750,pos. x,0.8908,2500
-e1_m3di_test_qwen_p0_minimal_n10000_20260913-120750,pos. y,0.9696,2500
-e1_m3di_test_qwen_p1_attributes_n10000_20260913-125501,color objeto,0.9716,2500
-e1_m3di_test_qwen_p1_attributes_n10000_20260913-125501,forma,0.79,2500
-e1_m3di_test_qwen_p1_attributes_n10000_20260913-125501,pos. x,0.45999999999999996,2500
-e1_m3di_test_qwen_p1_attributes_n10000_20260913-125501,pos. y,0.61,2500
-e1_m3di_test_qwen_p2_constrained_n10000_20260913-134223,color objeto,0.9712,2500
-e1_m3di_test_qwen_p2_constrained_n10000_20260913-134223,forma,0.38160000000000005,2500
-e1_m3di_test_qwen_p2_constrained_n10000_20260913-134223,pos. x,0.1008,2500
-e1_m3di_test_qwen_p2_constrained_n10000_20260913-134223,pos. y,0.13680000000000003,2500
-e1_m3di_test_qwen_p3_json_n10000_20260913-135723,color objeto,0.9648,2500
-e1_m3di_test_qwen_p3_json_n10000_20260913-135723,forma,0.3536,2500
-e1_m3di_test_qwen_p3_json_n10000_20260913-135723,pos. x,0.26680000000000004,2500
-e1_m3di_test_qwen_p3_json_n10000_20260913-135723,pos. y,1.0,2500
-e1_m3di_test_qwen_p4_dataset_format_n10000_20260913-142818,color objeto,0.972,2500
-e1_m3di_test_qwen_p4_dataset_format_n10000_20260913-142818,forma,0.7032,2500
-e1_m3di_test_qwen_p4_dataset_format_n10000_20260913-142818,pos. x,0.09440000000000004,2500
-e1_m3di_test_qwen_p4_dataset_format_n10000_20260913-142818,pos. y,0.1956,2500
-e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012131,color objeto,0.9884,2500
-e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012131,forma,0.7103999999999999,2500
-e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012131,pos. x,0.4476,2500
-e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012131,pos. y,0.41879999999999995,2500
-e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012156,color objeto,0.9884,2500
-e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012156,forma,0.7103999999999999,2500
-e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012156,pos. x,0.4476,2500
-e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012156,pos. y,0.41879999999999995,2500
-e1_m3di_test_vljepa_p1_attributes_n10000_none_20260914-013018,color objeto,0.9892,2500
-e1_m3di_test_vljepa_p1_attributes_n10000_none_20260914-013018,forma,0.7168,2500
-e1_m3di_test_vljepa_p1_attributes_n10000_none_20260914-013018,pos. x,0.44720000000000004,2500
-e1_m3di_test_vljepa_p1_attributes_n10000_none_20260914-013018,pos. y,0.4224,2500
-e1_m3di_test_vljepa_p2_constrained_n10000_none_20260914-013728,color objeto,0.9904,2500
-e1_m3di_test_vljepa_p2_constrained_n10000_none_20260914-013728,forma,0.7083999999999999,2500
-e1_m3di_test_vljepa_p2_constrained_n10000_none_20260914-013728,pos. x,0.44199999999999995,2500
-e1_m3di_test_vljepa_p2_constrained_n10000_none_20260914-013728,pos. y,0.43200000000000005,2500
-e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014419,color objeto,0.9912,2500
-e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014419,forma,0.7036,2500
-e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014419,pos. x,0.44720000000000004,2500
-e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014419,pos. y,0.4384,2500
-e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014420,color objeto,0.9912,2500
-e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014420,forma,0.7036,2500
-e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014420,pos. x,0.44720000000000004,2500
-e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014420,pos. y,0.4384,2500
-e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015108,color objeto,0.99,2500
-e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015108,forma,0.7092,2500
-e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015108,pos. x,0.4488,2500
-e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015108,pos. y,0.4292,2500
-e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015112,color objeto,0.99,2500
-e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015112,forma,0.7092,2500
-e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015112,pos. x,0.4488,2500
-e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015112,pos. y,0.4292,2500
+e1_m3di_test_internvl_p0_minimal_n10000_20260913-182227,color foco,0.9996,2500
+e1_m3di_test_internvl_p0_minimal_n10000_20260913-182227,color fondo,0.9868,2500
+e1_m3di_test_internvl_p0_minimal_n10000_20260913-182227,color objeto,0.6752,2500
+e1_m3di_test_internvl_p0_minimal_n10000_20260913-182227,forma,0.86,2500
+e1_m3di_test_internvl_p0_minimal_n10000_20260913-182227,pos. x,0.558,2500
+e1_m3di_test_internvl_p0_minimal_n10000_20260913-182227,pos. y,0.8976,2500
+e1_m3di_test_internvl_p1_attributes_n10000_20260913-193704,color foco,1.0,2500
+e1_m3di_test_internvl_p1_attributes_n10000_20260913-193704,color fondo,0.9988,2500
+e1_m3di_test_internvl_p1_attributes_n10000_20260913-193704,color objeto,0.5844,2500
+e1_m3di_test_internvl_p1_attributes_n10000_20260913-193704,forma,0.778,2500
+e1_m3di_test_internvl_p1_attributes_n10000_20260913-193704,pos. x,0.5384,2500
+e1_m3di_test_internvl_p1_attributes_n10000_20260913-193704,pos. y,0.7696000000000001,2500
+e1_m3di_test_internvl_p2_constrained_n10000_20260913-205052,color foco,1.0,2500
+e1_m3di_test_internvl_p2_constrained_n10000_20260913-205052,color fondo,1.0,2500
+e1_m3di_test_internvl_p2_constrained_n10000_20260913-205052,color objeto,0.28759999999999997,2500
+e1_m3di_test_internvl_p2_constrained_n10000_20260913-205052,forma,0.358,2500
+e1_m3di_test_internvl_p2_constrained_n10000_20260913-205052,pos. x,0.06000000000000005,2500
+e1_m3di_test_internvl_p2_constrained_n10000_20260913-205052,pos. y,0.21760000000000002,2500
+e1_m3di_test_internvl_p3_json_n10000_20260913-211300,color foco,1.0,2500
+e1_m3di_test_internvl_p3_json_n10000_20260913-211300,color fondo,1.0,2500
+e1_m3di_test_internvl_p3_json_n10000_20260913-211300,color objeto,0.3728,2500
+e1_m3di_test_internvl_p3_json_n10000_20260913-211300,forma,0.4044,2500
+e1_m3di_test_internvl_p3_json_n10000_20260913-211300,pos. x,0.03920000000000001,2500
+e1_m3di_test_internvl_p3_json_n10000_20260913-211300,pos. y,0.8508,2500
+e1_m3di_test_internvl_p4_dataset_format_n10000_20260913-215255,color foco,1.0,2500
+e1_m3di_test_internvl_p4_dataset_format_n10000_20260913-215255,color fondo,1.0,2500
+e1_m3di_test_internvl_p4_dataset_format_n10000_20260913-215255,color objeto,0.49560000000000004,2500
+e1_m3di_test_internvl_p4_dataset_format_n10000_20260913-215255,forma,0.764,2500
+e1_m3di_test_internvl_p4_dataset_format_n10000_20260913-215255,pos. x,0.14680000000000004,2500
+e1_m3di_test_internvl_p4_dataset_format_n10000_20260913-215255,pos. y,0.24960000000000004,2500
+e1_m3di_test_llava_p0_minimal_n10000_20260913-150010,color foco,0.9984,2500
+e1_m3di_test_llava_p0_minimal_n10000_20260913-150010,color fondo,0.9896,2500
+e1_m3di_test_llava_p0_minimal_n10000_20260913-150010,color objeto,0.6084,2500
+e1_m3di_test_llava_p0_minimal_n10000_20260913-150010,forma,0.6075999999999999,2500
+e1_m3di_test_llava_p0_minimal_n10000_20260913-150010,pos. x,0.49639999999999995,2500
+e1_m3di_test_llava_p0_minimal_n10000_20260913-150010,pos. y,0.7372000000000001,2500
+e1_m3di_test_llava_p1_attributes_n10000_20260913-155854,color foco,1.0,2500
+e1_m3di_test_llava_p1_attributes_n10000_20260913-155854,color fondo,0.9992,2500
+e1_m3di_test_llava_p1_attributes_n10000_20260913-155854,color objeto,0.36839999999999995,2500
+e1_m3di_test_llava_p1_attributes_n10000_20260913-155854,forma,0.6528,2500
+e1_m3di_test_llava_p1_attributes_n10000_20260913-155854,pos. x,0.7536,2500
+e1_m3di_test_llava_p1_attributes_n10000_20260913-155854,pos. y,0.8208,2500
+e1_m3di_test_llava_p2_constrained_n10000_20260913-165814,color foco,1.0,2500
+e1_m3di_test_llava_p2_constrained_n10000_20260913-165814,color fondo,1.0,2500
+e1_m3di_test_llava_p2_constrained_n10000_20260913-165814,color objeto,0.4628,2500
+e1_m3di_test_llava_p2_constrained_n10000_20260913-165814,forma,0.49439999999999995,2500
+e1_m3di_test_llava_p2_constrained_n10000_20260913-165814,pos. x,0.32999999999999996,2500
+e1_m3di_test_llava_p2_constrained_n10000_20260913-165814,pos. y,0.40159999999999996,2500
+e1_m3di_test_llava_p3_json_n10000_20260913-172317,color foco,1.0,2500
+e1_m3di_test_llava_p3_json_n10000_20260913-172317,color fondo,1.0,2500
+e1_m3di_test_llava_p3_json_n10000_20260913-172317,color objeto,0.26639999999999997,2500
+e1_m3di_test_llava_p3_json_n10000_20260913-172317,forma,0.26880000000000004,2500
+e1_m3di_test_llava_p3_json_n10000_20260913-172317,pos. x,0.2864,2500
+e1_m3di_test_llava_p3_json_n10000_20260913-172317,pos. y,0.9964,2500
+e1_m3di_test_llava_p4_dataset_format_n10000_20260913-175707,color foco,1.0,2500
+e1_m3di_test_llava_p4_dataset_format_n10000_20260913-175707,color fondo,1.0,2500
+e1_m3di_test_llava_p4_dataset_format_n10000_20260913-175707,color objeto,0.8188,2500
+e1_m3di_test_llava_p4_dataset_format_n10000_20260913-175707,forma,0.812,2500
+e1_m3di_test_llava_p4_dataset_format_n10000_20260913-175707,pos. x,0.26680000000000004,2500
+e1_m3di_test_llava_p4_dataset_format_n10000_20260913-175707,pos. y,0.39959999999999996,2500
+e1_m3di_test_qwen_p0_minimal_n10000_20260913-120750,color foco,0.9996,2500
+e1_m3di_test_qwen_p0_minimal_n10000_20260913-120750,color fondo,0.9968,2500
+e1_m3di_test_qwen_p0_minimal_n10000_20260913-120750,color objeto,0.4756,2500
+e1_m3di_test_qwen_p0_minimal_n10000_20260913-120750,forma,0.6828000000000001,2500
+e1_m3di_test_qwen_p0_minimal_n10000_20260913-120750,pos. x,0.8916,2500
+e1_m3di_test_qwen_p0_minimal_n10000_20260913-120750,pos. y,0.9664,2500
+e1_m3di_test_qwen_p1_attributes_n10000_20260913-125501,color foco,1.0,2500
+e1_m3di_test_qwen_p1_attributes_n10000_20260913-125501,color fondo,0.9984,2500
+e1_m3di_test_qwen_p1_attributes_n10000_20260913-125501,color objeto,0.4172,2500
+e1_m3di_test_qwen_p1_attributes_n10000_20260913-125501,forma,0.7676000000000001,2500
+e1_m3di_test_qwen_p1_attributes_n10000_20260913-125501,pos. x,0.45720000000000005,2500
+e1_m3di_test_qwen_p1_attributes_n10000_20260913-125501,pos. y,0.6028,2500
+e1_m3di_test_qwen_p2_constrained_n10000_20260913-134223,color foco,1.0,2500
+e1_m3di_test_qwen_p2_constrained_n10000_20260913-134223,color fondo,1.0,2500
+e1_m3di_test_qwen_p2_constrained_n10000_20260913-134223,color objeto,0.3448,2500
+e1_m3di_test_qwen_p2_constrained_n10000_20260913-134223,forma,0.35119999999999996,2500
+e1_m3di_test_qwen_p2_constrained_n10000_20260913-134223,pos. x,0.1028,2500
+e1_m3di_test_qwen_p2_constrained_n10000_20260913-134223,pos. y,0.13959999999999995,2500
+e1_m3di_test_qwen_p3_json_n10000_20260913-135723,color foco,1.0,2500
+e1_m3di_test_qwen_p3_json_n10000_20260913-135723,color fondo,1.0,2500
+e1_m3di_test_qwen_p3_json_n10000_20260913-135723,color objeto,0.23360000000000003,2500
+e1_m3di_test_qwen_p3_json_n10000_20260913-135723,forma,0.38680000000000003,2500
+e1_m3di_test_qwen_p3_json_n10000_20260913-135723,pos. x,0.3124,2500
+e1_m3di_test_qwen_p3_json_n10000_20260913-135723,pos. y,0.7827999999999999,2500
+e1_m3di_test_qwen_p4_dataset_format_n10000_20260913-142818,color foco,1.0,2500
+e1_m3di_test_qwen_p4_dataset_format_n10000_20260913-142818,color fondo,1.0,2500
+e1_m3di_test_qwen_p4_dataset_format_n10000_20260913-142818,color objeto,0.49160000000000004,2500
+e1_m3di_test_qwen_p4_dataset_format_n10000_20260913-142818,forma,0.6708000000000001,2500
+e1_m3di_test_qwen_p4_dataset_format_n10000_20260913-142818,pos. x,0.07720000000000005,2500
+e1_m3di_test_qwen_p4_dataset_format_n10000_20260913-142818,pos. y,0.21719999999999995,2500
+e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012131,color foco,1.0,2500
+e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012131,color fondo,1.0,2500
+e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012131,color objeto,0.8308,2500
+e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012131,forma,0.71,2500
+e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012131,pos. x,0.44720000000000004,2500
+e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012131,pos. y,0.51,2500
+e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012156,color foco,1.0,2500
+e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012156,color fondo,1.0,2500
+e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012156,color objeto,0.8308,2500
+e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012156,forma,0.71,2500
+e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012156,pos. x,0.44720000000000004,2500
+e1_m3di_test_vljepa_p0_minimal_n10000_none_20260914-012156,pos. y,0.51,2500
+e1_m3di_test_vljepa_p1_attributes_n10000_none_20260914-013018,color foco,1.0,2500
+e1_m3di_test_vljepa_p1_attributes_n10000_none_20260914-013018,color fondo,1.0,2500
+e1_m3di_test_vljepa_p1_attributes_n10000_none_20260914-013018,color objeto,0.8296,2500
+e1_m3di_test_vljepa_p1_attributes_n10000_none_20260914-013018,forma,0.7108,2500
+e1_m3di_test_vljepa_p1_attributes_n10000_none_20260914-013018,pos. x,0.4464,2500
+e1_m3di_test_vljepa_p1_attributes_n10000_none_20260914-013018,pos. y,0.49560000000000004,2500
+e1_m3di_test_vljepa_p2_constrained_n10000_none_20260914-013728,color foco,1.0,2500
+e1_m3di_test_vljepa_p2_constrained_n10000_none_20260914-013728,color fondo,1.0,2500
+e1_m3di_test_vljepa_p2_constrained_n10000_none_20260914-013728,color objeto,0.84,2500
+e1_m3di_test_vljepa_p2_constrained_n10000_none_20260914-013728,forma,0.7072,2500
+e1_m3di_test_vljepa_p2_constrained_n10000_none_20260914-013728,pos. x,0.4404,2500
+e1_m3di_test_vljepa_p2_constrained_n10000_none_20260914-013728,pos. y,0.48519999999999996,2500
+e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014419,color foco,1.0,2500
+e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014419,color fondo,1.0,2500
+e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014419,color objeto,0.8396,2500
+e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014419,forma,0.6996,2500
+e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014419,pos. x,0.44599999999999995,2500
+e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014419,pos. y,0.5048,2500
+e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014420,color foco,1.0,2500
+e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014420,color fondo,1.0,2500
+e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014420,color objeto,0.8396,2500
+e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014420,forma,0.6996,2500
+e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014420,pos. x,0.44599999999999995,2500
+e1_m3di_test_vljepa_p3_json_n10000_none_20260914-014420,pos. y,0.5048,2500
+e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015108,color foco,1.0,2500
+e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015108,color fondo,1.0,2500
+e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015108,color objeto,0.8396,2500
+e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015108,forma,0.7063999999999999,2500
+e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015108,pos. x,0.4476,2500
+e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015108,pos. y,0.49039999999999995,2500
+e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015112,color foco,1.0,2500
+e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015112,color fondo,1.0,2500
+e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015112,color objeto,0.8396,2500
+e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015112,forma,0.7063999999999999,2500
+e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015112,pos. x,0.4476,2500
+e1_m3di_test_vljepa_p4_dataset_format_n10000_none_20260914-015112,pos. y,0.49039999999999995,2500

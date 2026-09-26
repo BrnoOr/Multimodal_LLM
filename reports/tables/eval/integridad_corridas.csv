@@ -1,0 +1,24 @@
+run,filas,duplicados,fuera_manifest,vacias,sin_prediccion,cobertura
+LLaVA-1.5-7B · p0_minimal,10000,0,0,0,0,1.0
+LLaVA-1.5-7B · p1_attributes,10000,0,0,0,0,1.0
+LLaVA-1.5-7B · p2_constrained,10000,0,0,0,0,1.0
+LLaVA-1.5-7B · p3_json,10000,0,0,0,0,1.0
+LLaVA-1.5-7B · p4_dataset_format,10000,0,0,0,0,1.0
+Qwen2.5-VL-7B · p0_minimal,10000,0,0,0,0,1.0
+Qwen2.5-VL-7B · p1_attributes,10000,0,0,0,0,1.0
+Qwen2.5-VL-7B · p2_constrained,10000,0,0,0,0,1.0
+Qwen2.5-VL-7B · p3_json,10000,0,0,0,0,1.0
+Qwen2.5-VL-7B · p4_dataset_format,10000,0,0,0,0,1.0
+InternVL3.5-8B · p0_minimal,10000,0,0,0,0,1.0
+InternVL3.5-8B · p1_attributes,10000,0,0,0,0,1.0
+InternVL3.5-8B · p2_constrained,10000,0,0,0,0,1.0
+InternVL3.5-8B · p3_json,10000,0,0,0,0,1.0
+InternVL3.5-8B · p4_dataset_format,10000,0,0,0,0,1.0
+VL-JEPA · p1_attributes,10000,0,0,0,0,1.0
+VL-JEPA · p2_constrained,10000,0,0,0,0,1.0
+VL-JEPA [n10000_none_20260914-012131] · p0_minimal,10000,0,0,0,0,1.0
+VL-JEPA [n10000_none_20260914-012156] · p0_minimal,10000,0,0,0,0,1.0
+VL-JEPA [n10000_none_20260914-014419] · p3_json,10000,0,0,0,0,1.0
+VL-JEPA [n10000_none_20260914-014420] · p3_json,10000,0,0,0,0,1.0
+VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,10000,0,0,0,0,1.0
+VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,10000,0,0,0,0,1.0
