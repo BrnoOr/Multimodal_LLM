@@ -23,5 +23,5 @@ logs/*
 !logs/.gitkeep
 
 # paquetes y respaldos (el repo se versiona con git, no con .zip)
-*.zip
+#*.zip
 *.tgz
