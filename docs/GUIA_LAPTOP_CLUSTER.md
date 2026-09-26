@@ -68,7 +68,7 @@ Los tests son opcionales en el laptop porque no necesitan GPU ni datos:
 
 ```powershell
 uv sync --extra dev
-uv run pytest -q                      # esperado: 49 passed
+uv run pytest -q                      # esperado: todos pasan (63 al 26-09-2026)
 ```
 
 Antes de borrar `Multimodal_LLM_anterior`, revisa si tiene cambios sin subir con `git -C ..\Multimodal_LLM_anterior status` y `git -C ..\Multimodal_LLM_anterior log origin/modelos..HEAD`.
@@ -130,7 +130,7 @@ ls -l scripts/*.sh                                  # deben tener x (rwxr-xr-x)
 
 uv run --no-sync python -c "import vlmfid, vlmfid.config as c; print(vlmfid.__file__, hasattr(c, 'as_dict'))"
 # esperado: .../Multimodal_LLM/src/vlmfid/__init__.py True
-uv run --no-sync pytest -q                          # esperado: 49 passed
+uv run --no-sync pytest -q                          # esperado: todos pasan (63 al 26-09-2026)
 ```
 
 Si falla la importación de alguna librería, sincroniza el entorno: `uv sync --extra quant --extra eval --extra dev`. Después comprueba que torch siga siendo cu126 con `uv run --no-sync python scripts/check_env.py`.

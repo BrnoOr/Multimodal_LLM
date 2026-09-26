@@ -9,7 +9,8 @@ CATALOG = load_prompt_catalog()
 
 
 def test_catalog_ids_match_keys_and_have_rationale():
-    assert list(CATALOG) == ["p0_minimal", "p1_attributes", "p2_constrained", "p3_json", "p4_dataset_format"]
+    assert list(CATALOG) == ["p0_minimal", "p1_attributes", "p2_constrained", "p3_json", "p4_dataset_format",
+                           "p4m_multiexample"]
     for key, entry in CATALOG.items():
         assert entry.id == key
         assert entry.text.strip() and entry.rationale.strip()

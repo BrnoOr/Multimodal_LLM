@@ -7,6 +7,15 @@
 #
 # Los prompts se congelan al terminar la Etapa 1 y no se vuelven a tocar.
 #
+# p4 y p4m forman el experimento de sensibilidad a ejemplos. En la prueba piloto (8 imagenes),
+# con un solo ejemplo concreto (p4) los tres VLM autorregresivos lo copiaban: InternVL3 y
+# Qwen3.5 literalmente, LLaVA-OV parcialmente ("The horse is blue."). Con tres ejemplos
+# distintos (p4m) Qwen3.5 deja de copiar y sigue el formato; InternVL3 sigue copiando.
+# Por eso en ambos se reporta la tasa de copia (vlmfid.eval.copy_summary) junto a la exactitud.
+# Una plantilla con marcadores (<color>, <object>) se descarto: los modelos repetian los marcadores.
+# p4_dataset_format no se modifica aunque su rationale quede corto: cambiarlo alteraria la
+# configuracion de los runs ya hechos.
+#
 # Uso: `prompt=<clave>` en la linea de comandos (p. ej. prompt=p2_constrained).
 # `id` se registra en predictions.jsonl y forma parte del exp_id; debe coincidir con la clave.
 
@@ -61,3 +70,17 @@ p4_dataset_format:
     Replica el formato exacto de la referencia, incluidas las comillas. Es el unico
     prompt bajo el cual la exactitud sobre el nombre literal de color puede ser
     distinta de cero antes del fine-tuning.
+
+p4m_multiexample:
+  id: p4m_multiexample
+  text: >
+    Describe the object in the image with one sentence in the same format as these examples:
+    A "tab:red" dragon is at the top-left of the image.
+    A "gold" teapot is at the mid-center of the image.
+    A "xkcd:light blue" cow is at the bottom-right of the image.
+    Put the color name in double quotes. Describe only the object in this image.
+  rationale: >
+    Mismo objetivo de formato que p4, pero con tres ejemplos distintos entre si (forma, color y
+    posicion diferentes). Si el modelo copia, se detecta y el sesgo no recae en un solo valor.
+    El contraste p4 vs p4m mide la sensibilidad a los ejemplos del prompt: la tasa de copia es
+    la metrica principal y la exactitud se reporta tambien sobre las respuestas no copiadas.

@@ -1,3 +1,5 @@
+# Qwen3.5-0.8B-Base con los prompts sin ejemplos (p0-p3), 500 imagenes de test.
+# Se separo del piloto mientras se diagnosticaba la copia del ejemplo en p4.
 model=qwen35 prompt=p0_minimal data.limit=500
 model=qwen35 prompt=p1_attributes data.limit=500
 model=qwen35 prompt=p2_constrained data.limit=500

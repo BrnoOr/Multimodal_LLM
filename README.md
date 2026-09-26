@@ -142,7 +142,7 @@ Los latentes de texto discretos usados para la exactitud por atributo (y para lo
 
 ## Prompts
 
-`configs/prompts.yaml` es un catálogo único de cinco prompts, ordenados de menor a mayor especificación. Cada entrada tiene `id`, `text` y `rationale`, y se congela al cerrar la etapa 1.
+`configs/prompts.yaml` es un catálogo único de seis prompts, ordenados de menor a mayor especificación. Cada entrada tiene `id`, `text` y `rationale`, y se congela al cerrar la etapa 1.
 
 | Clave | Qué fija | Qué permite aislar |
 |---|---|---|
@@ -151,6 +151,9 @@ Los latentes de texto discretos usados para la exactitud por atributo (y para lo
 | `p2_constrained` | vocabulario cerrado de forma y posición + plantilla; color libre | efecto del vocabulario de color |
 | `p3_json` | salida estructurada (`response_format: json`) | error de extracción ≈ 0 |
 | `p4_dataset_format` | formato literal de la referencia, con un ejemplo | exactitud sobre el nombre literal de color |
+| `p4m_multiexample` | mismo formato, con tres ejemplos distintos | sensibilidad a los ejemplos (contraste con p4) |
+
+**Copia de ejemplos.** En la prueba piloto, con el ejemplo único de p4 los tres VLM autorregresivos lo repetían en vez de describir la imagen (InternVL3 y Qwen3.5 literalmente, LLaVA-OV nombrando el caballo del ejemplo). Con tres ejemplos distintos (p4m), Qwen3.5 deja de copiar y sigue el formato, mientras InternVL3 sigue copiando. Por eso p4 y p4m se analizan como un experimento de sensibilidad (`configs/queues/p4_sensibilidad.txt`) y su exactitud se reporta junto a la tasa de copia de `vlmfid.eval.copy_summary`, que distingue copia literal (`"tab:blue" horse`) de copia del objeto del ejemplo cuando no es la forma verdadera.
 
 Las respuestas de `p3_json` se leen con `vlmfid.prompts.parse_json_response`, tolerante a bloques ```` ```json ```` y texto previo; si no hay un objeto recuperable devuelve `None`, que la evaluación debe contar como fallo de formato.
 

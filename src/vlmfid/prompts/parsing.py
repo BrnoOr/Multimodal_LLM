@@ -57,3 +57,20 @@ def parse_json_response(text: str) -> dict | None:
         if isinstance(obj, dict):
             return {str(k).strip().lower(): (v.strip() if isinstance(v, str) else v) for k, v in obj.items()}
     return None
+
+
+_THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+_THINK_TAG = re.compile(r"</?think>", re.IGNORECASE)
+
+
+def strip_think_tags(text: str) -> str:
+    """Quita bloques <think>...</think> y etiquetas sueltas.
+
+    Qwen3.5-Base usa la plantilla de chat del Instruct y a veces emite un `</think>` suelto en
+    medio de la respuesta. La evaluación debe limpiar esas etiquetas antes de extraer atributos
+    o medir similitud textual.
+    """
+    if not text:
+        return ""
+    text = _THINK_TAG.sub(" ", _THINK_BLOCK.sub(" ", text))
+    return " ".join(text.split())

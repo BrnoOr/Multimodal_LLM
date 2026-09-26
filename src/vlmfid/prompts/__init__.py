@@ -3,13 +3,14 @@
 Este módulo solo expone utilidades:
   * render: texto final del prompt.
   * parse_json_response: parseo de respuestas de prompts con `response_format: json` (p3_json).
+  * strip_think_tags: limpia etiquetas <think> que algunos modelos dejan en la respuesta.
 """
 
 from __future__ import annotations
 
 from omegaconf import DictConfig
 
-from .parsing import parse_json_response
+from .parsing import parse_json_response, strip_think_tags
 
 
 def render(prompt_cfg: DictConfig, record: dict | None = None) -> str:
@@ -22,4 +23,4 @@ def render(prompt_cfg: DictConfig, record: dict | None = None) -> str:
     return " ".join(str(prompt_cfg.text).split())
 
 
-__all__ = ["render", "parse_json_response"]
+__all__ = ["render", "parse_json_response", "strip_think_tags"]

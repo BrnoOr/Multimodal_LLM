@@ -1,4 +1,4 @@
-# Piloto de la etapa 1: 4 modelos x 5 prompts (configs/prompts.yaml) sobre 500 imagenes de test,
+# Piloto de la etapa 1: 4 modelos x 6 prompts (configs/prompts.yaml) sobre 500 imagenes de test,
 # las mismas para todos (subconjunto determinista). Una linea = argumentos de `python scripts/infer.py`.
 # Se ejecutan en orden; si una falla se continua con la siguiente. Relanzar la cola salta los runs completos.
 # VL-JEPA va primero: es el de mayor riesgo.
@@ -7,24 +7,29 @@ model=vljepa           prompt=p1_attributes      data.limit=500 infer.save_embed
 model=vljepa           prompt=p2_constrained     data.limit=500 infer.save_embeddings=true
 model=vljepa           prompt=p3_json            data.limit=500 infer.save_embeddings=true
 model=vljepa           prompt=p4_dataset_format  data.limit=500 infer.save_embeddings=true
+model=vljepa           prompt=p4m_multiexample   data.limit=500 infer.save_embeddings=true
 model=llava_ov         prompt=p0_minimal         data.limit=500
 model=llava_ov         prompt=p1_attributes      data.limit=500
 model=llava_ov         prompt=p2_constrained     data.limit=500
 model=llava_ov         prompt=p3_json            data.limit=500
 model=llava_ov         prompt=p4_dataset_format  data.limit=500
+model=llava_ov         prompt=p4m_multiexample   data.limit=500
 model=qwen35           prompt=p0_minimal         data.limit=500
 model=qwen35           prompt=p1_attributes      data.limit=500
 model=qwen35           prompt=p2_constrained     data.limit=500
 model=qwen35           prompt=p3_json            data.limit=500
 model=qwen35           prompt=p4_dataset_format  data.limit=500
+model=qwen35           prompt=p4m_multiexample   data.limit=500
 model=internvl3        prompt=p0_minimal         data.limit=500
 model=internvl3        prompt=p1_attributes      data.limit=500
 model=internvl3        prompt=p2_constrained     data.limit=500
 model=internvl3        prompt=p3_json            data.limit=500
 model=internvl3        prompt=p4_dataset_format  data.limit=500
+model=internvl3        prompt=p4m_multiexample   data.limit=500
 # Control Base vs Instruct de Qwen3.5 (descomentar para incluirlo):
 # model=qwen35_instruct  prompt=p0_minimal         data.limit=500
 # model=qwen35_instruct  prompt=p1_attributes      data.limit=500
 # model=qwen35_instruct  prompt=p2_constrained     data.limit=500
 # model=qwen35_instruct  prompt=p3_json            data.limit=500
 # model=qwen35_instruct  prompt=p4_dataset_format  data.limit=500
+# model=qwen35_instruct  prompt=p4m_multiexample   data.limit=500

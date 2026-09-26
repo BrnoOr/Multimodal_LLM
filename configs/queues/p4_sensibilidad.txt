@@ -1,0 +1,14 @@
+# Experimento de sensibilidad a ejemplos: p4 (un ejemplo) vs p4m (tres ejemplos distintos),
+# mismas 500 imagenes de test que el piloto. Los p4 de LLaVA, InternVL y VL-JEPA ya existen
+# en el piloto: si estan completos, run_queue los salta.
+# Metrica principal: tasa de copia (vlmfid.eval.copy_summary) y exactitud sobre lo no copiado.
+model=qwen35           prompt=p4_dataset_format  data.limit=500
+model=qwen35_instruct  prompt=p4_dataset_format  data.limit=500
+model=qwen35           prompt=p4m_multiexample   data.limit=500
+model=qwen35_instruct  prompt=p4m_multiexample   data.limit=500
+model=internvl3        prompt=p4m_multiexample   data.limit=500
+model=llava_ov         prompt=p4m_multiexample   data.limit=500
+model=vljepa           prompt=p4m_multiexample   data.limit=500 infer.save_embeddings=true
+model=llava_ov         prompt=p4_dataset_format  data.limit=500
+model=internvl3        prompt=p4_dataset_format  data.limit=500
+model=vljepa           prompt=p4_dataset_format  data.limit=500 infer.save_embeddings=true
