@@ -1,0 +1,10 @@
+exp_id,model,prompt,n,n_examples,copy_literal,copy_object,copy_any,distinct_ratio
+zeroshot_internvl3_1b_nf4_p4_dataset_format_test_n500,internvl3_1b,p4_dataset_format,500,1,0.98,0.836,0.98,0.026
+zeroshot_llava_ov_05b_nf4_p4_dataset_format_test_n500,llava_ov_05b,p4_dataset_format,500,1,0.0,0.762,0.762,0.144
+zeroshot_qwen35_08b_base_nf4_p4_dataset_format_test_n8,qwen35_08b_base,p4_dataset_format,8,1,1.0,1.0,1.0,0.125
+zeroshot_qwen35_08b_instruct_nf4_p4_dataset_format_test_n8,qwen35_08b_instruct,p4_dataset_format,8,1,1.0,1.0,1.0,0.125
+zeroshot_vljepa_open_msrvtt_nf4_p4_dataset_format_test_n500,vljepa_open_msrvtt,p4_dataset_format,500,1,0.0,0.0,0.0,0.288
+probe_p4m_multiexample_internvl3_1b_n8,internvl3_1b,p4m_multiexample,8,3,0.875,0.875,0.875,0.375
+probe_p4m_multiexample_llava_ov_05b_n8,llava_ov_05b,p4m_multiexample,8,3,0.125,0.375,0.375,0.875
+probe_p4m_multiexample_qwen35_08b_base_n8,qwen35_08b_base,p4m_multiexample,8,3,0.0,0.125,0.125,1.0
+probe_p4m_multiexample_qwen35_08b_instruct_n8,qwen35_08b_instruct,p4m_multiexample,8,3,0.0,0.25,0.25,1.0
