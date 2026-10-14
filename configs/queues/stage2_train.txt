@@ -1,0 +1,9 @@
+# Etapa 2 — ajuste fino QLoRA de los 4 modelos con el presupuesto común de configs/train/budget.yaml
+# (1 época = 1953 pasos de 64 imágenes; LoRA r=16 + conector; mejor checkpoint en val por Índice macro).
+#   SCRIPT=scripts/train.py GPU=1 scripts/launch.sh stage2_train scripts/run_queue.sh configs/queues/stage2_train.txt
+# Orden: VL-JEPA primero (mayor riesgo), luego del más barato al más caro en tokens visuales.
+# Relanzar la cola reanuda el run interrumpido y salta los completos.
+model=vljepa
+model=qwen35
+model=internvl3
+model=llava_ov

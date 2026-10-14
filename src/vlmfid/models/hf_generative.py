@@ -85,7 +85,9 @@ class HFGenerativeDescriber(Describer):
         if c.get("adapter_path"):
             from peft import PeftModel
 
-            self.model = PeftModel.from_pretrained(self.model, c.adapter_path).eval()
+            from ..paths import resolve
+
+            self.model = PeftModel.from_pretrained(self.model, str(resolve(c.adapter_path))).eval()
 
     def _ensure_chat_template(self) -> None:
         """Garantiza una plantilla de chat en el processor, en este orden de preferencia:

@@ -4,7 +4,8 @@
 #
 #   scripts/launch.sh stage1 scripts/run_queue.sh configs/queues/stage1_pilot.txt
 #
-# Cada línea no vacía ni comentada son los argumentos de `python scripts/infer.py`.
+# Cada línea no vacía ni comentada son los argumentos de `python $SCRIPT` (por defecto scripts/infer.py;
+# para la etapa 2: SCRIPT=scripts/train.py scripts/run_queue.sh configs/queues/stage2_train.txt).
 # Si una línea falla se registra y se sigue con la siguiente. Como infer es reanudable e
 # idempotente, relanzar la misma cola retoma el run interrumpido y salta los completos.
 # Resumen en logs/<job>/queue_status.tsv (o logs/queue_status.tsv fuera de launch.sh).
@@ -25,6 +26,8 @@ if ! sed 's/#.*//' "$QUEUE" | grep -q '[^[:space:]]'; then
   exit 3
 fi
 PY="${PYTHON:-uv run --no-sync python}"
+SCRIPT="${SCRIPT:-scripts/infer.py}"
+[[ -f "$SCRIPT" ]] || { echo "[queue] ERROR: no existe SCRIPT='$SCRIPT'" >&2; exit 2; }
 STATUS="$ROOT/logs/${VLMFID_JOB:+$VLMFID_JOB/}queue_status.tsv"
 mkdir -p "$(dirname "$STATUS")"
 
@@ -51,7 +54,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   echo; echo "=================== [$n] $(date -Iseconds) :: $line"
   t0=$(date +%s)
   # shellcheck disable=SC2086
-  $PY scripts/infer.py $line &
+  $PY "$SCRIPT" $line &
   CHILD=$!; wait "$CHILD"; rc=$?
   # si llegó una señal durante wait, esperar a que el hijo termine de guardar
   if kill -0 "$CHILD" 2>/dev/null; then wait "$CHILD"; rc=$?; fi

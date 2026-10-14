@@ -1,0 +1,9 @@
+# Etapa 2 — evaluación en test (10 000 imágenes, las mismas de la etapa 1 con data.limit=10000) de los
+# adaptadores elegidos en val. Cada modelo con el MISMO prompt con que se entrenó.
+#   GPU=1 scripts/launch.sh stage2_test scripts/run_queue.sh configs/queues/stage2_test.txt
+# Las predicciones quedan en runs/<exp_id>/predictions.jsonl con el mismo formato de la etapa 1,
+# así que los notebooks de EDA las leen con STAGE = "finetuned".
+model=vljepa     prompt=p4m_multiexample stage=finetuned exp_id=finetuned_vljepa_open_msrvtt_nf4_p4m_multiexample_test_lora_r16_e1 model.adapter_path=runs/train_vljepa_open_msrvtt_nf4_p4m_multiexample_r16_e1/adapter_best infer.save_embeddings=true
+model=qwen35     prompt=p1_attributes    stage=finetuned exp_id=finetuned_qwen35_08b_base_nf4_p1_attributes_test_lora_r16_e1 model.adapter_path=runs/train_qwen35_08b_base_nf4_p1_attributes_r16_e1/adapter_best
+model=internvl3  prompt=p1_attributes    stage=finetuned exp_id=finetuned_internvl3_1b_nf4_p1_attributes_test_lora_r16_e1 model.adapter_path=runs/train_internvl3_1b_nf4_p1_attributes_r16_e1/adapter_best
+model=llava_ov   prompt=p1_attributes    stage=finetuned exp_id=finetuned_llava_ov_05b_nf4_p1_attributes_test_lora_r16_e1 model.adapter_path=runs/train_llava_ov_05b_nf4_p1_attributes_r16_e1/adapter_best

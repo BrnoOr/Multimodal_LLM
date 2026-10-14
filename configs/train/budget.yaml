@@ -1,0 +1,68 @@
+# Etapa 2 — presupuesto y optimización COMUNES a los cuatro modelos.
+#
+# Todo lo que está aquí es igual para LLaVA-OV, InternVL3, Qwen3.5 y VL-JEPA: esa es la definición
+# operativa de "mismo presupuesto de cómputo". Lo único que cambia por modelo vive en
+# configs/train/models/<modelo>.yaml y está restringido a: el prompt (mejor zero-shot de la etapa 1),
+# el micro-lote (solo memoria: no cambia la matemática), el conector entrenable y el objetivo.
+# `vlmfid.train.config` rechaza cualquier otra clave en esos archivos.
+#
+# Decisiones de diseño (tomadas con el equipo, 14-10-2026):
+#   * modelos: los 4 de la etapa 1 (sin el control Instruct)
+#   * objetivo: el caption original de M3DI, con sus 5 plantillas
+#   * prompt: el mejor zero-shot de cada modelo en la etapa 1 (LLaVA-OV usa p1: su mejor, p3, pide JSON)
+#   * precisión: QLoRA, base en NF4 + doble cuantización, cómputo bf16 (como la etapa 1)
+#   * presupuesto: 1 época completa de train (125 000 imágenes), mismo lote efectivo
+#   * entrenables: LoRA en el transformer de lenguaje / predictor + conector multimodal completo
+#   * checkpoint: el mejor en val (500 imágenes fijas) según el Índice macro de la etapa 1
+#
+# Uso: uv run --no-sync python scripts/train.py model=<llava_ov|internvl3|qwen35|vljepa> [clave=valor ...]
+
+exp_id: null            # null -> train_<model.name>_<quant>_<prompt.id>_r<r>_e<epochs>[_n<train_limit>]
+stage: finetuned
+seed: 0
+
+data:
+  dataset: m3di
+  variant: base
+  root: null            # null -> M3DI_ROOT
+  train_split: train
+  train_limit: null     # null = las 125 000; un entero SOLO para pruebas de humo (cambia el exp_id)
+  val_split: val        # nunca test: test se reserva para la evaluación final con scripts/infer.py
+  val_limit: 500        # mismas 500 imágenes para los 4 modelos (subconjunto determinista)
+  subset_seed: 0
+  num_workers: 4        # el preprocesado de imágenes corre en los workers; el cluster tiene 8 núcleos
+
+train:
+  epochs: 1
+  effective_batch_size: 64      # muestras por paso de optimización, igual en los 4 modelos
+  micro_batch_size: null        # lo fija configs/train/models/<modelo>.yaml (solo memoria)
+  drop_last: true               # 125 000 // 64 = 1953 pasos; las 8 muestras sobrantes no se usan
+  lr: 2.0e-4                    # LoRA
+  connector_lr: 2.0e-5          # conector multimodal (parámetros completos preentrenados): lr / 10
+  weight_decay: 0.0
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+  schedule: cosine              # cosine | constant (ambos con calentamiento lineal)
+  warmup_ratio: 0.03            # ≈ 59 de 1953 pasos
+  min_lr_ratio: 0.0
+  max_grad_norm: 1.0
+  max_target_tokens: 64         # el caption más largo de M3DI son 21 palabras; si alguno excede, falla
+  gradient_checkpointing: true
+  eval_every: 200               # pasos entre evaluaciones en val (+ paso 0 y el último)
+  eval_at_start: true           # paso 0 = modelo base con el adaptador en cero (control de paridad)
+  save_every: 100               # pasos entre checkpoints de reanudación
+  log_every: 10
+  max_steps: null               # SOLO pruebas de humo: corta el run sin cambiar el schedule
+  selection_metric: macro       # macro | shape | pos | color_adj | name | val_loss
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  bias: none
+  connector_modules: []         # lo fija el archivo del modelo; [] = conector congelado
+
+objective:
+  kind: lm                      # lm (VLM autorregresivo) | infonce (VL-JEPA)
+  temperature: 0.07             # solo infonce: la del preentrenamiento del checkpoint
+  mask_duplicate_captions: true # solo infonce: captions idénticos en el lote no son negativos

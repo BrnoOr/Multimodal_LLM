@@ -30,6 +30,7 @@ Multimodal_LLM/
 │   ├── models/               llava_ov · internvl3 · qwen35 · qwen35_instruct · vljepa
 │   ├── prompts.yaml          catálogo de prompts de la etapa 1
 │   ├── experiments/          runs con nombre fijo
+│   ├── train/                etapa 2: budget.yaml (común) + models/<modelo>.yaml
 │   └── queues/               listas de runs para ejecutar en serie
 ├── data/                     DATOS
 │   ├── raw/m3di/             M3DI publicado {train,val,test}             (git-ignored)
@@ -46,11 +47,12 @@ Multimodal_LLM/
 ├── scripts/                  PUNTOS DE ENTRADA (cómo se corre)
 │   ├── build_manifest.py     layout crudo -> Parquet (+ reporte de desacuerdo)
 │   ├── infer.py              inferencia reanudable (etapa 1 y modelos ajustados)
+│   ├── train.py              ajuste fino QLoRA reanudable (etapa 2)
 │   ├── smoke.py              carga y prueba rápida de los 4 modelos
 │   ├── check_env.py          verificación del entorno
 │   ├── launch.sh             lanza un job desacoplado de SSH (setsid + nohup)
 │   ├── jobs.sh               status · logs · stop · runs · gpu
-│   └── run_queue.sh          ejecuta una cola de configs/queues en serie
+│   └── run_queue.sh          ejecuta una cola de configs/queues en serie (SCRIPT=scripts/train.py para la etapa 2)
 ├── src/vlmfid/               LÓGICA REUTILIZABLE (paquete instalable)
 │   ├── paths.py  config.py  tracking.py
 │   ├── data/                 m3di.py (layout crudo) · manifest.py (Parquet -> registros)
@@ -58,7 +60,8 @@ Multimodal_LLM/
 │   │                         hf_generative.py (genérico por config) · qwen_vl.py
 │   │                         vljepa.py
 │   ├── prompts/              render y parseo de respuestas JSON
-│   └── eval/                 métricas de texto y por atributo            (siguiente hito)
+│   ├── train/                etapa 2: config, datos, colación, pérdidas, LoRA, bucle
+│   └── eval/                 copia de ejemplos · extractor de atributos y exactitud
 ├── tests/
 ├── logs/<job>/               salida de cada ejecución                      (git-ignored)
 └── runs/<exp_id>/            resultados de cada experimento                (git-ignored)
@@ -160,9 +163,15 @@ Las respuestas de `p3_json` se leen con `vlmfid.prompts.parse_json_response`, to
 ## Etapas y siguiente hito
 
 1. **Inferencia sin ajuste** (este código): modelo × prompt, NF4 y bf16.
-2. **Ajuste fino LoRA** con presupuesto común: los adaptadores ya exponen `lora_target_modules()` y cargan `model.adapter_path`; falta el loop de entrenamiento (`src/vlmfid/train/`).
+2. **Ajuste fino QLoRA** con presupuesto común (`scripts/train.py`, `src/vlmfid/train/`, `configs/train/`): LoRA en el transformer de lenguaje / predictor + conector multimodal, 1 época de train con lote efectivo 64, mejor checkpoint en val por Índice macro. Decisiones, hiperparámetros y su justificación en [`docs/ETAPA2_FINETUNING.md`](docs/ETAPA2_FINETUNING.md).
 
-Antes de la etapa 2: `src/vlmfid/eval/` con el extractor de atributos y sus tests (≈100 % sobre los captions de referencia; si no, la métrica mide el parser y no el modelo).
+```bash
+SCRIPT=scripts/train.py GPU=1 scripts/launch.sh stage2_smoke scripts/run_queue.sh configs/queues/stage2_smoke.txt
+SCRIPT=scripts/train.py GPU=1 scripts/launch.sh stage2_train scripts/run_queue.sh configs/queues/stage2_train.txt
+GPU=1 scripts/launch.sh stage2_test scripts/run_queue.sh configs/queues/stage2_test.txt    # test con adapter_best
+```
+
+El extractor de atributos está en `vlmfid.eval.attributes` (el del notebook 02, con tests: 100 % de forma, posición y nombre sobre los captions de referencia).
 
 ## Datos y licencias
 

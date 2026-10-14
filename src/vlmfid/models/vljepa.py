@@ -114,7 +114,11 @@ class VLJEPADescriber(Describer):
         if c.get("adapter_path"):
             from peft import PeftModel
 
-            self.model = PeftModel.from_pretrained(self.model, c.adapter_path).eval()
+            if c.quant == "nf4":
+                # PEFT crea la capa LoRA de bnb.Linear4bit solo si el modelo declara esta bandera (este
+                # modelo no es un PreTrainedModel; la cuantización se aplicó a mano). Igual que al entrenar.
+                self.model.is_loaded_in_4bit = True
+            self.model = PeftModel.from_pretrained(self.model, str(resolve(c.adapter_path))).eval()
 
         data_cfg = self.arch.get("data", {})
         self.max_query_len = int(c.get("max_query_len") or data_cfg.get("max_query_len", 64))
