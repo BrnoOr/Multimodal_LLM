@@ -1,0 +1,31 @@
+run,estado,filas,cobertura,faltantes,duplicados,fuera_del_conjunto,lineas_corruptas,img_por_s,pico_gb,intentos
+VL-JEPA · p0,completed,10000,1.0,0,0,0,0,42.803,4.37,1
+VL-JEPA · p1,completed,10000,1.0,0,0,0,0,42.586,4.37,1
+VL-JEPA · p2,completed,10000,1.0,0,0,0,0,42.53,4.37,1
+VL-JEPA · p3,completed,10000,1.0,0,0,0,0,42.478,4.37,1
+VL-JEPA · p4,completed,10000,1.0,0,0,0,0,42.777,4.37,1
+VL-JEPA · p4m,completed,10000,1.0,0,0,0,0,42.553,4.37,1
+LLaVA-OV 0.5B · p0,completed,10000,1.0,0,0,0,0,5.291,4.92,1
+LLaVA-OV 0.5B · p1,completed,10000,1.0,0,0,0,0,10.496,4.92,1
+LLaVA-OV 0.5B · p2,completed,10000,1.0,0,0,0,0,22.073,4.92,1
+LLaVA-OV 0.5B · p3,completed,10000,1.0,0,0,0,0,12.109,4.92,1
+LLaVA-OV 0.5B · p4,completed,10000,1.0,0,0,0,0,15.541,4.92,1
+LLaVA-OV 0.5B · p4m,completed,10000,1.0,0,0,0,0,15.287,4.92,1
+Qwen3.5 Base · p0,completed,10000,1.0,0,0,0,0,9.002,3.25,1
+Qwen3.5 Base · p1,completed,10000,1.0,0,0,0,0,8.918,3.29,1
+Qwen3.5 Base · p2,completed,10000,1.0,0,0,0,0,35.281,3.74,1
+Qwen3.5 Base · p3,completed,10000,1.0,0,0,0,0,25.84,3.76,1
+Qwen3.5 Base · p4,completed,10000,1.0,0,0,0,0,43.235,3.33,1
+Qwen3.5 Base · p4m,completed,10000,1.0,0,0,0,0,15.924,3.74,1
+Qwen3.5 Instruct · p0,completed,10000,1.0,0,0,0,0,8.919,3.25,1
+Qwen3.5 Instruct · p1,completed,10000,1.0,0,0,0,0,8.916,3.29,1
+Qwen3.5 Instruct · p2,completed,10000,1.0,0,0,0,0,43.519,3.74,1
+Qwen3.5 Instruct · p3,completed,10000,1.0,0,0,0,0,8.685,3.76,1
+Qwen3.5 Instruct · p4,completed,10000,1.0,0,0,0,0,28.592,3.33,1
+Qwen3.5 Instruct · p4m,completed,10000,1.0,0,0,0,0,30.61,3.74,1
+InternVL3 1B · p0,completed,10000,1.0,0,0,0,0,14.431,2.99,1
+InternVL3 1B · p1,completed,10000,1.0,0,0,0,0,13.623,2.99,1
+InternVL3 1B · p2,completed,10000,1.0,0,0,0,0,44.601,3.0,1
+InternVL3 1B · p3,completed,10000,1.0,0,0,0,0,32.508,3.0,1
+InternVL3 1B · p4,completed,10000,1.0,0,0,0,0,48.559,2.99,1
+InternVL3 1B · p4m,completed,10000,1.0,0,0,0,0,43.566,3.0,1

@@ -1,0 +1,12 @@
+# Los scripts se ejecutan en el cluster (Linux): siempre con saltos de línea LF, aunque se editen
+# en Windows. Un .sh con CRLF falla con "bad interpreter" o "$'\r': command not found".
+*.sh      text eol=lf
+*.py      text eol=lf
+*.yaml    text eol=lf
+*.txt     text eol=lf
+
+# binarios: sin conversión ni diff de texto
+*.parquet binary
+*.png     binary
+*.pdf     binary
+*.zip     binary

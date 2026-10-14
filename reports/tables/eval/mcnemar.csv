@@ -1,0 +1,305 @@
+familia,A,B,atributo,n,acc_A,acc_B,delta,b,c,p,p_holm,signif
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p1_attributes,Forma,10000,0.3041,0.3064,-0.0023000000000000242,297,320,0.37580044806952323,0.9086326578909745,False
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p1_attributes,"Posición (x,y)",10000,0.0567,0.0252,0.0315,443,128,1.3228292454618928e-41,2.2488097172852177e-40,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p1_attributes,Color objeto ±1,10000,0.9003,0.9538,-0.05349999999999999,91,626,4.569424765143282e-99,1.0052734483315221e-97,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p1_attributes,Forma+pos+color±1,10000,0.0173,0.0063,0.011,151,41,5.345131574955564e-16,4.276105259964451e-15,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p2_constrained,Forma,10000,0.3041,0.4219,-0.11780000000000002,432,1610,4.820168059397497e-159,1.3014453760373241e-157,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p2_constrained,"Posición (x,y)",10000,0.0567,0.1073,-0.050600000000000006,567,1073,3.029523789397626e-36,4.5442856840964386e-35,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p2_constrained,Color objeto ±1,10000,0.9003,0.7262,0.17410000000000003,1960,219,0.0,0.0,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p2_constrained,Forma+pos+color±1,10000,0.0173,0.0296,-0.012300000000000002,173,296,1.4704125951823465e-08,8.82247557109408e-08,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p3_json,Forma,10000,0.3041,0.5198,-0.21570000000000006,85,2242,0.0,0.0,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p3_json,"Posición (x,y)",10000,0.0567,0.0678,-0.011099999999999999,562,673,0.0017363729081340115,0.006945491632536046,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p3_json,Color objeto ±1,10000,0.9003,0.9245,-0.0242,442,684,5.620694093191148e-13,3.9344858652338034e-12,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p3_json,Forma+pos+color±1,10000,0.0173,0.0398,-0.022500000000000003,172,397,1.769818163129823e-21,1.9467999794428054e-20,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p4_dataset_format,Forma,10000,0.3041,0.1421,0.16199999999999998,2281,661,5.956273252966862e-207,1.6677565108307215e-205,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p4_dataset_format,"Posición (x,y)",10000,0.0567,0.1068,-0.050100000000000006,567,1068,1.164522866162462e-35,1.6303320126274467e-34,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p4_dataset_format,Color objeto ±1,10000,0.9003,0.3397,0.5606,5844,238,0.0,0.0,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p0_minimal,LLaVA-1.5-7B · p4_dataset_format,Forma+pos+color±1,10000,0.0173,0.0051,0.012199999999999999,173,51,1.021191332423165e-16,9.190721991808486e-16,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p1_attributes,LLaVA-1.5-7B · p2_constrained,Forma,10000,0.3064,0.4219,-0.11549999999999999,476,1631,2.546126267499093e-147,6.619928295497641e-146,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p1_attributes,LLaVA-1.5-7B · p2_constrained,"Posición (x,y)",10000,0.0252,0.1073,-0.0821,236,1057,3.0139050181825117e-124,7.233372043638028e-123,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p1_attributes,LLaVA-1.5-7B · p2_constrained,Color objeto ±1,10000,0.9538,0.7262,0.22760000000000002,2351,75,0.0,0.0,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p1_attributes,LLaVA-1.5-7B · p2_constrained,Forma+pos+color±1,10000,0.0063,0.0296,-0.0233,57,290,1.0306049190928768e-38,1.6489678705486028e-37,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p1_attributes,LLaVA-1.5-7B · p3_json,Forma,10000,0.3064,0.5198,-0.21340000000000003,89,2223,0.0,0.0,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p1_attributes,LLaVA-1.5-7B · p3_json,"Posición (x,y)",10000,0.0252,0.0678,-0.0426,247,673,2.868637848103439e-46,5.4504119113965344e-45,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p1_attributes,LLaVA-1.5-7B · p3_json,Color objeto ±1,10000,0.9538,0.9245,0.029299999999999993,506,213,2.246525616955336e-28,2.9204833020419373e-27,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p1_attributes,LLaVA-1.5-7B · p3_json,Forma+pos+color±1,10000,0.0063,0.0398,-0.0335,61,396,3.392701709397119e-61,6.785403418794237e-60,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p1_attributes,LLaVA-1.5-7B · p4_dataset_format,Forma,10000,0.3064,0.1421,0.1643,2281,638,4.4432849912983345e-215,1.288552647476517e-213,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p1_attributes,LLaVA-1.5-7B · p4_dataset_format,"Posición (x,y)",10000,0.0252,0.1068,-0.0816,251,1067,6.1011753783029666e-120,1.4032703370096823e-118,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p1_attributes,LLaVA-1.5-7B · p4_dataset_format,Color objeto ±1,10000,0.9538,0.3397,0.6141,6268,127,0.0,0.0,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p1_attributes,LLaVA-1.5-7B · p4_dataset_format,Forma+pos+color±1,10000,0.0063,0.0051,0.0011999999999999997,63,51,0.30287755263032484,0.9086326578909745,False
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p2_constrained,LLaVA-1.5-7B · p3_json,Forma,10000,0.4219,0.5198,-0.09790000000000004,290,1269,6.037164759736065e-146,1.509291189934016e-144,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p2_constrained,LLaVA-1.5-7B · p3_json,"Posición (x,y)",10000,0.1073,0.0678,0.03950000000000001,1049,654,8.771359452703867e-22,1.052563134324464e-20,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p2_constrained,LLaVA-1.5-7B · p3_json,Color objeto ±1,10000,0.7262,0.9245,-0.19830000000000003,266,2249,0.0,0.0,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p2_constrained,LLaVA-1.5-7B · p3_json,Forma+pos+color±1,10000,0.0296,0.0398,-0.0102,289,391,0.00010451123801919186,0.0005225561900959592,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p2_constrained,LLaVA-1.5-7B · p4_dataset_format,Forma,10000,0.4219,0.1421,0.2798,3625,827,0.0,0.0,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p2_constrained,LLaVA-1.5-7B · p4_dataset_format,"Posición (x,y)",10000,0.1073,0.1068,0.0005000000000000004,1073,1068,0.9311134686745187,0.9311134686745187,False
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p2_constrained,LLaVA-1.5-7B · p4_dataset_format,Color objeto ±1,10000,0.7262,0.3397,0.38649999999999995,4143,278,0.0,0.0,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p2_constrained,LLaVA-1.5-7B · p4_dataset_format,Forma+pos+color±1,10000,0.0296,0.0051,0.0245,296,51,4.091094938897865e-43,7.363970890016156e-42,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p3_json,LLaVA-1.5-7B · p4_dataset_format,Forma,10000,0.5198,0.1421,0.37770000000000004,4282,505,0.0,0.0,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p3_json,LLaVA-1.5-7B · p4_dataset_format,"Posición (x,y)",10000,0.0678,0.1068,-0.03900000000000001,678,1068,8.907979972931933e-21,8.907979972931932e-20,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p3_json,LLaVA-1.5-7B · p4_dataset_format,Color objeto ±1,10000,0.9245,0.3397,0.5848,5936,88,0.0,0.0,True
+prompts · e1 · LLaVA-1.5-7B,LLaVA-1.5-7B · p3_json,LLaVA-1.5-7B · p4_dataset_format,Forma+pos+color±1,10000,0.0398,0.0051,0.0347,398,51,9.758962358176273e-68,2.0493820952170175e-66,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p1_attributes,Forma,10000,0.1891,0.1971,-0.008000000000000007,273,353,0.0015708456868732716,0.004712537060619815,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p1_attributes,"Posición (x,y)",10000,0.0039,0.1255,-0.1216,32,1248,0.0,0.0,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p1_attributes,Color objeto ±1,10000,0.9446,0.9127,0.03190000000000004,713,394,6.287873551103133e-22,6.287873551103133e-21,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p1_attributes,Forma+pos+color±1,10000,0.0002,0.021,-0.020800000000000003,2,210,6.860813572208336e-60,1.0291220358312504e-58,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p2_constrained,Forma,10000,0.1891,0.4637,-0.2746,194,2940,0.0,0.0,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p2_constrained,"Posición (x,y)",10000,0.0039,0.3207,-0.31679999999999997,19,3187,0.0,0.0,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p2_constrained,Color objeto ±1,10000,0.9446,0.9249,0.01969999999999994,591,394,3.717508519776324e-10,2.2305051118657943e-09,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p2_constrained,Forma+pos+color±1,10000,0.0002,0.1314,-0.13119999999999998,2,1314,0.0,0.0,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p3_json,Forma,10000,0.1891,0.4268,-0.23770000000000002,196,2573,0.0,0.0,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p3_json,"Posición (x,y)",10000,0.0039,0.2687,-0.2648,30,2678,0.0,0.0,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p3_json,Color objeto ±1,10000,0.9446,0.99,-0.045399999999999996,62,516,4.251567036244716e-90,7.652820665240489e-89,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p3_json,Forma+pos+color±1,10000,0.0002,0.1343,-0.1341,2,1343,0.0,0.0,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p4_dataset_format,Forma,10000,0.1891,0.2154,-0.026300000000000018,540,803,7.399766684168995e-13,5.179836678918297e-12,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p4_dataset_format,"Posición (x,y)",10000,0.0039,0.2142,-0.21030000000000001,24,2127,0.0,0.0,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p4_dataset_format,Color objeto ±1,10000,0.9446,0.9507,-0.006099999999999994,375,436,0.035062946356750106,0.07012589271350021,False
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p0_minimal,Qwen2.5-VL-7B · p4_dataset_format,Forma+pos+color±1,10000,0.0002,0.0586,-0.0584,2,586,3.418673916151981e-172,8.204817398764755e-171,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p1_attributes,Qwen2.5-VL-7B · p2_constrained,Forma,10000,0.1971,0.4637,-0.2666,162,2828,0.0,0.0,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p1_attributes,Qwen2.5-VL-7B · p2_constrained,"Posición (x,y)",10000,0.1255,0.3207,-0.19519999999999998,515,2467,8.650139475526587e-304,2.4220390531474443e-302,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p1_attributes,Qwen2.5-VL-7B · p2_constrained,Color objeto ±1,10000,0.9127,0.9249,-0.0122000000000001,575,697,0.0006862478786758462,0.002744991514703385,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p1_attributes,Qwen2.5-VL-7B · p2_constrained,Forma+pos+color±1,10000,0.021,0.1314,-0.11039999999999998,119,1223,3.0017354458328266e-231,7.804512159165349e-230,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p1_attributes,Qwen2.5-VL-7B · p3_json,Forma,10000,0.1971,0.4268,-0.22970000000000002,170,2467,0.0,0.0,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p1_attributes,Qwen2.5-VL-7B · p3_json,"Posición (x,y)",10000,0.1255,0.2687,-0.1432,945,2377,1.479276577100056e-140,3.2544084696201232e-139,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p1_attributes,Qwen2.5-VL-7B · p3_json,Color objeto ±1,10000,0.9127,0.99,-0.07730000000000004,60,833,5.806918068559626e-175,1.4517295171399066e-173,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p1_attributes,Qwen2.5-VL-7B · p3_json,Forma+pos+color±1,10000,0.021,0.1343,-0.1133,126,1259,2.0902444027686446e-235,5.64365988747534e-234,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p1_attributes,Qwen2.5-VL-7B · p4_dataset_format,Forma,10000,0.1971,0.2154,-0.01830000000000001,562,745,4.6043776969975257e-07,2.302188848498763e-06,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p1_attributes,Qwen2.5-VL-7B · p4_dataset_format,"Posición (x,y)",10000,0.1255,0.2142,-0.0887,765,1652,2.8087478045351977e-74,4.4939964872563164e-73,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p1_attributes,Qwen2.5-VL-7B · p4_dataset_format,Color objeto ±1,10000,0.9127,0.9507,-0.038000000000000034,376,756,5.669064644538353e-30,7.369784037899859e-29,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p1_attributes,Qwen2.5-VL-7B · p4_dataset_format,Forma+pos+color±1,10000,0.021,0.0586,-0.037599999999999995,129,505,1.8468150149950298e-53,2.5855410209930418e-52,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p2_constrained,Qwen2.5-VL-7B · p3_json,Forma,10000,0.4637,0.4268,0.03689999999999999,876,507,2.4032188295337133e-23,2.643540712487085e-22,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p2_constrained,Qwen2.5-VL-7B · p3_json,"Posición (x,y)",10000,0.3207,0.2687,0.05199999999999999,2165,1645,3.728383714594187e-17,2.9827069716753495e-16,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p2_constrained,Qwen2.5-VL-7B · p3_json,Color objeto ±1,10000,0.9249,0.99,-0.06509999999999994,55,706,5.705960870647512e-145,1.3123710002489276e-143,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p2_constrained,Qwen2.5-VL-7B · p3_json,Forma+pos+color±1,10000,0.1314,0.1343,-0.0029000000000000137,852,881,0.5012112300477233,0.5012112300477233,False
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p2_constrained,Qwen2.5-VL-7B · p4_dataset_format,Forma,10000,0.4637,0.2154,0.2483,3025,542,0.0,0.0,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p2_constrained,Qwen2.5-VL-7B · p4_dataset_format,"Posición (x,y)",10000,0.3207,0.2142,0.10649999999999998,1720,655,1.9026955009658048e-109,3.9956605520281905e-108,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p2_constrained,Qwen2.5-VL-7B · p4_dataset_format,Color objeto ±1,10000,0.9249,0.9507,-0.025799999999999934,260,518,1.4026104367158906e-20,1.2623493930443014e-19,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p2_constrained,Qwen2.5-VL-7B · p4_dataset_format,Forma+pos+color±1,10000,0.1314,0.0586,0.07279999999999999,992,264,1.864145651389128e-99,3.728291302778256e-98,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p3_json,Qwen2.5-VL-7B · p4_dataset_format,Forma,10000,0.4268,0.2154,0.2114,2706,592,9.25e-321,2.6822e-319,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p3_json,Qwen2.5-VL-7B · p4_dataset_format,"Posición (x,y)",10000,0.2687,0.2142,0.05449999999999999,1601,1056,3.28913900701591e-26,3.9469668084190917e-25,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p3_json,Qwen2.5-VL-7B · p4_dataset_format,Color objeto ±1,10000,0.99,0.9507,0.0393,442,49,3.537653729917439e-80,6.014011340859647e-79,True
+prompts · e1 · Qwen2.5-VL-7B,Qwen2.5-VL-7B · p3_json,Qwen2.5-VL-7B · p4_dataset_format,Forma+pos+color±1,10000,0.1343,0.0586,0.0757,1058,301,7.127847735743115e-99,1.3542910697911918e-97,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p1_attributes,Forma,10000,0.1241,0.144,-0.019899999999999987,320,519,6.5379166760239e-12,3.26895833801195e-11,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p1_attributes,"Posición (x,y)",10000,0.0289,0.2567,-0.22779999999999997,205,2483,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p1_attributes,Color objeto ±1,10000,0.895,0.8895,0.00550000000000006,766,711,0.1599721688121456,0.3199443376242912,False
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p1_attributes,Forma+pos+color±1,10000,0.0037,0.0308,-0.0271,35,306,3.544840294323316e-55,5.317260441484975e-54,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p2_constrained,Forma,10000,0.1241,0.4654,-0.3413,127,3540,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p2_constrained,"Posición (x,y)",10000,0.0289,0.404,-0.37510000000000004,162,3913,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p2_constrained,Color objeto ±1,10000,0.895,0.9853,-0.09029999999999994,38,941,1.6820142391951995e-226,3.868632750148959e-225,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p2_constrained,Forma+pos+color±1,10000,0.0037,0.1871,-0.18339999999999998,33,1867,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p3_json,Forma,10000,0.1241,0.4094,-0.2853,204,3057,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p3_json,"Posición (x,y)",10000,0.0289,0.2518,-0.22290000000000001,130,2359,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p3_json,Color objeto ±1,10000,0.895,0.8201,0.07489999999999997,1562,813,4.756086167148274e-54,6.658520634007584e-53,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p3_json,Forma+pos+color±1,10000,0.0037,0.0778,-0.0741,20,761,3.702454221987461e-196,8.145399288372415e-195,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p4_dataset_format,Forma,10000,0.1241,0.1777,-0.053599999999999995,506,1042,5.965002195570961e-43,5.965002195570961e-42,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p4_dataset_format,"Posición (x,y)",10000,0.0289,0.2043,-0.1754,256,2010,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p4_dataset_format,Color objeto ±1,10000,0.895,0.798,0.09699999999999998,1554,584,4.430386956500122e-101,7.974696521700219e-100,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p0_minimal,InternVL3.5-8B · p4_dataset_format,Forma+pos+color±1,10000,0.0037,0.042,-0.0383,33,416,1.722705000551324e-85,2.928598500937251e-84,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p1_attributes,InternVL3.5-8B · p2_constrained,Forma,10000,0.144,0.4654,-0.3214,52,3266,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p1_attributes,InternVL3.5-8B · p2_constrained,"Posición (x,y)",10000,0.2567,0.404,-0.14730000000000004,1003,2476,8.043233419628633e-142,1.52821434972944e-140,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p1_attributes,InternVL3.5-8B · p2_constrained,Color objeto ±1,10000,0.8895,0.9853,-0.0958,34,992,1.343140860067513e-245,3.357852150168782e-244,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p1_attributes,InternVL3.5-8B · p2_constrained,Forma+pos+color±1,10000,0.0308,0.1871,-0.1563,145,1708,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p1_attributes,InternVL3.5-8B · p3_json,Forma,10000,0.144,0.4094,-0.26539999999999997,103,2757,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p1_attributes,InternVL3.5-8B · p3_json,"Posición (x,y)",10000,0.2567,0.2518,0.00489999999999996,1716,1667,0.4092282818701365,0.4092282818701365,False
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p1_attributes,InternVL3.5-8B · p3_json,Color objeto ±1,10000,0.8895,0.8201,0.0693999999999999,1632,938,4.7816129080224685e-43,5.259774198824715e-42,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p1_attributes,InternVL3.5-8B · p3_json,Forma+pos+color±1,10000,0.0308,0.0778,-0.04699999999999999,260,730,3.0978534824514188e-52,3.7174241789417027e-51,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p1_attributes,InternVL3.5-8B · p4_dataset_format,Forma,10000,0.144,0.1777,-0.03370000000000001,584,921,3.4014986099854325e-18,2.0408991659912595e-17,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p1_attributes,InternVL3.5-8B · p4_dataset_format,"Posición (x,y)",10000,0.2567,0.2043,0.052399999999999974,1938,1414,1.4085065987251423e-19,9.859546191075996e-19,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p1_attributes,InternVL3.5-8B · p4_dataset_format,Color objeto ±1,10000,0.8895,0.798,0.09149999999999991,1634,719,2.9153011280979492e-81,4.664481804956719e-80,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p1_attributes,InternVL3.5-8B · p4_dataset_format,Forma+pos+color±1,10000,0.0308,0.042,-0.011200000000000002,246,358,5.932963230417027e-06,2.3731852921668108e-05,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p2_constrained,InternVL3.5-8B · p3_json,Forma,10000,0.4654,0.4094,0.055999999999999994,953,393,5.570770841874155e-54,7.242002094436402e-53,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p2_constrained,InternVL3.5-8B · p3_json,"Posición (x,y)",10000,0.404,0.2518,0.1522,2609,1087,2.891700150591749e-142,5.783400301183497e-141,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p2_constrained,InternVL3.5-8B · p3_json,Color objeto ±1,10000,0.9853,0.8201,0.1651999999999999,1730,78,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p2_constrained,InternVL3.5-8B · p3_json,Forma+pos+color±1,10000,0.1871,0.0778,0.1093,1474,381,2.8874484253942267e-151,6.063641693327876e-150,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p2_constrained,InternVL3.5-8B · p4_dataset_format,Forma,10000,0.4654,0.1777,0.28769999999999996,3219,342,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p2_constrained,InternVL3.5-8B · p4_dataset_format,"Posición (x,y)",10000,0.404,0.2043,0.19970000000000002,2887,890,1.8720783276503802e-243,4.4929879863609125e-242,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p2_constrained,InternVL3.5-8B · p4_dataset_format,Color objeto ±1,10000,0.9853,0.798,0.1872999999999999,1895,22,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p2_constrained,InternVL3.5-8B · p4_dataset_format,Forma+pos+color±1,10000,0.1871,0.042,0.14509999999999998,1667,216,2.0710729815824527e-277,5.384789752114377e-276,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p3_json,InternVL3.5-8B · p4_dataset_format,Forma,10000,0.4094,0.1777,0.2317,2429,112,0.0,0.0,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p3_json,InternVL3.5-8B · p4_dataset_format,"Posición (x,y)",10000,0.2518,0.2043,0.047500000000000014,1608,1133,1.1244926356811943e-19,8.995941085449555e-19,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p3_json,InternVL3.5-8B · p4_dataset_format,Color objeto ±1,10000,0.8201,0.798,0.02210000000000001,1524,1303,3.47793732100571e-05,0.00010433811963017129,True
+prompts · e1 · InternVL3.5-8B,InternVL3.5-8B · p3_json,InternVL3.5-8B · p4_dataset_format,Forma+pos+color±1,10000,0.0778,0.042,0.03579999999999999,670,312,1.0081874705359636e-30,9.073687234823673e-30,True
+prompts · e1 · VL-JEPA,VL-JEPA · p1_attributes,VL-JEPA · p2_constrained,Forma,10000,0.2542,0.2619,-0.00770000000000004,99,176,3.9967595203437515e-06,1.5987038081375006e-05,True
+prompts · e1 · VL-JEPA,VL-JEPA · p1_attributes,VL-JEPA · p2_constrained,"Posición (x,y)",10000,0.1015,0.1026,-0.0010999999999999899,252,263,0.659506230575055,1.0,False
+prompts · e1 · VL-JEPA,VL-JEPA · p1_attributes,VL-JEPA · p2_constrained,Color objeto ±1,10000,0.3942,0.3926,0.0015999999999999903,484,468,0.6268819246517612,1.0,False
+prompts · e1 · VL-JEPA,VL-JEPA · p1_attributes,VL-JEPA · p2_constrained,Forma+pos+color±1,10000,0.0079,0.0086,-0.0006999999999999992,23,30,0.4101027163746913,1.0,False
+modelos · e1,LLaVA-1.5-7B · p3_json,Qwen2.5-VL-7B · p2_constrained,Forma,10000,0.5198,0.4637,0.05610000000000004,1623,1062,2.0669070716844333e-27,1.9428926473833672e-25,True
+modelos · e1,LLaVA-1.5-7B · p3_json,Qwen2.5-VL-7B · p2_constrained,"Posición (x,y)",10000,0.0678,0.3207,-0.2529,75,2604,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,Qwen2.5-VL-7B · p2_constrained,Color objeto ±1,10000,0.9245,0.9249,-0.00040000000000006697,535,539,0.9270677537162167,1.0,False
+modelos · e1,LLaVA-1.5-7B · p3_json,Qwen2.5-VL-7B · p2_constrained,Forma+pos+color±1,10000,0.0398,0.1314,-0.09159999999999999,245,1161,1.1343678911530577e-142,1.2024299646222411e-140,True
+modelos · e1,LLaVA-1.5-7B · p3_json,InternVL3.5-8B · p2_constrained,Forma,10000,0.5198,0.4654,0.05440000000000006,1419,875,4.6501948253334236e-30,4.417685084066752e-28,True
+modelos · e1,LLaVA-1.5-7B · p3_json,InternVL3.5-8B · p2_constrained,"Posición (x,y)",10000,0.0678,0.404,-0.33620000000000005,103,3465,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,InternVL3.5-8B · p2_constrained,Color objeto ±1,10000,0.9245,0.9853,-0.060799999999999965,73,681,1.609121742696226e-124,1.6895778298310375e-122,True
+modelos · e1,LLaVA-1.5-7B · p3_json,InternVL3.5-8B · p2_constrained,Forma+pos+color±1,10000,0.0398,0.1871,-0.1473,171,1644,3.639744253618456e-302,4.731667529703993e-300,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA · p2_constrained,Forma,10000,0.5198,0.2619,0.2579,3204,625,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA · p2_constrained,"Posición (x,y)",10000,0.0678,0.1026,-0.0348,661,1009,1.5702776745046882e-17,1.46035823728936e-15,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA · p2_constrained,Color objeto ±1,10000,0.9245,0.3926,0.5319,5573,254,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA · p2_constrained,Forma+pos+color±1,10000,0.0398,0.0086,0.031200000000000002,397,85,3.123054022444273e-49,3.0918234822198305e-47,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,Forma,10000,0.5198,0.2466,0.2732,3260,528,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,"Posición (x,y)",10000,0.0678,0.0913,-0.023500000000000007,646,881,1.976947214539028e-09,1.5420188273404417e-07,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,Color objeto ±1,10000,0.9245,0.4002,0.5243,5480,237,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,Forma+pos+color±1,10000,0.0398,0.0082,0.0316,394,78,7.858705876202406e-52,7.93729293496443e-50,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Forma,10000,0.5198,0.2466,0.2732,3260,528,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,"Posición (x,y)",10000,0.0678,0.0913,-0.023500000000000007,646,881,1.976947214539028e-09,1.5420188273404417e-07,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Color objeto ±1,10000,0.9245,0.4002,0.5243,5480,237,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Forma+pos+color±1,10000,0.0398,0.0082,0.0316,394,78,7.858705876202406e-52,7.93729293496443e-50,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-014419] · p3_json,Forma,10000,0.5198,0.2629,0.2569,3201,632,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-014419] · p3_json,"Posición (x,y)",10000,0.0678,0.1017,-0.0339,654,993,6.389053307780757e-17,5.877929043158297e-15,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-014419] · p3_json,Color objeto ±1,10000,0.9245,0.3839,0.5406,5657,251,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-014419] · p3_json,Forma+pos+color±1,10000,0.0398,0.0087,0.031100000000000003,396,85,5.148101128664565e-49,5.045139106091274e-47,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma,10000,0.5198,0.2629,0.2569,3201,632,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-014420] · p3_json,"Posición (x,y)",10000,0.0678,0.1017,-0.0339,654,993,6.389053307780757e-17,5.877929043158297e-15,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-014420] · p3_json,Color objeto ±1,10000,0.9245,0.3839,0.5406,5657,251,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma+pos+color±1,10000,0.0398,0.0087,0.031100000000000003,396,85,5.148101128664565e-49,5.045139106091274e-47,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma,10000,0.5198,0.2592,0.26060000000000005,3210,604,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,"Posición (x,y)",10000,0.0678,0.099,-0.031200000000000006,653,965,8.80969529130274e-15,7.928725762172466e-13,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Color objeto ±1,10000,0.9245,0.3904,0.5341,5578,237,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma+pos+color±1,10000,0.0398,0.008,0.0318,396,78,2.812583971326985e-52,2.8969614904667944e-50,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma,10000,0.5198,0.2592,0.26060000000000005,3210,604,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,"Posición (x,y)",10000,0.0678,0.099,-0.031200000000000006,653,965,8.80969529130274e-15,7.928725762172466e-13,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Color objeto ±1,10000,0.9245,0.3904,0.5341,5578,237,0.0,0.0,True
+modelos · e1,LLaVA-1.5-7B · p3_json,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma+pos+color±1,10000,0.0398,0.008,0.0318,396,78,2.812583971326985e-52,2.8969614904667944e-50,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,InternVL3.5-8B · p2_constrained,Forma,10000,0.4637,0.4654,-0.0016999999999999793,1462,1479,0.7679735310519255,1.0,False
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,InternVL3.5-8B · p2_constrained,"Posición (x,y)",10000,0.3207,0.404,-0.08330000000000004,718,1551,6.928972162277031e-70,7.206131048768113e-68,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,InternVL3.5-8B · p2_constrained,Color objeto ±1,10000,0.9249,0.9853,-0.0603999999999999,33,637,4.053385935996367e-146,4.337122951516112e-144,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,InternVL3.5-8B · p2_constrained,Forma+pos+color±1,10000,0.1314,0.1871,-0.0557,637,1194,3.4553310171405265e-39,3.3171177764549056e-37,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA · p2_constrained,Forma,10000,0.4637,0.2619,0.20179999999999998,3045,1027,3.7549489852450114e-229,4.205542863474413e-227,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA · p2_constrained,"Posición (x,y)",10000,0.3207,0.1026,0.2181,2961,780,1.8627188093691637e-296,2.3283985117114546e-294,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA · p2_constrained,Color objeto ±1,10000,0.9249,0.3926,0.5323,5647,324,0.0,0.0,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA · p2_constrained,Forma+pos+color±1,10000,0.1314,0.0086,0.12279999999999999,1298,70,1.5263282781270696e-293,1.8926470648775664e-291,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,Forma,10000,0.4637,0.2466,0.2171,3113,942,3.406993814597463e-268,4.054322639370981e-266,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,"Posición (x,y)",10000,0.3207,0.0913,0.2294,2935,641,0.0,0.0,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,Color objeto ±1,10000,0.9249,0.4002,0.5247,5558,311,0.0,0.0,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,Forma+pos+color±1,10000,0.1314,0.0082,0.12319999999999999,1292,60,4.902582422860664e-302,6.324331325490257e-300,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Forma,10000,0.4637,0.2466,0.2171,3113,942,3.406993814597463e-268,4.054322639370981e-266,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,"Posición (x,y)",10000,0.3207,0.0913,0.2294,2935,641,0.0,0.0,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Color objeto ±1,10000,0.9249,0.4002,0.5247,5558,311,0.0,0.0,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Forma+pos+color±1,10000,0.1314,0.0082,0.12319999999999999,1292,60,4.902582422860664e-302,6.324331325490257e-300,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-014419] · p3_json,Forma,10000,0.4637,0.2629,0.20079999999999998,3048,1040,7.794111056545345e-226,8.495581051634426e-224,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-014419] · p3_json,"Posición (x,y)",10000,0.3207,0.1017,0.21899999999999997,2942,752,2.02971705713923e-303,2.6792265154237836e-301,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-014419] · p3_json,Color objeto ±1,10000,0.9249,0.3839,0.541,5731,321,0.0,0.0,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-014419] · p3_json,Forma+pos+color±1,10000,0.1314,0.0087,0.12269999999999999,1297,70,2.896580238148523e-293,3.5627936929226835e-291,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma,10000,0.4637,0.2629,0.20079999999999998,3048,1040,7.794111056545345e-226,8.495581051634426e-224,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-014420] · p3_json,"Posición (x,y)",10000,0.3207,0.1017,0.21899999999999997,2942,752,2.02971705713923e-303,2.6792265154237836e-301,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-014420] · p3_json,Color objeto ±1,10000,0.9249,0.3839,0.541,5731,321,0.0,0.0,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma+pos+color±1,10000,0.1314,0.0087,0.12269999999999999,1297,70,2.896580238148523e-293,3.5627936929226835e-291,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma,10000,0.4637,0.2592,0.20450000000000002,3057,1012,9.105892930059583e-236,1.0471776869568522e-233,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,"Posición (x,y)",10000,0.3207,0.099,0.22169999999999998,2961,744,2.0189393700005e-310,2.705378755800648e-308,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Color objeto ±1,10000,0.9249,0.3904,0.5345,5656,311,0.0,0.0,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma+pos+color±1,10000,0.1314,0.008,0.12339999999999998,1299,65,7.798597391706696e-299,9.904218687467505e-297,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma,10000,0.4637,0.2592,0.20450000000000002,3057,1012,9.105892930059583e-236,1.0471776869568522e-233,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,"Posición (x,y)",10000,0.3207,0.099,0.22169999999999998,2961,744,2.0189393700005e-310,2.705378755800648e-308,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Color objeto ±1,10000,0.9249,0.3904,0.5345,5656,311,0.0,0.0,True
+modelos · e1,Qwen2.5-VL-7B · p2_constrained,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma+pos+color±1,10000,0.1314,0.008,0.12339999999999998,1299,65,7.798597391706696e-299,9.904218687467505e-297,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA · p2_constrained,Forma,10000,0.4654,0.2619,0.20349999999999996,3072,1037,6.680835072557164e-231,7.549343631989595e-229,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA · p2_constrained,"Posición (x,y)",10000,0.404,0.1026,0.3014,3702,688,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA · p2_constrained,Color objeto ±1,10000,0.9853,0.3926,0.5927,5997,70,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA · p2_constrained,Forma+pos+color±1,10000,0.1871,0.0086,0.1785,1846,61,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,Forma,10000,0.4654,0.2466,0.21879999999999997,3124,936,2.9521563490694582e-272,3.5721091823740446e-270,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,"Posición (x,y)",10000,0.404,0.0913,0.31270000000000003,3675,548,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,Color objeto ±1,10000,0.9853,0.4002,0.5851,5909,58,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,Forma+pos+color±1,10000,0.1871,0.0082,0.17889999999999998,1839,50,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Forma,10000,0.4654,0.2466,0.21879999999999997,3124,936,2.9521563490694582e-272,3.5721091823740446e-270,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,"Posición (x,y)",10000,0.404,0.0913,0.31270000000000003,3675,548,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Color objeto ±1,10000,0.9853,0.4002,0.5851,5909,58,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Forma+pos+color±1,10000,0.1871,0.0082,0.17889999999999998,1839,50,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-014419] · p3_json,Forma,10000,0.4654,0.2629,0.20249999999999996,3074,1049,1.0448924435285027e-227,1.159830612316638e-225,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-014419] · p3_json,"Posición (x,y)",10000,0.404,0.1017,0.3023,3686,663,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-014419] · p3_json,Color objeto ±1,10000,0.9853,0.3839,0.6013999999999999,6083,69,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-014419] · p3_json,Forma+pos+color±1,10000,0.1871,0.0087,0.1784,1847,63,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma,10000,0.4654,0.2629,0.20249999999999996,3074,1049,1.0448924435285027e-227,1.159830612316638e-225,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-014420] · p3_json,"Posición (x,y)",10000,0.404,0.1017,0.3023,3686,663,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-014420] · p3_json,Color objeto ±1,10000,0.9853,0.3839,0.6013999999999999,6083,69,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma+pos+color±1,10000,0.1871,0.0087,0.1784,1847,63,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma,10000,0.4654,0.2592,0.2062,3082,1020,9.179176174807838e-238,1.073963612452517e-235,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,"Posición (x,y)",10000,0.404,0.099,0.30500000000000005,3701,651,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Color objeto ±1,10000,0.9853,0.3904,0.5949,6015,66,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma+pos+color±1,10000,0.1871,0.008,0.17909999999999998,1851,60,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma,10000,0.4654,0.2592,0.2062,3082,1020,9.179176174807838e-238,1.073963612452517e-235,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,"Posición (x,y)",10000,0.404,0.099,0.30500000000000005,3701,651,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Color objeto ±1,10000,0.9853,0.3904,0.5949,6015,66,0.0,0.0,True
+modelos · e1,InternVL3.5-8B · p2_constrained,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma+pos+color±1,10000,0.1871,0.008,0.17909999999999998,1851,60,0.0,0.0,True
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,Forma,10000,0.2619,0.2466,0.015300000000000008,327,174,7.722995745911234e-12,6.487316426565436e-10,True
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,"Posición (x,y)",10000,0.1026,0.0913,0.01129999999999999,500,387,0.00016637452986577997,0.011646217090604599,True
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,Color objeto ±1,10000,0.3926,0.4002,-0.007599999999999996,827,903,0.07132980799300358,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,Forma+pos+color±1,10000,0.0086,0.0082,0.0003999999999999993,46,42,0.7493290032022802,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Forma,10000,0.2619,0.2466,0.015300000000000008,327,174,7.722995745911234e-12,6.487316426565436e-10,True
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,"Posición (x,y)",10000,0.1026,0.0913,0.01129999999999999,500,387,0.00016637452986577997,0.011646217090604599,True
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Color objeto ±1,10000,0.3926,0.4002,-0.007599999999999996,827,903,0.07132980799300358,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Forma+pos+color±1,10000,0.0086,0.0082,0.0003999999999999993,46,42,0.7493290032022802,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-014419] · p3_json,Forma,10000,0.2619,0.2629,-0.0010000000000000009,28,38,0.2678116648465871,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-014419] · p3_json,"Posición (x,y)",10000,0.1026,0.1017,0.000899999999999998,92,83,0.5454726578478973,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-014419] · p3_json,Color objeto ±1,10000,0.3926,0.3839,0.008699999999999986,197,110,7.814141708192552e-07,5.93874769822634e-05,True
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-014419] · p3_json,Forma+pos+color±1,10000,0.0086,0.0087,-9.99999999999994e-05,7,8,1.0,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma,10000,0.2619,0.2629,-0.0010000000000000009,28,38,0.2678116648465871,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-014420] · p3_json,"Posición (x,y)",10000,0.1026,0.1017,0.000899999999999998,92,83,0.5454726578478973,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-014420] · p3_json,Color objeto ±1,10000,0.3926,0.3839,0.008699999999999986,197,110,7.814141708192552e-07,5.93874769822634e-05,True
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma+pos+color±1,10000,0.0086,0.0087,-9.99999999999994e-05,7,8,1.0,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma,10000,0.2619,0.2592,0.0027000000000000357,89,62,0.03401054230206992,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,"Posición (x,y)",10000,0.1026,0.099,0.003599999999999992,173,137,0.04665163231707609,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Color objeto ±1,10000,0.3926,0.3904,0.0021999999999999797,321,299,0.3990342307654337,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma+pos+color±1,10000,0.0086,0.008,0.0005999999999999998,21,15,0.4050322461407632,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma,10000,0.2619,0.2592,0.0027000000000000357,89,62,0.03401054230206992,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,"Posición (x,y)",10000,0.1026,0.099,0.003599999999999992,173,137,0.04665163231707609,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Color objeto ±1,10000,0.3926,0.3904,0.0021999999999999797,321,299,0.3990342307654337,1.0,False
+modelos · e1,VL-JEPA · p2_constrained,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma+pos+color±1,10000,0.0086,0.008,0.0005999999999999998,21,15,0.4050322461407632,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Forma,10000,0.2466,0.2466,0.0,0,0,1.0,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,"Posición (x,y)",10000,0.0913,0.0913,0.0,0,0,1.0,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Color objeto ±1,10000,0.4002,0.4002,0.0,0,0,1.0,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,Forma+pos+color±1,10000,0.0082,0.0082,0.0,0,0,1.0,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-014419] · p3_json,Forma,10000,0.2466,0.2629,-0.01630000000000001,184,347,1.38533541538886e-12,1.219095165542197e-10,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-014419] · p3_json,"Posición (x,y)",10000,0.0913,0.1017,-0.010399999999999993,405,509,0.0006490403306036972,0.04413474248105141,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-014419] · p3_json,Color objeto ±1,10000,0.4002,0.3839,0.01629999999999998,974,811,0.00012462413682227767,0.009222186124848548,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-014419] · p3_json,Forma+pos+color±1,10000,0.0082,0.0087,-0.0004999999999999987,43,48,0.675222459916057,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma,10000,0.2466,0.2629,-0.01630000000000001,184,347,1.38533541538886e-12,1.219095165542197e-10,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-014420] · p3_json,"Posición (x,y)",10000,0.0913,0.1017,-0.010399999999999993,405,509,0.0006490403306036972,0.04413474248105141,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-014420] · p3_json,Color objeto ±1,10000,0.4002,0.3839,0.01629999999999998,974,811,0.00012462413682227767,0.009222186124848548,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma+pos+color±1,10000,0.0082,0.0087,-0.0004999999999999987,43,48,0.675222459916057,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma,10000,0.2466,0.2592,-0.012599999999999972,149,275,9.672927899512107e-10,7.931800877599928e-08,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,"Posición (x,y)",10000,0.0913,0.099,-0.0076999999999999985,345,422,0.006029830971254133,0.36178985827524796,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Color objeto ±1,10000,0.4002,0.3904,0.009799999999999975,794,696,0.011948296656450363,0.6691046127612204,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma+pos+color±1,10000,0.0082,0.008,0.00020000000000000052,40,38,0.9099464518745242,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma,10000,0.2466,0.2592,-0.012599999999999972,149,275,9.672927899512107e-10,7.931800877599928e-08,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,"Posición (x,y)",10000,0.0913,0.099,-0.0076999999999999985,345,422,0.006029830971254133,0.36178985827524796,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Color objeto ±1,10000,0.4002,0.3904,0.009799999999999975,794,696,0.011948296656450363,0.6691046127612204,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012131] · p0_minimal,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma+pos+color±1,10000,0.0082,0.008,0.00020000000000000052,40,38,0.9099464518745242,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-014419] · p3_json,Forma,10000,0.2466,0.2629,-0.01630000000000001,184,347,1.38533541538886e-12,1.219095165542197e-10,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-014419] · p3_json,"Posición (x,y)",10000,0.0913,0.1017,-0.010399999999999993,405,509,0.0006490403306036972,0.04413474248105141,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-014419] · p3_json,Color objeto ±1,10000,0.4002,0.3839,0.01629999999999998,974,811,0.00012462413682227767,0.009222186124848548,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-014419] · p3_json,Forma+pos+color±1,10000,0.0082,0.0087,-0.0004999999999999987,43,48,0.675222459916057,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma,10000,0.2466,0.2629,-0.01630000000000001,184,347,1.38533541538886e-12,1.219095165542197e-10,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-014420] · p3_json,"Posición (x,y)",10000,0.0913,0.1017,-0.010399999999999993,405,509,0.0006490403306036972,0.04413474248105141,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-014420] · p3_json,Color objeto ±1,10000,0.4002,0.3839,0.01629999999999998,974,811,0.00012462413682227767,0.009222186124848548,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma+pos+color±1,10000,0.0082,0.0087,-0.0004999999999999987,43,48,0.675222459916057,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma,10000,0.2466,0.2592,-0.012599999999999972,149,275,9.672927899512107e-10,7.931800877599928e-08,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,"Posición (x,y)",10000,0.0913,0.099,-0.0076999999999999985,345,422,0.006029830971254133,0.36178985827524796,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Color objeto ±1,10000,0.4002,0.3904,0.009799999999999975,794,696,0.011948296656450363,0.6691046127612204,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma+pos+color±1,10000,0.0082,0.008,0.00020000000000000052,40,38,0.9099464518745242,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma,10000,0.2466,0.2592,-0.012599999999999972,149,275,9.672927899512107e-10,7.931800877599928e-08,True
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,"Posición (x,y)",10000,0.0913,0.099,-0.0076999999999999985,345,422,0.006029830971254133,0.36178985827524796,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Color objeto ±1,10000,0.4002,0.3904,0.009799999999999975,794,696,0.011948296656450363,0.6691046127612204,False
+modelos · e1,VL-JEPA [n10000_none_20260914-012156] · p0_minimal,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma+pos+color±1,10000,0.0082,0.008,0.00020000000000000052,40,38,0.9099464518745242,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014419] · p3_json,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma,10000,0.2629,0.2629,0.0,0,0,1.0,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014419] · p3_json,VL-JEPA [n10000_none_20260914-014420] · p3_json,"Posición (x,y)",10000,0.1017,0.1017,0.0,0,0,1.0,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014419] · p3_json,VL-JEPA [n10000_none_20260914-014420] · p3_json,Color objeto ±1,10000,0.3839,0.3839,0.0,0,0,1.0,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014419] · p3_json,VL-JEPA [n10000_none_20260914-014420] · p3_json,Forma+pos+color±1,10000,0.0087,0.0087,0.0,0,0,1.0,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014419] · p3_json,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma,10000,0.2629,0.2592,0.0037000000000000366,103,66,0.005461315704369491,0.34952420507964743,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014419] · p3_json,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,"Posición (x,y)",10000,0.1017,0.099,0.002699999999999994,190,163,0.16631596757083641,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014419] · p3_json,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Color objeto ±1,10000,0.3839,0.3904,-0.006500000000000006,296,361,0.01247057514746873,0.6691046127612204,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014419] · p3_json,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma+pos+color±1,10000,0.0087,0.008,0.0006999999999999992,22,15,0.3240086000878364,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014419] · p3_json,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma,10000,0.2629,0.2592,0.0037000000000000366,103,66,0.005461315704369491,0.34952420507964743,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014419] · p3_json,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,"Posición (x,y)",10000,0.1017,0.099,0.002699999999999994,190,163,0.16631596757083641,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014419] · p3_json,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Color objeto ±1,10000,0.3839,0.3904,-0.006500000000000006,296,361,0.01247057514746873,0.6691046127612204,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014419] · p3_json,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma+pos+color±1,10000,0.0087,0.008,0.0006999999999999992,22,15,0.3240086000878364,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014420] · p3_json,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma,10000,0.2629,0.2592,0.0037000000000000366,103,66,0.005461315704369491,0.34952420507964743,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014420] · p3_json,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,"Posición (x,y)",10000,0.1017,0.099,0.002699999999999994,190,163,0.16631596757083641,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014420] · p3_json,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Color objeto ±1,10000,0.3839,0.3904,-0.006500000000000006,296,361,0.01247057514746873,0.6691046127612204,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014420] · p3_json,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,Forma+pos+color±1,10000,0.0087,0.008,0.0006999999999999992,22,15,0.3240086000878364,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014420] · p3_json,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma,10000,0.2629,0.2592,0.0037000000000000366,103,66,0.005461315704369491,0.34952420507964743,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014420] · p3_json,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,"Posición (x,y)",10000,0.1017,0.099,0.002699999999999994,190,163,0.16631596757083641,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014420] · p3_json,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Color objeto ±1,10000,0.3839,0.3904,-0.006500000000000006,296,361,0.01247057514746873,0.6691046127612204,False
+modelos · e1,VL-JEPA [n10000_none_20260914-014420] · p3_json,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma+pos+color±1,10000,0.0087,0.008,0.0006999999999999992,22,15,0.3240086000878364,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma,10000,0.2592,0.2592,0.0,0,0,1.0,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,"Posición (x,y)",10000,0.099,0.099,0.0,0,0,1.0,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Color objeto ±1,10000,0.3904,0.3904,0.0,0,0,1.0,1.0,False
+modelos · e1,VL-JEPA [n10000_none_20260914-015108] · p4_dataset_format,VL-JEPA [n10000_none_20260914-015112] · p4_dataset_format,Forma+pos+color±1,10000,0.008,0.008,0.0,0,0,1.0,1.0,False

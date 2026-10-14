@@ -1,0 +1,18 @@
+# InternVL3-1B (versión -hf nativa): InternViT-300M (448 px, teselas dinámicas) + MLP + Qwen2.5-0.5B.
+name: internvl3_1b
+family: hf
+hf_id: OpenGVLab/InternVL3-1B-hf
+revision: null
+model_class: AutoModelForImageTextToText     # -> InternVLForConditionalGeneration
+quant: nf4
+quant_skip_modules: ['.*\.vision_tower', '.*\.multi_modal_projector', 'lm_head']
+vision_modules: [vision_tower, multi_modal_projector]
+attn_implementation: sdpa
+# una imagen de 224 px cabe en una tesela de 448 -> 256 tokens visuales
+batch_size: 64
+generation:
+  max_new_tokens: 128
+  do_sample: false
+  num_beams: 1
+lora_target_modules: null
+adapter_path: null

@@ -1,0 +1,32 @@
+# Etapa 1 sobre 10 000 imagenes de test: 5 modelos x 6 prompts (p0-p4m), mismo subset_seed=0.
+# Los p4/p4m ya corridos con p4_sensibilidad.txt (data.limit=10000) tienen el mismo exp_id: run_queue los salta.
+model=vljepa           prompt=p0_minimal         data.limit=10000 infer.save_embeddings=true
+model=vljepa           prompt=p1_attributes      data.limit=10000 infer.save_embeddings=true
+model=vljepa           prompt=p2_constrained     data.limit=10000 infer.save_embeddings=true
+model=vljepa           prompt=p3_json            data.limit=10000 infer.save_embeddings=true
+model=vljepa           prompt=p4_dataset_format  data.limit=10000 infer.save_embeddings=true
+model=vljepa           prompt=p4m_multiexample   data.limit=10000 infer.save_embeddings=true
+model=llava_ov         prompt=p0_minimal         data.limit=10000
+model=llava_ov         prompt=p1_attributes      data.limit=10000
+model=llava_ov         prompt=p2_constrained     data.limit=10000
+model=llava_ov         prompt=p3_json            data.limit=10000
+model=llava_ov         prompt=p4_dataset_format  data.limit=10000
+model=llava_ov         prompt=p4m_multiexample   data.limit=10000
+model=qwen35           prompt=p0_minimal         data.limit=10000
+model=qwen35           prompt=p1_attributes      data.limit=10000
+model=qwen35           prompt=p2_constrained     data.limit=10000
+model=qwen35           prompt=p3_json            data.limit=10000
+model=qwen35           prompt=p4_dataset_format  data.limit=10000
+model=qwen35           prompt=p4m_multiexample   data.limit=10000
+model=qwen35_instruct  prompt=p0_minimal         data.limit=10000
+model=qwen35_instruct  prompt=p1_attributes      data.limit=10000
+model=qwen35_instruct  prompt=p2_constrained     data.limit=10000
+model=qwen35_instruct  prompt=p3_json            data.limit=10000
+model=qwen35_instruct  prompt=p4_dataset_format  data.limit=10000
+model=qwen35_instruct  prompt=p4m_multiexample   data.limit=10000
+model=internvl3        prompt=p0_minimal         data.limit=10000
+model=internvl3        prompt=p1_attributes      data.limit=10000
+model=internvl3        prompt=p2_constrained     data.limit=10000
+model=internvl3        prompt=p3_json            data.limit=10000
+model=internvl3        prompt=p4_dataset_format  data.limit=10000
+model=internvl3        prompt=p4m_multiexample   data.limit=10000

@@ -1,0 +1,20 @@
+# Valores base. Toda configuración resuelta parte de aquí (ver src/vlmfid/config.py).
+exp_id: null            # null -> <stage>_<model>_<quant>_<prompt>_<split>[_<variant>][_n<limit>]
+stage: zeroshot         # zeroshot | finetuned
+seed: 0
+model: llava_ov         # nombre de archivo en configs/models/
+prompt: p0_minimal      # clave en configs/prompts.yaml
+
+data:
+  dataset: m3di
+  variant: base         # base = M3DI publicado; otras = data/generated/<variant>
+  root: null            # null -> M3DI_ROOT (base) o data/generated/<variant>
+  split: test
+  limit: null           # subconjunto aleatorio determinista (mismos ids para todos los modelos)
+  subset_seed: 0
+  num_workers: 2        # el cluster tiene 8 núcleos compartidos
+
+infer:
+  batch_size: null      # null -> model.batch_size
+  log_every: 10         # lotes entre líneas de progreso
+  save_embeddings: false
