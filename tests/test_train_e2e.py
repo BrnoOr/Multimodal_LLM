@@ -22,6 +22,13 @@ from vlmfid.data.manifest import to_records
 from vlmfid.train import loop
 
 
+@pytest.fixture(autouse=True)
+def solo_cpu(monkeypatch):
+    """Los modelos diminutos viven en CPU. Trainer y VLJEPADescriber eligen el dispositivo con
+    torch.cuda.is_available(), así que en el cluster (con GPU) mandarían los tensores a cuda:0."""
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+
 @pytest.fixture
 def data(tmp_path, monkeypatch):
     root = tmp_path / "m3di"
