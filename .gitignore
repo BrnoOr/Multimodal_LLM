@@ -6,6 +6,7 @@ __pycache__/
 .ipynb_checkpoints/
 .pytest_cache/
 .ruff_cache/
+.claude/
 
 # datos y pesos (solo se versionan los manifiestos)
 data/raw/*
