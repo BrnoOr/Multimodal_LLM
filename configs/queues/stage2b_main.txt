@@ -1,0 +1,8 @@
+# Etapa 2 reformulada — entrenamiento principal: objetivo canónico, 1 época completa de las 125 000 imágenes, sin límite (1954 pasos de 64; el último con 8).
+#   SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2b_main scripts/run_queue.sh configs/queues/stage2b_main.txt
+# exp_id: train_<model>_nf4_p1_attributes_tcan_r16_e1. Relanzar reanuda el interrumpido y salta los completos.
+# Orden: del más barato al más caro en tokens visuales (VL-JEPA ≈ Qwen3.5 < InternVL3 < LLaVA-OV).
+model=vljepa
+model=qwen35
+model=internvl3
+model=llava_ov

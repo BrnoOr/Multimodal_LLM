@@ -150,23 +150,34 @@ class VLJEPADescriber(Describer):
             out.append(F.normalize(e.float(), dim=-1).half())
         return torch.cat(out)
 
+    def _bank_format(self) -> str:
+        """Formato de los textos del banco: `original` (captions de M3DI, etapa 1) o `canonical` (el
+        objetivo de la etapa 2 reformulada; ver vlmfid.data.targets)."""
+        return str(self.cfg.bank.get("target_format") or "original")
+
     def _bank_key(self) -> str:
         b = self.cfg.bank
         st = self.ckpt_path.stat()
         ident = (f"{self.ckpt_path.name}|{st.st_size}|{b.split}|{b.max_captions}|{b.seed}|"
                  f"{self.max_caption_len}|{self.cfg.get('adapter_path')}")
+        if self._bank_format() != "original":          # la clave de los bancos ya cacheados no cambia
+            ident += f"|{self._bank_format()}"
         return hashlib.sha1(ident.encode()).hexdigest()[:12]
 
     def _build_bank(self) -> None:
+        from ..data.targets import target_text
+
         b = self.cfg.bank
+        fmt = self._bank_format()
         rows = load_manifest(b.split, limit=b.max_captions, subset_seed=b.seed)
+        row_text = [target_text(r, fmt) for r in rows]
         cache = CACHE / f"vljepa_bank_{self._bank_key()}.pt"
         if cache.exists():
             blob = torch.load(cache, map_location="cpu", weights_only=False)
             texts, emb = blob["texts"], blob["emb"]
         else:
-            texts = sorted({r["caption"] for r in rows})
-            print(f"[vljepa] codificando banco: {len(texts)} descripciones únicas de '{b.split}'")
+            texts = sorted(set(row_text))
+            print(f"[vljepa] codificando banco: {len(texts)} descripciones únicas de '{b.split}' (formato {fmt})")
             emb = self.encode_texts(texts).cpu()
             cache.parent.mkdir(parents=True, exist_ok=True)
             torch.save({"texts": texts, "emb": emb}, cache)
@@ -175,7 +186,7 @@ class VLJEPADescriber(Describer):
 
         # prototipos por valor de atributo (factores discretos del texto)
         index = {t: i for i, t in enumerate(texts)}
-        row_idx = torch.tensor([index[r["caption"]] for r in rows])
+        row_idx = torch.tensor([index[t] for t in row_text])
         for attr in self._bank_attributes(rows):
             vals = np.array([r["latents_text"][attr] for r in rows])
             uniq = sorted(set(vals.tolist()))
@@ -241,6 +252,6 @@ class VLJEPADescriber(Describer):
 
     def info(self) -> dict:
         out = super().info()
-        out.update({"ckpt": str(self.ckpt_path), "bank_size": len(self.bank_texts),
+        out.update({"ckpt": str(self.ckpt_path), "bank_size": len(self.bank_texts), "bank_format": self._bank_format(),
                     "num_frames": self.num_frames, "attributes": list(self.prototypes)})
         return out

@@ -163,12 +163,14 @@ Las respuestas de `p3_json` se leen con `vlmfid.prompts.parse_json_response`, to
 ## Etapas y siguiente hito
 
 1. **Inferencia sin ajuste** (este código): modelo × prompt, NF4 y bf16.
-2. **Ajuste fino QLoRA** con presupuesto común (`scripts/train.py`, `src/vlmfid/train/`, `configs/train/`): LoRA en el transformer de lenguaje / predictor + conector multimodal, 1 época de train con lote efectivo 64, mejor checkpoint en val por Índice macro. Decisiones, hiperparámetros y su justificación en [`docs/ETAPA2_FINETUNING.md`](docs/ETAPA2_FINETUNING.md).
+2. **Ajuste fino QLoRA** con presupuesto común (`scripts/train.py`, `src/vlmfid/train/`, `configs/train/`): LoRA en el transformer de lenguaje / predictor + conector multimodal, lote efectivo 64, mismo prompt (p1) en los 4 modelos, objetivo **canónico** (`A <color> <forma> is at the <v>-<h> of the image.`), mejor checkpoint en val por forma + posición. Todos los entrenamientos usan train completo (125 000 imágenes, sin límite). Incluye sondas lineales (`scripts/probe.py`) y split composicional. El diseño base y sus hiperparámetros están en [`docs/ETAPA2_FINETUNING.md`](docs/ETAPA2_FINETUNING.md); la reformulación y todos sus cambios, en [`docs/ETAPA2B_REFORMULACION.md`](docs/ETAPA2B_REFORMULACION.md). El análisis de resultados está en `notebooks/04_eda_finetuning.ipynb`.
 
 ```bash
-SCRIPT=scripts/train.py GPU=1 scripts/launch.sh stage2_smoke scripts/run_queue.sh configs/queues/stage2_smoke.txt
-SCRIPT=scripts/train.py GPU=1 scripts/launch.sh stage2_train scripts/run_queue.sh configs/queues/stage2_train.txt
-GPU=1 scripts/launch.sh stage2_test scripts/run_queue.sh configs/queues/stage2_test.txt    # test con adapter_best
+SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2b_smoke scripts/run_queue.sh configs/queues/stage2b_smoke.txt
+SCRIPT=scripts/probe.py GPU=1 scripts/launch.sh s2b_probe scripts/run_queue.sh configs/queues/stage2b_probe.txt
+SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2b_main  scripts/run_queue.sh configs/queues/stage2b_main.txt
+GPU=1 scripts/launch.sh s2b_test scripts/run_queue.sh configs/queues/stage2b_test.txt     # test con adapter_best
+# después: stage2b_compositional, stage2b_ablations (train) y stage2b_probe_ft (probe)
 ```
 
 El extractor de atributos está en `vlmfid.eval.attributes` (el del notebook 02, con tests: 100 % de forma, posición y nombre sobre los captions de referencia).

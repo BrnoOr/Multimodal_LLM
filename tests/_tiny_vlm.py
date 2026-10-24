@@ -212,9 +212,10 @@ class TensorCharTokenizer(CharTokenizer):
         return {"input_ids": torch.tensor(ids), "attention_mask": torch.tensor(att)}
 
 
-def tiny_vljepa_describer(tmp, records_by_split):
+def tiny_vljepa_describer(tmp, records_by_split, target_format: str = "original"):
     """VLJEPADescriber con un OpenVLJEPA diminuto (V-JEPA 2 + Llama + Gemma3 aleatorios, guardados en
-    `tmp`). `records_by_split` alimenta el banco de recuperación en lugar del manifiesto real."""
+    `tmp`). `records_by_split` alimenta el banco de recuperación en lugar del manifiesto real; el banco
+    queda en `target_format` (original | canonical), como lo fija compose_train al entrenar."""
     import sys
 
     import transformers as T
@@ -247,6 +248,7 @@ def tiny_vljepa_describer(tmp, records_by_split):
     mcfg.quant = "bf16"
     mcfg.batch_size = 4
     mcfg.bank.max_captions = 1000
+    mcfg.bank.target_format = target_format
     d = vj.VLJEPADescriber(mcfg)
     d.model = m
     d.ckpt_path = tmp / "best.pt"

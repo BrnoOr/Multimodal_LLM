@@ -1,0 +1,30 @@
+# Etapa 2 reformulada — evaluación en test (las mismas 10 000 imágenes del zero-shot) con el adaptador
+# elegido en val. Usa scripts/infer.py (SCRIPT por defecto), así que las predicciones quedan con el mismo
+# formato de la etapa 1 en runs/<exp_id>/predictions.jsonl y el notebook 04 las encuentra por
+# stage=finetuned + model.adapter_path.
+#   GPU=1 scripts/launch.sh s2b_test scripts/run_queue.sh configs/queues/stage2b_test.txt
+# Las líneas cuyo adaptador aún no existe fallan al cargar el modelo y la cola sigue: se puede relanzar la cola a
+# medida que terminan los entrenamientos (los runs completos se saltan).
+# VL-JEPA necesita el banco en el formato con que se entrenó (model.bank.target_format).
+# Prompt: p1_attributes en todos, el mismo con que se entrenó.
+
+# 1) principal (stage2b_main)
+model=vljepa     prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_vljepa_open_msrvtt_nf4_p1_attributes_tcan_r16_e1_test model.adapter_path=runs/train_vljepa_open_msrvtt_nf4_p1_attributes_tcan_r16_e1/adapter_best model.bank.target_format=canonical infer.save_embeddings=true
+model=qwen35     prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_qwen35_08b_base_nf4_p1_attributes_tcan_r16_e1_test model.adapter_path=runs/train_qwen35_08b_base_nf4_p1_attributes_tcan_r16_e1/adapter_best
+model=internvl3  prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_internvl3_1b_nf4_p1_attributes_tcan_r16_e1_test model.adapter_path=runs/train_internvl3_1b_nf4_p1_attributes_tcan_r16_e1/adapter_best
+model=llava_ov   prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_llava_ov_05b_nf4_p1_attributes_tcan_r16_e1_test model.adapter_path=runs/train_llava_ov_05b_nf4_p1_attributes_tcan_r16_e1/adapter_best
+
+# 2) split composicional (stage2b_compositional)
+model=vljepa     prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_vljepa_open_msrvtt_nf4_p1_attributes_tcan_r16_e1_hc_test model.adapter_path=runs/train_vljepa_open_msrvtt_nf4_p1_attributes_tcan_r16_e1_hc/adapter_best model.bank.target_format=canonical infer.save_embeddings=true
+model=qwen35     prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_qwen35_08b_base_nf4_p1_attributes_tcan_r16_e1_hc_test model.adapter_path=runs/train_qwen35_08b_base_nf4_p1_attributes_tcan_r16_e1_hc/adapter_best
+model=internvl3  prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_internvl3_1b_nf4_p1_attributes_tcan_r16_e1_hc_test model.adapter_path=runs/train_internvl3_1b_nf4_p1_attributes_tcan_r16_e1_hc/adapter_best
+model=llava_ov   prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_llava_ov_05b_nf4_p1_attributes_tcan_r16_e1_hc_test model.adapter_path=runs/train_llava_ov_05b_nf4_p1_attributes_tcan_r16_e1_hc/adapter_best
+
+# 3) controles y ablaciones (stage2b_ablations)
+model=vljepa     prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_vljepa_open_msrvtt_nf4_p1_attributes_torig_r16_e1_test model.adapter_path=runs/train_vljepa_open_msrvtt_nf4_p1_attributes_torig_r16_e1/adapter_best model.bank.target_format=original infer.save_embeddings=true
+model=qwen35     prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_qwen35_08b_base_nf4_p1_attributes_torig_r16_e1_test model.adapter_path=runs/train_qwen35_08b_base_nf4_p1_attributes_torig_r16_e1/adapter_best
+model=internvl3  prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_internvl3_1b_nf4_p1_attributes_torig_r16_e1_test model.adapter_path=runs/train_internvl3_1b_nf4_p1_attributes_torig_r16_e1/adapter_best
+model=llava_ov   prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_llava_ov_05b_nf4_p1_attributes_torig_r16_e1_test model.adapter_path=runs/train_llava_ov_05b_nf4_p1_attributes_torig_r16_e1/adapter_best
+model=qwen35     prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_qwen35_08b_base_bf16_p1_attributes_tcan_r16_e1_test model.adapter_path=runs/train_qwen35_08b_base_bf16_p1_attributes_tcan_r16_e1/adapter_best model.quant=bf16
+model=qwen35     prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_qwen35_08b_base_nf4_p1_attributes_tcan_r16_e1_s1_test model.adapter_path=runs/train_qwen35_08b_base_nf4_p1_attributes_tcan_r16_e1_s1/adapter_best
+model=llava_ov   prompt=p1_attributes stage=finetuned data.limit=10000 exp_id=finetuned_llava_ov_05b_nf4_p1_attributes_tcan_r16_e1_s1_test model.adapter_path=runs/train_llava_ov_05b_nf4_p1_attributes_tcan_r16_e1_s1/adapter_best

@@ -27,6 +27,9 @@ VLM autorregresivo — la muestra se arma igual que en la inferencia:
 VL-JEPA — la imagen se repite como video estático igual que en `VLJEPADescriber.predict_embeddings`;
 la consulta es el prompt tokenizado con el tokenizador del predictor; el objetivo es el embedding del
 caption según el Y-Encoder congelado (se precalcula una vez por caption único).
+
+El texto objetivo sale de `target_fn(registro)` (vlmfid.data.targets): el caption original o el canónico,
+según `target.format`. En las muestras queda en la clave "caption" (el texto que se aprende).
 """
 
 from __future__ import annotations
@@ -64,8 +67,13 @@ def eos_ids(model) -> set[int]:
     return set(e) if isinstance(e, (list, tuple)) else {int(e)}
 
 
+def _caption(rec: dict) -> str:
+    return rec["caption"]
+
+
 class GenerativeFeaturizer:
-    def __init__(self, describer, prompt_text: str, max_target_tokens: int):
+    def __init__(self, describer, prompt_text: str, max_target_tokens: int, target_fn=_caption):
+        self.target_fn = target_fn
         self.processor = describer.processor
         self.tok = describer.processor.tokenizer
         self.max_target_tokens = int(max_target_tokens)
@@ -97,8 +105,8 @@ class GenerativeFeaturizer:
         out = []
         for rec, img in batch:
             enc = self.processor(text=[self.prompt_str], images=[img], return_tensors="pt")
-            out.append({"enc": dict(enc), "target": self.target_ids(rec["caption"]), "id": rec["id"],
-                        "caption": rec["caption"]})
+            text = self.target_fn(rec)
+            out.append({"enc": dict(enc), "target": self.target_ids(text), "id": rec["id"], "caption": text})
         return out
 
     def pad(self, samples: list[dict]) -> dict:
@@ -147,7 +155,8 @@ class GenerativeFeaturizer:
 
 
 class JEPAFeaturizer:
-    def __init__(self, describer, prompt_text: str):
+    def __init__(self, describer, prompt_text: str, target_fn=_caption):
+        self.target_fn = target_fn
         self.transform = describer.transform
         self.num_frames = describer.num_frames
         q = describer.cfg.get("query_override") or prompt_text
@@ -159,7 +168,7 @@ class JEPAFeaturizer:
         self.query_tokens = n_real
 
     def __call__(self, batch):
-        return [{"frame": self.transform(img), "id": rec["id"], "caption": rec["caption"]} for rec, img in batch]
+        return [{"frame": self.transform(img), "id": rec["id"], "caption": self.target_fn(rec)} for rec, img in batch]
 
     def pad(self, samples: list[dict]) -> dict:
         frames = torch.stack([s["frame"] for s in samples])                       # (B,3,H,W)

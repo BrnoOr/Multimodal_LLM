@@ -1,0 +1,9 @@
+# Etapa 2 reformulada — sondas lineales sobre los modelos CONGELADOS (diagnóstico, ~10-30 min por modelo).
+#   SCRIPT=scripts/probe.py GPU=1 scripts/launch.sh s2b_probe scripts/run_queue.sh configs/queues/stage2b_probe.txt
+# 10 000 imágenes de train para ajustar la sonda y 2 000 de val para medirla (test no se toca).
+# Resultado: runs/probe_<model>_nf4_p1_attributes/probe_results.jsonl (lo lee notebooks/04_eda_finetuning.ipynb).
+# Prueba de humo de una línea: agregar probe.train_limit=256 probe.test_limit=128.
+model=qwen35     prompt=p1_attributes
+model=vljepa     prompt=p1_attributes
+model=internvl3  prompt=p1_attributes
+model=llava_ov   prompt=p1_attributes

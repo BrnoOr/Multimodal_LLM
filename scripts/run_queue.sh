@@ -5,7 +5,7 @@
 #   scripts/launch.sh stage1 scripts/run_queue.sh configs/queues/stage1_pilot.txt
 #
 # Cada línea no vacía ni comentada son los argumentos de `python $SCRIPT` (por defecto scripts/infer.py;
-# para la etapa 2: SCRIPT=scripts/train.py scripts/run_queue.sh configs/queues/stage2_train.txt).
+# para la etapa 2: SCRIPT=scripts/train.py scripts/run_queue.sh configs/queues/stage2b_main.txt; sondas: SCRIPT=scripts/probe.py).
 # Si una línea falla se registra y se sigue con la siguiente. Como infer es reanudable e
 # idempotente, relanzar la misma cola retoma el run interrumpido y salta los completos.
 # Resumen en logs/<job>/queue_status.tsv (o logs/queue_status.tsv fuera de launch.sh).

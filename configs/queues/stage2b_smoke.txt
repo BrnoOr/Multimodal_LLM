@@ -1,0 +1,16 @@
+# Etapa 2 reformulada — prueba de humo (minutos por línea). Correr ANTES que cualquier otra cola stage2b.
+#   SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2b_smoke scripts/run_queue.sh configs/queues/stage2b_smoke.txt
+# Qué mirar en el log (scripts/jobs.sh logs s2b_smoke -f):
+#   * "modelo listo": target_format=canonical, n_train=125000 (todo train), y en VL-JEPA negatives=bank,
+#     n_target_texts≈504, query_truncated=false (p1 cabe en 64 tokens)
+#   * paso 0 de val ≈ zero-shot con p1; que la loss baje; img/s y pico de memoria
+#   * en Qwen3.5: que la loss NO quede en NaN ni plana (backward de Gated DeltaNet con fla 0.4.2)
+#   * la línea con holdout imprime no_vistas[forma+pos]
+# Train COMPLETO (sin límite): solo se corta en 20 pasos con train.max_steps (exp_id ..._m20, nunca choca con el
+# run principal). Sin calentamiento, para que en 20 pasos el lr sea el del presupuesto y la loss alcance a bajar.
+# val de 64 imágenes.
+model=vljepa     train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1
+model=qwen35     train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1
+model=internvl3  train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1
+model=llava_ov   train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1
+model=qwen35     train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1 data.holdout=compositional

@@ -15,18 +15,30 @@
 #   * entrenables: LoRA en el transformer de lenguaje / predictor + conector multimodal completo
 #   * checkpoint: el mejor en val (500 imágenes fijas) según el Índice macro de la etapa 1
 #
+# Reformulación (23-10-2026, docs/ETAPA2B_REFORMULACION.md). Cambian, para los 4 modelos por igual:
+#   * objetivo: caption CANÓNICO ("A <color básico> <forma> is at the <v>-<h> of the image.");
+#     el original queda como control con target.format=original
+#   * prompt: p1_attributes en los 4 (VL-JEPA dejaba p4m, que se truncaba a 64 tokens)
+#   * selección: forma + posición (shape_pos); color ±1 está saturado y diluía el macro
+#   * train COMPLETO en todos los runs: sin data.train_limit y sin descartar el último lote incompleto
+#     (drop_last=false: 1954 pasos, se usan las 125 000 imágenes); data.holdout: split composicional
+#   * VL-JEPA: negativos = banco completo de objetivos (objective.negatives, en su archivo de modelo)
+#
 # Uso: uv run --no-sync python scripts/train.py model=<llava_ov|internvl3|qwen35|vljepa> [clave=valor ...]
 
-exp_id: null            # null -> train_<model.name>_<quant>_<prompt.id>_r<r>_e<epochs>[_n<train_limit>]
+exp_id: null            # null -> train_<model>_<quant>_<prompt>_t<can|orig>_r<r>_e<epochs>[_hc][_s<seed>][_m<max_steps>]
 stage: finetuned
 seed: 0
+
+target:
+  format: canonical     # canonical | original (control: el caption de M3DI con sus 5 plantillas)
 
 data:
   dataset: m3di
   variant: base
   root: null            # null -> M3DI_ROOT
-  train_split: train
-  train_limit: null     # null = las 125 000; un entero SOLO para pruebas de humo (cambia el exp_id)
+  train_split: train    # siempre completo (125 000): no hay train_limit, compose_train lo rechaza
+  holdout: null        # null | compositional: retira 14 de 63 combinaciones forma × posición de train
   val_split: val        # nunca test: test se reserva para la evaluación final con scripts/infer.py
   val_limit: 500        # mismas 500 imágenes para los 4 modelos (subconjunto determinista)
   subset_seed: 0
@@ -36,14 +48,14 @@ train:
   epochs: 1
   effective_batch_size: 64      # muestras por paso de optimización, igual en los 4 modelos
   micro_batch_size: null        # lo fija configs/train/models/<modelo>.yaml (solo memoria)
-  drop_last: true               # 125 000 // 64 = 1953 pasos; las 8 muestras sobrantes no se usan
+  drop_last: false              # 125 000 = 1953·64 + 8 -> 1954 pasos; el último lleva las 8 restantes (todo train)
   lr: 2.0e-4                    # LoRA
   connector_lr: 2.0e-5          # conector multimodal (parámetros completos preentrenados): lr / 10
   weight_decay: 0.0
   betas: [0.9, 0.999]
   eps: 1.0e-8
   schedule: cosine              # cosine | constant (ambos con calentamiento lineal)
-  warmup_ratio: 0.03            # ≈ 59 de 1953 pasos
+  warmup_ratio: 0.03            # ≈ 59 de 1954 pasos
   min_lr_ratio: 0.0
   max_grad_norm: 1.0
   max_target_tokens: 64         # el caption más largo de M3DI son 21 palabras; si alguno excede, falla
@@ -52,8 +64,8 @@ train:
   eval_at_start: true           # paso 0 = modelo base con el adaptador en cero (control de paridad)
   save_every: 100               # pasos entre checkpoints de reanudación
   log_every: 10
-  max_steps: null               # SOLO pruebas de humo: corta el run sin cambiar el schedule
-  selection_metric: macro       # macro | shape | pos | color_adj | name | val_loss
+  max_steps: null               # SOLO pruebas de humo: corta el run sin cambiar el schedule (exp_id ..._m<N>)
+  selection_metric: shape_pos   # shape_pos | macro | macro_cat | shape | pos | color | color_adj | name | val_loss
 
 lora:
   r: 16
@@ -65,4 +77,5 @@ lora:
 objective:
   kind: lm                      # lm (VLM autorregresivo) | infonce (VL-JEPA)
   temperature: 0.07             # solo infonce: la del preentrenamiento del checkpoint
-  mask_duplicate_captions: true # solo infonce: captions idénticos en el lote no son negativos
+  mask_duplicate_captions: true # solo infonce con negatives=batch: captions idénticos en el lote no son negativos
+  negatives: batch              # solo infonce: batch (las otras muestras del lote) | bank (todos los objetivos únicos)

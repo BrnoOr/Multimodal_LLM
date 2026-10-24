@@ -6,6 +6,9 @@ en los 4 modelos, **todos ven las mismas imágenes en el mismo orden y agrupadas
 el micro-lote solo decide cuántas de esas B pasan juntas por la GPU.
 
 Reanudar en el paso s es saltar a la posición s·B: no hace falta guardar el estado del DataLoader.
+
+Con `drop_last=False` (el valor del presupuesto) se usan todas las imágenes de train: el último paso de
+cada época lleva el resto (125 000 = 1953·64 + 8 -> 1954 pasos, el último con 8 muestras).
 """
 
 from __future__ import annotations

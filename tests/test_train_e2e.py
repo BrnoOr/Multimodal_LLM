@@ -73,7 +73,7 @@ def test_qwen35_entrena_selecciona_y_recarga(data, tmp_path):
     assert rc == 0
     rd = tmp_path / "runs" / cfg.exp_id
     summary = json.loads((rd / "summary.json").read_text())
-    assert summary["steps"] == 8 and summary["samples_seen"] == 64            # 64 // 8, drop_last
+    assert summary["steps"] == 8 and summary["samples_seen"] == 64            # 64 / 8: todo train
     assert summary["trainable_connector"] > 0 and summary["lora_layers"] > 0
     names = [n for n, p in d.model.named_parameters() if p.requires_grad]
     assert all("language_model" in n or "merger.modules_to_save" in n for n in names)
@@ -82,7 +82,9 @@ def test_qwen35_entrena_selecciona_y_recarga(data, tmp_path):
     val = _lines(rd / "val_log.jsonl")
     assert [r["step"] for r in val] == [0, 2, 4, 6, 8]
     best = json.loads((rd / "best.json").read_text())
-    assert best["value"] == max(r["macro"] for r in val)
+    assert best["value"] == max(r[cfg.train.selection_metric] for r in val)
+    preds0 = _lines(rd / "val_predictions" / "step_00000.jsonl")
+    assert all(p["target"].endswith("of the image.") and '"' not in p["target"] for p in preds0)   # canónico
     train = _lines(rd / "train_log.jsonl")
     assert train[-1]["loss"] < train[0]["loss"]
     assert (rd / "adapter_best" / "adapter_config.json").exists()
@@ -119,6 +121,15 @@ def test_qwen35_reanudar_es_identico(data, tmp_path):
     assert pa.keys() == pb.keys()
     for n, a in pa.items():
         assert torch.allclose(a, pb[n], atol=1e-6), n
+
+
+def test_usa_todo_train_con_ultimo_lote_incompleto(data, tmp_path):
+    """64 imágenes con lote efectivo 24 -> 3 pasos (24, 24, 16): ninguna imagen queda fuera."""
+    cfg = train_cfg(**{"train.effective_batch_size": 24, "train.micro_batch_size": 8})
+    rc, _tr = _run(cfg, tiny_describer(), tmp_path / "runs")
+    assert rc == 0
+    summary = json.loads((tmp_path / "runs" / cfg.exp_id / "summary.json").read_text())
+    assert summary["steps"] == 3 and summary["samples_seen"] == 64 == summary["n_train"]
 
 
 def test_reanudar_con_otra_config_falla(data, tmp_path):
@@ -159,9 +170,25 @@ def test_micro_lote_no_cambia_el_gradiente(data, tmp_path):
             assert torch.allclose(g0[n], g[n], atol=1e-6, rtol=1e-4), n
 
 
-def test_vljepa_entrena_con_lora_en_el_predictor(data, tmp_path):
-    cfg = train_cfg(**{"model": "vljepa", "train.micro_batch_size": 8, "model.batch_size": 4})
-    d = tiny_vljepa_describer(tmp_path, data)
+def test_split_composicional_reporta_no_vistas(data, tmp_path):
+    cfg = train_cfg(**{"data.holdout": "compositional", "train.eval_every": 4})
+    rc, tr = _run(cfg, tiny_describer(), tmp_path / "runs")
+    assert rc == 0
+    from vlmfid.data.targets import is_held_out
+
+    rd = tmp_path / "runs" / cfg.exp_id
+    assert cfg.exp_id.endswith("_hc")
+    summary = json.loads((rd / "summary.json").read_text())
+    assert summary["n_train"] == sum(not is_held_out(r) for r in data["train"])
+    val = _lines(rd / "val_log.jsonl")
+    assert all("seen_shape_pos" in r and "unseen_shape_pos" in r for r in val)
+
+
+@pytest.mark.parametrize("negatives", ["bank", "batch"])
+def test_vljepa_entrena_con_lora_en_el_predictor(data, tmp_path, negatives):
+    cfg = train_cfg(**{"model": "vljepa", "train.micro_batch_size": 8, "model.batch_size": 4,
+                       "objective.negatives": negatives})
+    d = tiny_vljepa_describer(tmp_path, data, target_format=cfg.target.format)
     bank_before = d.bank_emb.clone()
     rc, _tr = _run(cfg, d, tmp_path / "runs")
     assert rc == 0
@@ -182,7 +209,7 @@ def test_vljepa_entrena_con_lora_en_el_predictor(data, tmp_path):
     from peft import PeftModel
 
     (tmp_path / "f").mkdir()
-    fresh = tiny_vljepa_describer(tmp_path / "f", data)
+    fresh = tiny_vljepa_describer(tmp_path / "f", data, target_format=cfg.target.format)
     fresh.model = PeftModel.from_pretrained(fresh.model, str(rd / "adapter_last")).eval()
     img = [Image.new("RGB", (64, 64), (200, 30, 30))]
     d.model.eval()

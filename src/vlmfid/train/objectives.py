@@ -14,6 +14,16 @@ del checkpoint (`openvljepa.losses.bidirectional_infonce`), con una corrección 
 hay solo 10 936 captions distintos entre 125 000 imágenes, así que dos muestras de un lote pueden
 tener exactamente el mismo caption. InfoNCE estándar trataría a la otra como negativo y empujaría a
 separar dos embeddings que deben coincidir. Se excluyen esos pares del denominador (falsos negativos).
+
+VL-JEPA con `objective.negatives: bank` (reformulación) — los negativos no son las otras 63 muestras del
+lote, sino TODOS los textos objetivo distintos (504 captions canónicos o ~11 000 originales):
+
+    L = (1 / B_efectivo) · Σ_i −log softmax_j( ⟨ŝ_i, s_j⟩ / τ )[c_i],     j ∈ textos objetivo únicos
+
+Es una clasificación sobre el mismo banco con que se decodifica por recuperación en inferencia. Cada
+muestra aporta un término independiente del resto del lote, así que se puede acumular gradiente en
+micro-lotes (como en los VLM) y no hace falta la máscara de duplicados: un caption repetido es la misma
+clase. Solo es dirección predictor -> texto: la dirección inversa no tiene sentido con un banco fijo.
 """
 
 from __future__ import annotations
@@ -57,3 +67,11 @@ def infonce_loss(pred: torch.Tensor, target: torch.Tensor, temperature: float,
         logits = logits.masked_fill(duplicate_mask(captions, logits.device), float("-inf"))
     labels = torch.arange(logits.shape[0], device=logits.device)
     return (F.cross_entropy(logits, labels) + F.cross_entropy(logits.T, labels)) / 2
+
+
+def bank_infonce_loss(pred: torch.Tensor, bank: torch.Tensor, target_idx: torch.Tensor,
+                      temperature: float) -> torch.Tensor:
+    """Suma (no media) de −log p(texto correcto | ŝ) con softmax sobre todo el banco de objetivos."""
+    p = F.normalize(pred.float(), dim=-1)
+    b = F.normalize(bank.float(), dim=-1)
+    return F.cross_entropy(p @ b.T / temperature, target_idx, reduction="sum")

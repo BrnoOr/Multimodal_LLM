@@ -6,9 +6,14 @@ Diseñado para el cluster compartido, con las mismas garantías que `scripts/inf
     mismo orden de datos (ver vlmfid.train.data).
   * Idempotente: si el run ya terminó, sale de inmediato (útil en colas).
   * Apagado limpio: SIGTERM/SIGINT terminan el paso en curso, guardan y salen con 143/130.
-  * OOM (GPU compartida, solo VLM): se descarta el paso, se parte el micro-lote a la mitad y se repite el
-    paso con las mismas muestras. La normalización por tokens del lote efectivo hace que el gradiente no
-    cambie. VL-JEPA no se parte (cambiaría los negativos de InfoNCE).
+  * OOM (GPU compartida): se descarta el paso, se parte el micro-lote a la mitad y se repite el paso con
+    las mismas muestras. La normalización por tokens (o muestras) del lote efectivo hace que el gradiente
+    no cambie. VL-JEPA con negatives=batch no se parte (cambiaría los negativos de InfoNCE); con
+    negatives=bank sí.
+
+Reformulación (docs/ETAPA2B_REFORMULACION.md): el texto objetivo sale de `target.format` (original o
+canónico), train se usa completo (sin límite; solo `data.holdout` puede excluir combinaciones
+forma × posición) y VL-JEPA puede usar el banco completo de objetivos como negativos.
 
 runs/<exp_id>/
     config.yaml, env.jsonl, status.json     como en inferencia (vlmfid.tracking.RunTracker)
@@ -24,6 +29,7 @@ runs/<exp_id>/
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import math
 import os
@@ -40,6 +46,7 @@ from torch.utils.data import DataLoader
 
 from ..config import to_yaml
 from ..data.manifest import ImageRecordDataset, data_root, load_manifest
+from ..data.targets import apply_holdout, is_held_out, target_fn
 from ..models import build_describer
 from ..paths import CACHE, RUNS
 from ..prompts import render
@@ -49,7 +56,7 @@ from .config import strip_resume_safe
 from .data import EpochSampler, steps_per_epoch
 from .evaluate import generate_and_score
 from .lora import attach_lora, load_trainable_state, param_groups, set_train_mode, trainable_state
-from .objectives import infonce_loss, lm_loss
+from .objectives import bank_infonce_loss, infonce_loss, lm_loss
 
 _STOP = {"flag": False, "signum": None}
 
@@ -100,8 +107,11 @@ class Trainer:
         self.dir = Path(run_root or RUNS) / cfg.exp_id
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.jepa = cfg.objective.kind == "infonce"
+        self.bank_negatives = self.jepa and cfg.objective.get("negatives", "batch") == "bank"
         self.prompt_text = render(cfg.prompt)
         self.micro = int(cfg.train.micro_batch_size)
+        self.target_fn = target_fn(str(cfg.target.format))
+        self.holdout = cfg.data.get("holdout")
 
     # ------------------------------------------------------------------ utilidades
     def amp(self):
@@ -131,10 +141,18 @@ class Trainer:
 
     # --------------------------------------------------------------------- datos
     def _records(self):
+        """train: split completo, sin límite (con holdout, sin las combinaciones retiradas).
+        val: las mismas `val_limit` imágenes de siempre (también las retiradas, que se reportan aparte)."""
         d = self.cfg.data
-        train = load_manifest(d.train_split, d.dataset, d.get("train_limit"), d.subset_seed, variant=d.variant)
+        train = load_manifest(d.train_split, d.dataset, None, d.subset_seed, variant=d.variant)
+        train = apply_holdout(train, self.holdout)
         val = load_manifest(d.val_split, d.dataset, d.get("val_limit"), d.subset_seed, variant=d.variant)
         return train, val
+
+    def _val_groups(self) -> dict:
+        if self.holdout != "compositional":
+            return {}
+        return {"seen": lambda r: not is_held_out(r), "unseen": is_held_out}
 
     def _target_table(self, captions: list[str]):
         """VL-JEPA: embeddings del Y-Encoder congelado para cada caption único (caché en disco)."""
@@ -165,7 +183,7 @@ class Trainer:
                 out[k] = v
         return out
 
-    def _jepa_loss(self, batch: dict, mask: bool):
+    def _jepa_pred(self, batch: dict):
         inner = self.describer.model.get_base_model()
         pv = batch["pixel_values"].to(self.device, dtype=torch.bfloat16)
         qi, qm = batch["query_ids"].to(self.device), batch["query_mask"].to(self.device)
@@ -173,26 +191,44 @@ class Trainer:
             vis = inner.x_encoder(pv)
             pred = inner.predictor(vis, qi, qm)
         idx = torch.tensor([self.target_index[c] for c in batch["captions"]], device=self.device)
-        tgt = self.target_emb[idx]
+        return pred, idx
+
+    def _jepa_loss(self, batch: dict, mask: bool):
+        """InfoNCE con negativos del lote (media sobre el lote)."""
+        pred, idx = self._jepa_pred(batch)
         caps = batch["captions"] if mask else None
-        return infonce_loss(pred, tgt, float(self.cfg.objective.temperature), caps)
+        return infonce_loss(pred, self.target_emb[idx], float(self.cfg.objective.temperature), caps)
+
+    def _jepa_bank_loss_sum(self, batch: dict):
+        """InfoNCE contra el banco completo de objetivos (suma sobre el micro-lote)."""
+        pred, idx = self._jepa_pred(batch)
+        return bank_infonce_loss(pred, self.target_emb, idx, float(self.cfg.objective.temperature))
+
+    def _micro_loss(self, model, batch: dict, n_eff: int):
+        """(pérdida para backward ya normalizada por el lote efectivo, suma sin normalizar)."""
+        if self.jepa:
+            s = self._jepa_bank_loss_sum(batch)
+            return s / n_eff, float(s.detach())
+        batch["inputs"] = self._to_device(batch["inputs"])
+        with self.amp():
+            loss, loss_sum, _ = lm_loss(model, batch, n_eff)
+        return loss, loss_sum
 
     def _step(self, samples: list, model) -> dict:
         """Un paso de optimización sobre `samples` (= un lote efectivo). Devuelve estadísticas."""
-        if self.jepa:
+        if self.jepa and not self.bank_negatives:
             batch = self.featurizer.pad(samples)
             loss = self._jepa_loss(batch, bool(self.cfg.objective.mask_duplicate_captions))
             loss.backward()
             return {"loss": float(loss.detach()), "tokens": len(samples)}
-        n_eff = sum(len(s["target"]) for s in samples)
+        # VLM: normaliza por tokens objetivo; VL-JEPA con banco: por muestras
+        n_eff = len(samples) if self.jepa else sum(len(s["target"]) for s in samples)
         while True:
             try:
                 total = 0.0
                 for i in range(0, len(samples), self.micro):
                     batch = self.featurizer.pad(samples[i:i + self.micro])
-                    batch["inputs"] = self._to_device(batch["inputs"])
-                    with self.amp():
-                        loss, loss_sum, _ = lm_loss(model, batch, n_eff)
+                    loss, loss_sum = self._micro_loss(model, batch, n_eff)
                     loss.backward()
                     total += loss_sum
                 return {"loss": total / n_eff, "tokens": n_eff}
@@ -211,7 +247,9 @@ class Trainer:
                             collate_fn=self.featurizer, shuffle=False, generator=torch.Generator())
         tot, n = 0.0, 0
         for samples in loader:
-            if self.jepa:
+            if self.bank_negatives:
+                tot, n = tot + float(self._jepa_bank_loss_sum(self.featurizer.pad(samples))), n + len(samples)
+            elif self.jepa:
                 batch = self.featurizer.pad(samples)
                 loss = self._jepa_loss(batch, bool(self.cfg.objective.mask_duplicate_captions))
                 tot, n = tot + float(loss) * len(samples), n + len(samples)
@@ -229,7 +267,8 @@ class Trainer:
         model.eval()
         val_loss = self._val_loss(model, val_records)
         bs = int(self.cfg.model.get("batch_size", 16))
-        metrics, preds = generate_and_score(self.describer, val_records, self.root, self.prompt_text, bs, self.amp)
+        metrics, preds = generate_and_score(self.describer, val_records, self.root, self.prompt_text, bs, self.amp,
+                                            target_fn=self.target_fn, groups=self._val_groups())
         set_train_mode(model, self._frozen_modules())
         pred_dir = self.dir / "val_predictions"
         pred_dir.mkdir(exist_ok=True)
@@ -238,7 +277,9 @@ class Trainer:
                 f.write(json.dumps(p, ensure_ascii=False) + "\n")
 
         metric = self.cfg.train.selection_metric
-        value = val_loss if metric == "val_loss" else metrics[metric]
+        # con holdout, el checkpoint se elige solo con las combinaciones vistas: las retiradas no se miran
+        key = metric if not self._val_groups() else f"seen_{metric}"
+        value = val_loss if metric == "val_loss" else metrics[key]
         best = state.get("best")
         better = best is None or (value < best["value"] if metric == "val_loss" else value > best["value"])
         row = {"step": step, "val_loss": round(val_loss, 5), **{k: (round(v, 5) if isinstance(v, float) else v)
@@ -250,8 +291,10 @@ class Trainer:
             (self.dir / "best.json").write_text(json.dumps(state["best"], indent=2, ensure_ascii=False))
         state["last_eval_step"] = step
         _append_jsonl(self.dir / "val_log.jsonl", row)
-        print(f"[val] paso {step}: macro={metrics['macro']:.4f} forma={metrics['shape']:.3f} pos={metrics['pos']:.3f} "
-              f"color±1={metrics['color_adj']:.3f} nombre={metrics['name']:.3f} val_loss={val_loss:.4f}"
+        unseen = (f" no_vistas[forma+pos]={metrics['unseen_shape_pos']:.3f}" if "unseen_shape_pos" in metrics else "")
+        print(f"[val] paso {step}: macro={metrics['macro']:.4f} forma+pos={metrics['shape_pos']:.4f} "
+              f"forma={metrics['shape']:.3f} pos={metrics['pos']:.3f} color={metrics['color']:.3f} "
+              f"color±1={metrics['color_adj']:.3f} nombre={metrics['name']:.3f} val_loss={val_loss:.4f}{unseen}"
               f"{'  *mejor*' if better else ''}  ({row['eval_seconds']} s) | {preds[0]['prediction'][:80]!r}",
               flush=True)
         return row
@@ -313,15 +356,25 @@ class Trainer:
         model = self.describer.model
         info = self.describer.info() | lora_info | {"load_seconds": round(time.time() - t_load, 1)}
 
+        info |= {"target_format": str(cfg.target.format), "holdout": self.holdout, "n_train": len(train_records),
+                 "n_val": len(val_records)}
         if self.jepa:
-            self.featurizer = JEPAFeaturizer(self.describer, self.prompt_text)
-            info |= {"query_tokens": self.featurizer.query_tokens, "query_truncated": self.featurizer.query_truncated}
-            self._target_table([r["caption"] for r in train_records + val_records])
+            bank_fmt = self.describer._bank_format()
+            if bank_fmt != cfg.target.format:
+                raise RuntimeError(f"El banco de recuperación de VL-JEPA está en formato '{bank_fmt}' y el objetivo en "
+                                   f"'{cfg.target.format}': val mediría textos de otro formato.")
+            self.featurizer = JEPAFeaturizer(self.describer, self.prompt_text, self.target_fn)
+            info |= {"query_tokens": self.featurizer.query_tokens, "query_truncated": self.featurizer.query_truncated,
+                     "negatives": "bank" if self.bank_negatives else "batch"}
+            self._target_table([self.target_fn(r) for r in train_records + val_records])
+            info["n_target_texts"] = len(self.target_index)
         else:
-            self.featurizer = GenerativeFeaturizer(self.describer, self.prompt_text, int(t.max_target_tokens))
+            self.featurizer = GenerativeFeaturizer(self.describer, self.prompt_text, int(t.max_target_tokens),
+                                                   self.target_fn)
             info |= {"turn_end": self.featurizer.turn_end}
-            for r in train_records[:2000] + val_records:               # falla temprano si algún caption excede
-                self.featurizer.target_ids(r["caption"])
+            # falla temprano si algún objetivo excede max_target_tokens (todos los textos distintos de train y val)
+            for txt in {self.target_fn(r) for r in train_records + val_records}:
+                self.featurizer.target_ids(txt)
         tracker.update(model_info=info, total_steps=total_steps)
         print(f"[train] modelo listo: {json.dumps(info, default=str)}", flush=True)
 
@@ -331,7 +384,7 @@ class Trainer:
             self.optimizer, lr_lambda_factory(total_steps, warmup, str(t.schedule), float(t.min_lr_ratio)))
 
         state = {"global_step": 0, "best": None, "last_eval_step": None, "train_seconds": 0.0,
-                 "eval_seconds": 0.0, "micro_batch_size": self.micro}
+                 "eval_seconds": 0.0, "micro_batch_size": self.micro, "samples_seen": 0}
         if (self.dir / "checkpoint").exists():
             state = self.load_checkpoint(model)
             self.micro = min(self.micro, int(state.get("micro_batch_size") or self.micro))
@@ -362,7 +415,8 @@ class Trainer:
                                     generator=torch.Generator().manual_seed(int(cfg.seed) + epoch))
                 it = iter(loader)
                 for _ in range(step_in_epoch, n_steps_epoch):
-                    samples = [s for _ in range(accum) for s in next(it)]
+                    # el último paso de la época puede traer menos de `accum` micro-lotes (drop_last=False)
+                    samples = [s for mb in itertools.islice(it, accum) for s in mb]
                     t_step = time.time()
                     stats = self._step(samples, model)
                     gnorm = torch.nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad],
@@ -371,6 +425,7 @@ class Trainer:
                     self.scheduler.step()
                     self.optimizer.zero_grad(set_to_none=True)
                     state["global_step"] += 1
+                    state["samples_seen"] = state.get("samples_seen", 0) + len(samples)
                     state["train_seconds"] += time.time() - t_step
                     step = state["global_step"]
                     log_loss += stats["loss"] * stats["tokens"]
@@ -422,7 +477,9 @@ class Trainer:
         gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
         summary = {
             "exp_id": cfg.exp_id, "model": cfg.model.name, "prompt": cfg.prompt.id, "steps": state["global_step"],
-            "total_steps_schedule": total_steps, "samples_seen": state["global_step"] * int(t.effective_batch_size),
+            "target_format": str(cfg.target.format), "holdout": self.holdout, "n_train": len(train_records),
+            "epochs": int(t.epochs), "quant": cfg.model.quant, "seed": int(cfg.seed),
+            "total_steps_schedule": total_steps, "samples_seen": state.get("samples_seen", 0),
             "best": state["best"], "adapter_best": str(self.dir / "adapter_best"),
             "train_hours": round(state["train_seconds"] / 3600, 3), "eval_hours": round(state["eval_seconds"] / 3600, 3),
             "gpu": gpu, "micro_batch_final": self.micro, **lora_info,

@@ -11,6 +11,12 @@ Atributos y criterio de acierto (idénticos a la etapa 1):
     color ±1         categoría a distancia circular <= 1 en la rueda de 8 categorías
     nombre exacto    nombre literal == `text_object_color_name`
     macro            (forma + posición(x,y) + color ±1) / 3        <- "Índice macro" de los informes
+    shape_pos        (forma + posición(x,y)) / 2                   <- selección en la etapa 2 (reformulada)
+    macro_cat        (forma + posición(x,y) + color categoría) / 3
+
+`shape_pos` y `macro_cat` se agregaron en la reformulación de la etapa 2 (docs/ETAPA2B_REFORMULACION.md):
+color ±1 está saturado (≈ 0,98 en los VLM autorregresivos) y diluye el macro. Las métricas de la
+etapa 1 no cambian.
 
 Omitir un atributo cuenta como error (exactitud estricta). El color se compara contra el tono de
 la imagen y no contra el nombre del caption, porque el nombre no es función determinista del tono.
@@ -274,19 +280,22 @@ def score(ext: dict, truth: dict) -> dict:
     shape_ok = ext["shape"] == truth["shape_true"]
     pos_ok = ext["xpos"] == truth["x_true"] and ext["ypos"] == truth["y_true"]
     color_adj = cat_distance(ext["color_cat"], truth["cat_true"]) <= 1
+    color_ok = ext["color_cat"] == truth["cat_true"]
     return {
         "shape": shape_ok,
         "x": ext["xpos"] == truth["x_true"],
         "y": ext["ypos"] == truth["y_true"],
         "pos": pos_ok,
-        "color": ext["color_cat"] == truth["cat_true"],
+        "color": color_ok,
         "color_adj": color_adj,
         "name": ext["color_name"] == truth["name_true"],
         "macro": (int(shape_ok) + int(pos_ok) + int(color_adj)) / 3,
+        "shape_pos": (int(shape_ok) + int(pos_ok)) / 2,
+        "macro_cat": (int(shape_ok) + int(pos_ok) + int(color_ok)) / 3,
     }
 
 
-METRICS = ("shape", "x", "y", "pos", "color", "color_adj", "name", "macro")
+METRICS = ("shape", "x", "y", "pos", "color", "color_adj", "name", "macro", "shape_pos", "macro_cat")
 
 
 def score_texts(texts: list[str], records: list[dict], json_mode: bool = False) -> dict:

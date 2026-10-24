@@ -1,9 +1,0 @@
-# Etapa 2 — prueba de humo de los 4 modelos (minutos cada uno). Correr ANTES de stage2_train.txt.
-#   SCRIPT=scripts/train.py GPU=1 scripts/launch.sh stage2_smoke scripts/run_queue.sh configs/queues/stage2_smoke.txt
-# Qué mirar en el log: que carguen, el paso 0 de val (~ zero-shot), img/s, `pico` de memoria y que la
-# loss baje. Con data.train_limit el exp_id lleva _n<limit>: no se mezcla con el run real.
-# 1280 imágenes = 20 pasos de 64; val de 64 imágenes.
-model=vljepa     data.train_limit=1280 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1
-model=qwen35     data.train_limit=1280 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1
-model=internvl3  data.train_limit=1280 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1
-model=llava_ov   data.train_limit=1280 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1

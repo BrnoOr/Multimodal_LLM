@@ -2,9 +2,11 @@
 
 Esta guía documenta qué se entrena, con qué hiperparámetros y por qué, y cómo ejecutarlo en el cluster. Se deja en el repo porque es la base de la sección de metodología del informe.
 
+> **Reformulación (23-10-2026).** Este documento describe el diseño original. Varias decisiones cambiaron: objetivo canónico, p1 en VL-JEPA, selección por forma + posición, negativos del banco en VL-JEPA, train completo sin límite (`drop_last: false`, 1954 pasos), split composicional y sondas lineales. Los cambios y su justificación están en [`ETAPA2B_REFORMULACION.md`](ETAPA2B_REFORMULACION.md). Las colas `stage2_*` se reemplazaron por `stage2b_*`. El diseño de aquí se reproduce con `target.format=original train.selection_metric=macro` y, en VL-JEPA, `prompt=p4m_multiexample objective.negatives=batch` (ver §8 de ese documento).
+
 **Código:** `src/vlmfid/train/`, `scripts/train.py`, `configs/train/`.
 
-**Colas:** `configs/queues/stage2_{smoke,train,test}.txt`.
+**Colas:** `configs/queues/stage2b_*.txt` (antes `stage2_{smoke,train,test}.txt`).
 
 ## 1. Decisiones de diseño
 
@@ -16,7 +18,7 @@ Las tomó el equipo el 14-10-2026. Ninguna está implícita en el código: todas
 | Objetivo | Caption original de M3DI, con sus 5 plantillas | BLEU/ROUGE/CIDEr comparables con la etapa 1 y con el banco de VL-JEPA. La plantilla es ruido irreducible (§3.2). |
 | Prompt | El mejor zero-shot de cada modelo | Qwen3.5 Base e InternVL3 usan p1. VL-JEPA usa p4m. LLaVA-OV usa **p1** (su mejor, p3, pide JSON). |
 | Precisión | QLoRA: base NF4 + doble cuantización, cómputo bf16 | Igual que la etapa 1; el antes/después no mezcla el efecto de cuantizar. |
-| Presupuesto | **1 época** de train (125 000 imágenes), **mismo lote efectivo (64)** | 1953 pasos para todos; las mismas imágenes en los mismos lotes. Las horas de GPU difieren y se reportan. |
+| Presupuesto | **1 época** de train (125 000 imágenes), **mismo lote efectivo (64)** | 1953 pasos para todos (reformulación: 1954, sin descartar las 8 últimas); las mismas imágenes en los mismos lotes. Las horas de GPU difieren y se reportan. |
 | Entrenables | LoRA en el transformer de lenguaje / predictor **+ conector completo** | Visión, cabeza de salida y el Y-Encoder de VL-JEPA quedan congelados. |
 | Checkpoint | El **mejor en val** (500 imágenes fijas) según el Índice macro | Test (10 000) no se toca hasta la evaluación final. |
 
@@ -109,7 +111,7 @@ Todos están en `configs/train/budget.yaml` y son comunes a los 4 modelos. El ar
 |---|---|---|
 | Épocas | 1 | Decisión de presupuesto. Son 125 000 ejemplos de una tarea de baja complejidad (7 formas × 9 posiciones × 100 nombres × 5 plantillas); una época es amplia. |
 | Lote efectivo | 64 | Igual al del preentrenamiento de VL-JEPA, para no cambiar su número de negativos. Da 1953 pasos, suficientes para calentamiento + coseno. Es el único valor que sirve a la vez a InfoNCE y a los VLM sin tratarlos distinto. |
-| `drop_last` | sí | 125 000 = 1953·64 + 8: el último lote incompleto se descarta para que todos los pasos tengan el mismo tamaño. |
+| `drop_last` | sí → **no** (reformulación) | 125 000 = 1953·64 + 8. Diseño original: se descartaba el último lote incompleto. Reformulación: se usa todo train y el paso 1954 lleva esas 8 imágenes. |
 | Micro-lote | 8 / 16 / 32 / 64 | Solo memoria (LLaVA-OV / InternVL3 / Qwen3.5 / VL-JEPA), según los tokens visuales por imagen (≈1 500 / 256 / 64). No cambia la matemática (§3.1). Ante un OOM se parte solo. |
 | lr LoRA | 2·10⁻⁴ | Valor estándar de QLoRA para modelos ≤ 13 B y del script LoRA de LLaVA-1.5. Con B = 0 al inicio, LoRA tolera lr altos. |
 | lr conector | 2·10⁻⁵ (= lr / 10) | El conector son pesos preentrenados completos que alinean visión y lenguaje. Con el lr de LoRA se destruiría esa alineación al inicio. Es el mismo criterio de LLaVA-1.5 LoRA (`mm_projector_lr = 2e-5` con `learning_rate = 2e-4`). |

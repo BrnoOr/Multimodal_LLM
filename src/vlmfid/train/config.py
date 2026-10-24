@@ -12,6 +12,13 @@ y preprocesa exactamente igual que en la etapa 1 y que en la evaluación final c
 El archivo por modelo solo puede tocar las claves de `ALLOWED_MODEL_KEYS`. Cualquier otra (lr,
 épocas, rango LoRA...) rompería el "mismo presupuesto" y se rechaza. Desde la línea de comandos sí se
 puede cambiar todo (pruebas de humo, ablaciones), pero el cambio queda en el exp_id o en config.yaml.
+
+exp_id por defecto (reformulación, docs/ETAPA2B_REFORMULACION.md):
+    train_<model>_<quant>_<prompt>_t<can|orig>_r<r>_e<epochs>[_hc][_s<seed>][_m<max_steps>]
+    (_hc = split composicional; _s<seed> solo si seed != 0; _m<max_steps> solo en pruebas de humo)
+
+Train se usa SIEMPRE completo (las 125 000 imágenes, o todas las no retiradas con el split
+composicional): no hay `data.train_limit` y pasarlo es un error.
 """
 
 from __future__ import annotations
@@ -21,14 +28,18 @@ import json
 from omegaconf import DictConfig, OmegaConf
 
 from ..config import _load_model, _load_prompt, as_dict
+from ..data.targets import HOLDOUTS, TARGET_FORMATS
 from ..paths import CONFIGS
 
 TRAIN_CONFIGS = CONFIGS / "train"
 ALLOWED_MODEL_KEYS = {"prompt", "train.micro_batch_size", "lora.connector_modules", "objective.kind",
-                      "objective.temperature", "objective.mask_duplicate_captions"}
+                      "objective.temperature", "objective.mask_duplicate_captions", "objective.negatives"}
+SELECTION_METRICS = ("macro", "shape_pos", "macro_cat", "shape", "pos", "color", "color_adj", "name", "val_loss")
+TARGET_TAG = {"canonical": "tcan", "original": "torig"}
 # Claves que pueden cambiar al reanudar un entrenamiento sin alterar su resultado.
+# (max_steps no: un run cortado con max_steps escribe summary.json y adapter_best, así que va en el exp_id)
 RESUME_SAFE = {"data.num_workers", "train.micro_batch_size", "train.log_every", "train.save_every",
-               "train.max_steps", "train.eval_every"}
+               "train.eval_every"}
 
 
 def _flat_keys(d: dict, prefix: str = "") -> set[str]:
@@ -83,18 +94,39 @@ def compose_train(args: list[str] | None = None) -> DictConfig:
     if t.effective_batch_size % t.micro_batch_size:
         raise ValueError(f"effective_batch_size={t.effective_batch_size} no es múltiplo de "
                          f"micro_batch_size={t.micro_batch_size}")
-    if cfg.objective.kind == "infonce" and t.micro_batch_size != t.effective_batch_size:
-        raise ValueError("objective=infonce: los negativos salen del micro-lote, que debe ser igual al lote "
-                         "efectivo (acumular gradientes cambia la pérdida). Ajusta train.effective_batch_size.")
     if cfg.objective.kind not in ("lm", "infonce"):
         raise ValueError(f"objective.kind='{cfg.objective.kind}' inválido (lm | infonce)")
+    negatives = cfg.objective.get("negatives", "batch")
+    if negatives not in ("batch", "bank"):
+        raise ValueError(f"objective.negatives='{negatives}' inválido (batch | bank)")
+    if (cfg.objective.kind == "infonce" and negatives == "batch"
+            and t.micro_batch_size != t.effective_batch_size):
+        raise ValueError("objective=infonce con negatives=batch: los negativos salen del micro-lote, que debe ser "
+                         "igual al lote efectivo (acumular gradientes cambia la pérdida). Ajusta "
+                         "train.effective_batch_size o usa objective.negatives=bank.")
     if cfg.model.get("adapter_path"):
         raise ValueError("model.adapter_path debe ser null al entrenar (el adaptador se crea desde cero)")
+    if cfg.target.format not in TARGET_FORMATS:
+        raise ValueError(f"target.format='{cfg.target.format}' inválido ({' | '.join(TARGET_FORMATS)})")
+    if cfg.data.get("train_limit") not in (None, "", "null"):
+        raise ValueError("data.train_limit no existe: el entrenamiento usa train completo. Para una prueba "
+                         "corta usa train.max_steps (agrega _m<N> al exp_id).")
+    if cfg.data.get("holdout") in ("", "null"):
+        cfg.data.holdout = None
+    if cfg.data.get("holdout") not in HOLDOUTS:
+        raise ValueError(f"data.holdout='{cfg.data.holdout}' inválido (null | compositional)")
+    if t.selection_metric not in SELECTION_METRICS:
+        raise ValueError(f"train.selection_metric='{t.selection_metric}' inválido {SELECTION_METRICS}")
+    if cfg.model.family == "vljepa":
+        # el banco de recuperación (val durante el ajuste y test después) debe estar en el formato aprendido
+        cfg.model.bank.target_format = cfg.target.format
 
     if cfg.get("exp_id") in (None, "", "null"):
-        lim = cfg.data.get("train_limit")
-        cfg.exp_id = (f"train_{cfg.model.name}_{cfg.model.quant}_{cfg.prompt.id}_r{cfg.lora.r}_e{t.epochs}"
-                      + (f"_n{lim}" if lim else ""))
+        cfg.exp_id = (f"train_{cfg.model.name}_{cfg.model.quant}_{cfg.prompt.id}_{TARGET_TAG[cfg.target.format]}"
+                      f"_r{cfg.lora.r}_e{t.epochs}"
+                      + ("_hc" if cfg.data.holdout == "compositional" else "")
+                      + (f"_s{cfg.seed}" if int(cfg.seed) != 0 else "")
+                      + (f"_m{t.max_steps}" if t.get("max_steps") else ""))
     return cfg
 
 
