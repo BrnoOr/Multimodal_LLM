@@ -1,0 +1,5 @@
+modelo,clase,n_train,épocas,pasos,h entrenamiento,h evaluación,img/s (mediana),pico GB,LoRA (M),conector (M),estado
+VL-JEPA,principal,125000.0,1,1954.0,2.036,0.084,17.05,16.14,5.636096,2.0992,completed
+Qwen3.5 Base,principal,125000.0,1,1954.0,0.778,0.077,44.575,3.51,10.223616,12.588544,completed
+InternVL3 1B,principal,125000.0,1,1954.0,1.358,0.084,25.55,11.36,8.798208,4.482816,completed
+LLaVA-OV 0.5B,principal,125000.0,1,1954.0,3.92,0.185,8.85,10.76,8.798208,1.8368,completed

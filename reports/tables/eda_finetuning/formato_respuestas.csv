@@ -1,0 +1,9 @@
+modelo,run,n_train,plantilla canónica,idéntica al objetivo,respuestas distintas,palabras (mediana)
+InternVL3 1B,principal,125000.0,1.0,0.8861,0.0231,10.0
+LLaVA-OV 0.5B,principal,125000.0,1.0,0.8737,0.0231,10.0
+Qwen3.5 Base,principal,125000.0,1.0,0.9134,0.0231,10.0
+VL-JEPA,principal,125000.0,1.0,0.4728,0.0191,10.0
+InternVL3 1B,zero-shot,,0.0,0.0,0.9962,53.0
+LLaVA-OV 0.5B,zero-shot,,0.0,0.0,0.6264,28.0
+Qwen3.5 Base,zero-shot,,0.0,0.0,0.9999,82.0
+VL-JEPA,zero-shot,,0.0,0.0,0.053,12.0

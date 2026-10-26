@@ -1,0 +1,23 @@
+\begin{tabular}{lllrrrr}
+\toprule
+ &  &  & plantilla canónica & idéntica al objetivo & respuestas distintas & palabras (mediana) \\
+modelo & run & n\_train &  &  &  &  \\
+\midrule
+InternVL3 1B & principal & 125000.000000 & 1.000 & 0.886 & 0.023 & 10.000 \\
+\cline{1-7} \cline{2-7}
+LLaVA-OV 0.5B & principal & 125000.000000 & 1.000 & 0.874 & 0.023 & 10.000 \\
+\cline{1-7} \cline{2-7}
+Qwen3.5 Base & principal & 125000.000000 & 1.000 & 0.913 & 0.023 & 10.000 \\
+\cline{1-7} \cline{2-7}
+VL-JEPA & principal & 125000.000000 & 1.000 & 0.473 & 0.019 & 10.000 \\
+\cline{1-7} \cline{2-7}
+InternVL3 1B & zero-shot & -- & 0.000 & 0.000 & 0.996 & 53.000 \\
+\cline{1-7} \cline{2-7}
+LLaVA-OV 0.5B & zero-shot & -- & 0.000 & 0.000 & 0.626 & 28.000 \\
+\cline{1-7} \cline{2-7}
+Qwen3.5 Base & zero-shot & -- & 0.000 & 0.000 & 1.000 & 82.000 \\
+\cline{1-7} \cline{2-7}
+VL-JEPA & zero-shot & -- & 0.000 & 0.000 & 0.053 & 12.000 \\
+\cline{1-7} \cline{2-7}
+\bottomrule
+\end{tabular}
