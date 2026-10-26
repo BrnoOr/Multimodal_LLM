@@ -3,6 +3,7 @@
 # exp_id: train_<model>_nf4_p1_attributes_tcan_r16_e1. Relanzar reanuda el interrumpido y salta los completos.
 # Cada línea: train (ajuste) -> val (elige adapter_best) -> test (10 000 imágenes del zero-shot) en el mismo proceso.
 # Desempeño final en runs/finetuned_<model>_nf4_p1_attributes_tcan_r16_e1_test/test_metrics.json.
+# Con 2 GPU libres: stage2b_main_gpu0.txt + stage2b_main_gpu1.txt (mismos runs, repartidos; no mezclar con esta cola).
 # Orden: del más barato al más caro en tokens visuales (VL-JEPA ≈ Qwen3.5 < InternVL3 < LLaVA-OV).
 model=vljepa
 model=qwen35

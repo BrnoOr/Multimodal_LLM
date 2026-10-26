@@ -1,0 +1,6 @@
+# Etapa 2 reformulada — entrenamiento principal repartido en 2 GPU (mitad A). Mismos runs que stage2b_main.txt.
+#   SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2b_main_g0 scripts/run_queue.sh configs/queues/stage2b_main_gpu0.txt
+# La otra mitad va en stage2b_main_gpu1.txt (GPU 1). No lanzar stage2b_main.txt mientras corran estas dos:
+# el mismo exp_id en dos procesos escribiría el mismo checkpoint.
+# Reparto por tiempo estimado con el img/s del smoke (train + val + test): LLaVA-OV es el más lento (≈ 8,9 img/s).
+model=llava_ov
