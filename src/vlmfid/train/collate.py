@@ -18,8 +18,10 @@ VLM autorregresivo — la muestra se arma igual que en la inferencia:
   * El objetivo se tokeniza por separado y se concatena: así la frontera prompt/objetivo es exacta y
     los tokens objetivo son los mismos que `generate` produce tras el prompt.
   * `fin_de_turno` es el token con que la plantilla cierra un turno del asistente (`<|im_end|>` en los
-    tres modelos, que heredan el formato ChatML de Qwen). Se detecta de la plantilla y se exige que
-    esté entre los `eos_token_id` de generación: si no, el modelo ajustado no sabría detenerse.
+    tres modelos, que heredan el formato ChatML de Qwen). Se detecta de la plantilla y se agrega a los
+    `eos_token_id` de generación si falta: si no, el modelo ajustado no sabría detenerse. Pasa con
+    Qwen3.5-0.8B-Base, que solo para en `<|endoftext|>` y usa la plantilla prestada de la versión
+    Instruct (ver `ensure_turn_end_eos`).
   * Relleno a la IZQUIERDA, como en `describe()`: los tokens objetivo de todas las filas quedan al
     final, y basta calcular logits para las últimas max(len objetivo)+1 posiciones (`logits_to_keep`).
     Con RoPE el desplazamiento constante de posiciones por el relleno no altera la atención.
@@ -67,6 +69,30 @@ def eos_ids(model) -> set[int]:
     return set(e) if isinstance(e, (list, tuple)) else {int(e)}
 
 
+def ensure_turn_end_eos(describer, prompt_text: str = "Describe the image.") -> tuple[str, int]:
+    """Agrega el fin de turno de la plantilla a los `eos_token_id` de generación si no está.
+
+    Lo usan el entrenamiento y la inferencia con `model.adapter_path`: el adaptador aprendió a cerrar
+    la respuesta con ese token, así que `generate` debe detenerse ahí (también en val y en test).
+    """
+    turn_end = detect_turn_end(describer, prompt_text)
+    ids = describer.processor.tokenizer(turn_end, add_special_tokens=False)["input_ids"]
+    if len(ids) != 1:
+        raise ValueError(f"El fin de turno {turn_end!r} no es un token único: {ids}")
+    tid = ids[0]
+    allowed = eos_ids(describer.model)
+    gc = getattr(describer.model, "generation_config", None)
+    if allowed and tid not in allowed:
+        if gc is None:
+            raise ValueError(f"El fin de turno {turn_end!r} (id {tid}) no está en los eos_token_id {sorted(allowed)} "
+                             "y el modelo no tiene generation_config para agregarlo.")
+        prev = gc.eos_token_id
+        gc.eos_token_id = (list(prev) if isinstance(prev, (list, tuple)) else [int(prev)]) + [tid]
+        print(f"[collate] fin de turno {turn_end!r} (id {tid}) agregado a eos_token_id: {gc.eos_token_id}",
+              flush=True)
+    return turn_end, tid
+
+
 def _caption(rec: dict) -> str:
     return rec["caption"]
 
@@ -80,15 +106,7 @@ class GenerativeFeaturizer:
         self.prompt_str = self.processor.apply_chat_template(
             describer.build_messages(prompt_text), add_generation_prompt=True, tokenize=False,
             **describer.chat_template_kwargs())
-        self.turn_end = detect_turn_end(describer, prompt_text)
-        end_ids = self.tok(self.turn_end, add_special_tokens=False)["input_ids"]
-        if len(end_ids) != 1:
-            raise ValueError(f"El fin de turno {self.turn_end!r} no es un token único: {end_ids}")
-        self.turn_end_id = end_ids[0]
-        allowed = eos_ids(describer.model)
-        if allowed and self.turn_end_id not in allowed:
-            raise ValueError(f"El fin de turno {self.turn_end!r} (id {self.turn_end_id}) no está en los "
-                             f"eos_token_id de generación {sorted(allowed)}: el modelo no sabría detenerse.")
+        self.turn_end, self.turn_end_id = ensure_turn_end_eos(describer, prompt_text)
         self.pad_id = self.tok.pad_token_id if self.tok.pad_token_id is not None else self.tok.eos_token_id
 
     def target_ids(self, caption: str) -> list[int]:

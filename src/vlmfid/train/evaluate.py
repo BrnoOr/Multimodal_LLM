@@ -56,3 +56,24 @@ def generate_and_score(describer, records, root, prompt_text: str, batch_size: i
         metrics |= {f"{prefix}_{k}": v for k, v in sub.items()}
     metrics["gen_seconds"] = round(time.time() - t0, 1)
     return metrics, preds
+
+
+def score_predictions(pred_path, records, groups: dict | None = None) -> dict:
+    """Métricas de un predictions.jsonl de `scripts/infer.py` sobre `records` (mismas que en val)."""
+    import json
+
+    by_id = {}
+    with open(pred_path, encoding="utf-8") as f:
+        for line in f:
+            p = json.loads(line)
+            by_id[p["id"]] = p["prediction"]
+    missing = [r["id"] for r in records if r["id"] not in by_id]
+    if missing:
+        raise ValueError(f"{pred_path}: faltan {len(missing)} predicciones (p. ej. {missing[:3]})")
+    texts = [by_id[r["id"]] for r in records]
+    metrics = score_texts(texts, records)
+    for prefix, keep in (groups or {}).items():
+        sel = [i for i, r in enumerate(records) if keep(r)]
+        metrics |= {f"{prefix}_{k}": v for k, v in score_texts([texts[i] for i in sel],
+                                                               [records[i] for i in sel]).items()}
+    return metrics

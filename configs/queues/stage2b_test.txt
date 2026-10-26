@@ -1,5 +1,7 @@
 # Etapa 2 reformulada — evaluación en test (las mismas 10 000 imágenes del zero-shot) con el adaptador
-# elegido en val. Usa scripts/infer.py (SCRIPT por defecto), así que las predicciones quedan con el mismo
+# elegido en val. NORMALMENTE NO HACE FALTA: scripts/train.py ya evalúa en test al terminar cada
+# entrenamiento (sección `test` de configs/train/budget.yaml), con estos mismos exp_id. Esta cola queda
+# para re-evaluar sin entrenar o para runs entrenados con test.enabled=false (no escribe test_metrics.json). Usa scripts/infer.py (SCRIPT por defecto), así que las predicciones quedan con el mismo
 # formato de la etapa 1 en runs/<exp_id>/predictions.jsonl y el notebook 04 las encuentra por
 # stage=finetuned + model.adapter_path.
 #   GPU=1 scripts/launch.sh s2b_test scripts/run_queue.sh configs/queues/stage2b_test.txt

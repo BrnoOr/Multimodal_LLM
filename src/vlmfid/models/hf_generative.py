@@ -88,6 +88,10 @@ class HFGenerativeDescriber(Describer):
             from ..paths import resolve
 
             self.model = PeftModel.from_pretrained(self.model, str(resolve(c.adapter_path))).eval()
+            # el adaptador aprendió a cerrar la respuesta con el fin de turno: generate debe parar ahí
+            from ..train.collate import ensure_turn_end_eos
+
+            ensure_turn_end_eos(self)
 
     def _ensure_chat_template(self) -> None:
         """Garantiza una plantilla de chat en el processor, en este orden de preferencia:

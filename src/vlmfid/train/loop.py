@@ -348,6 +348,33 @@ class Trainer:
         signal.signal(signal.SIGTERM, _handle)
         signal.signal(signal.SIGINT, _handle)
 
+        try:
+            model, info, lora_info = self._setup(train_records, val_records)
+        except Exception as e:      # sin esto el run queda en "running" para siempre en status.json
+            tracker.finish("failed", error=f"{type(e).__name__}: {e}", step=0)
+            raise
+        tracker.update(model_info=info, total_steps=total_steps)
+        print(f"[train] modelo listo: {json.dumps(info, default=str)}", flush=True)
+
+        self.optimizer = torch.optim.AdamW(param_groups(model, cfg), betas=tuple(t.betas), eps=float(t.eps),
+                                           weight_decay=float(t.weight_decay))
+        self.scheduler = torch.optim.lr_scheduler.LambdaLR(
+            self.optimizer, lr_lambda_factory(total_steps, warmup, str(t.schedule), float(t.min_lr_ratio)))
+
+        state = {"global_step": 0, "best": None, "last_eval_step": None, "train_seconds": 0.0,
+                 "eval_seconds": 0.0, "micro_batch_size": self.micro, "samples_seen": 0}
+        if (self.dir / "checkpoint").exists():
+            state = self.load_checkpoint(model)
+            self.micro = min(self.micro, int(state.get("micro_batch_size") or self.micro))
+            print(f"[train] reanudando desde el paso {state['global_step']} "
+                  f"(mejor: {state['best'] and state['best']['step']})", flush=True)
+        set_train_mode(model, self._frozen_modules())
+        return self._train_loop(model, state, train_records, val_records, n_steps_epoch, total_steps,
+                                lora_info, tracker, summary_path)
+
+    def _setup(self, train_records, val_records):
+        """Carga el modelo, adjunta LoRA y arma el featurizer. Devuelve (modelo, info, lora_info)."""
+        cfg, t = self.cfg, self.cfg.train
         t_load = time.time()
         if self.describer is None:
             self.describer = build_describer(cfg.model)
@@ -375,23 +402,11 @@ class Trainer:
             # falla temprano si algún objetivo excede max_target_tokens (todos los textos distintos de train y val)
             for txt in {self.target_fn(r) for r in train_records + val_records}:
                 self.featurizer.target_ids(txt)
-        tracker.update(model_info=info, total_steps=total_steps)
-        print(f"[train] modelo listo: {json.dumps(info, default=str)}", flush=True)
+        return model, info, lora_info
 
-        self.optimizer = torch.optim.AdamW(param_groups(model, cfg), betas=tuple(t.betas), eps=float(t.eps),
-                                           weight_decay=float(t.weight_decay))
-        self.scheduler = torch.optim.lr_scheduler.LambdaLR(
-            self.optimizer, lr_lambda_factory(total_steps, warmup, str(t.schedule), float(t.min_lr_ratio)))
-
-        state = {"global_step": 0, "best": None, "last_eval_step": None, "train_seconds": 0.0,
-                 "eval_seconds": 0.0, "micro_batch_size": self.micro, "samples_seen": 0}
-        if (self.dir / "checkpoint").exists():
-            state = self.load_checkpoint(model)
-            self.micro = min(self.micro, int(state.get("micro_batch_size") or self.micro))
-            print(f"[train] reanudando desde el paso {state['global_step']} "
-                  f"(mejor: {state['best'] and state['best']['step']})", flush=True)
-        set_train_mode(model, self._frozen_modules())
-
+    def _train_loop(self, model, state, train_records, val_records, n_steps_epoch, total_steps, lora_info,
+                    tracker, summary_path) -> int:
+        cfg, t = self.cfg, self.cfg.train
         if t.eval_at_start and state["global_step"] == 0 and state["last_eval_step"] is None:
             t0 = time.time()
             self.evaluate(model, val_records, 0, state)

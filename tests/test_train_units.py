@@ -82,6 +82,23 @@ def test_smoke_cambia_exp_id():
     assert compose_train(["model=qwen35", "train.max_steps=20"]).exp_id.endswith("_tcan_r16_e1_m20")
 
 
+@pytest.mark.parametrize("m", MODELS)
+def test_test_usa_el_adaptador_y_el_subconjunto_del_zeroshot(m):
+    from vlmfid.train.config import compose_test
+
+    c = compose_train([f"model={m}"])
+    t = compose_test(c)
+    # mismos exp_id que configs/queues/stage2b_test.txt
+    assert t.exp_id == f"finetuned_{c.exp_id.removeprefix('train_')}_test"
+    assert t.model.adapter_path == f"runs/{c.exp_id}/adapter_best"
+    assert t.stage == "finetuned" and t.data.split == "test" and t.data.limit == 10000
+    assert t.data.subset_seed == 0 and t.prompt.id == c.prompt.id
+    if m == "vljepa":
+        assert t.model.bank.target_format == "canonical" and t.infer.save_embeddings
+    smoke = compose_test(compose_train([f"model={m}", "train.max_steps=20", "test.limit=64"]))
+    assert smoke.exp_id.endswith("_m20_test_n64") and smoke.data.limit == 64
+
+
 def test_orden_de_datos_determinista_y_reanudable():
     assert steps_per_epoch(125_000, 64, drop_last=False) == 1954            # todo train: el último paso con 8
     assert steps_per_epoch(125_000, 64, drop_last=True) == 1953

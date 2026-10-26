@@ -79,3 +79,13 @@ objective:
   temperature: 0.07             # solo infonce: la del preentrenamiento del checkpoint
   mask_duplicate_captions: true # solo infonce con negatives=batch: captions idénticos en el lote no son negativos
   negatives: batch              # solo infonce: batch (las otras muestras del lote) | bank (todos los objetivos únicos)
+
+# Evaluación final en test, en el mismo proceso al terminar el entrenamiento (scripts/train.py).
+# Carga adapter_best (el mejor checkpoint en val) y corre scripts/infer.py: mismo camino, formato y
+# subconjunto que el zero-shot de la etapa 1. Test nunca se mira durante el entrenamiento.
+# Resultado en runs/finetuned_<exp_id sin "train_">_test[_n<limit>]/ (predictions.jsonl + test_metrics.json),
+# los mismos exp_id que configs/queues/stage2b_test.txt. Reanudable e idempotente como cualquier inferencia.
+test:
+  enabled: true
+  split: test
+  limit: 10000                  # las mismas 10 000 imágenes del zero-shot (data.limit de la etapa 1)

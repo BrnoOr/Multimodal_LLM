@@ -39,7 +39,8 @@ TARGET_TAG = {"canonical": "tcan", "original": "torig"}
 # Claves que pueden cambiar al reanudar un entrenamiento sin alterar su resultado.
 # (max_steps no: un run cortado con max_steps escribe summary.json y adapter_best, así que va en el exp_id)
 RESUME_SAFE = {"data.num_workers", "train.micro_batch_size", "train.log_every", "train.save_every",
-               "train.eval_every"}
+               "train.eval_every", "test"}
+TEST_DEFAULT_LIMIT = 10000      # el subconjunto de test del zero-shot: sin sufijo _n en el exp_id
 
 
 def _flat_keys(d: dict, prefix: str = "") -> set[str]:
@@ -128,6 +129,36 @@ def compose_train(args: list[str] | None = None) -> DictConfig:
                       + (f"_s{cfg.seed}" if int(cfg.seed) != 0 else "")
                       + (f"_m{t.max_steps}" if t.get("max_steps") else ""))
     return cfg
+
+
+def compose_test(cfg: DictConfig) -> DictConfig:
+    """Config de `scripts/infer.py` para evaluar en test el adaptador elegido en val.
+
+    Parte de configs/defaults.yaml (como el zero-shot) y toma de la config de entrenamiento el modelo
+    tal como se entrenó (cuantización, banco de VL-JEPA en el formato aprendido), el prompt y la semilla.
+    El exp_id coincide con el de configs/queues/stage2b_test.txt, así que ambos caminos comparten run.
+    """
+    from ..config import compose
+    from ..paths import ROOT, RUNS
+
+    t = cfg.test
+    if t.split == cfg.data.val_split or t.split == cfg.data.train_split:
+        raise ValueError(f"test.split='{t.split}' no puede ser el split de train o val")
+    limit = None if t.get("limit") in (None, "", "null") else int(t.limit)
+    exp_id = cfg.exp_id.removeprefix("train_")
+    exp_id = f"finetuned_{exp_id}_test" + (f"_n{limit}" if limit != TEST_DEFAULT_LIMIT else "")
+    tcfg = compose([f"model={cfg.model_key}", f"prompt={cfg.prompt.id}", "stage=finetuned", f"exp_id={exp_id}",
+                    f"seed={cfg.seed}", f"data.split={t.split}", f"data.limit={'null' if limit is None else limit}",
+                    f"data.variant={cfg.data.variant}", f"data.subset_seed={cfg.data.subset_seed}"])
+    adapter = RUNS / cfg.exp_id / "adapter_best"
+    if adapter.is_relative_to(ROOT):        # relativa, como en stage2b_test.txt (config.yaml comparable)
+        adapter = adapter.relative_to(ROOT)
+    tcfg.model = OmegaConf.merge(cfg.model, {"adapter_path": adapter.as_posix()})
+    if cfg.data.get("root") is not None:
+        tcfg.data.root = cfg.data.root
+    tcfg.infer.batch_size = cfg.model.get("batch_size", 8)
+    tcfg.infer.save_embeddings = cfg.model.family == "vljepa"
+    return tcfg
 
 
 def strip_resume_safe(cfg: dict) -> dict:

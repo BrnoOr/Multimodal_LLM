@@ -6,11 +6,14 @@
 #   * paso 0 de val ≈ zero-shot con p1; que la loss baje; img/s y pico de memoria
 #   * en Qwen3.5: que la loss NO quede en NaN ni plana (backward de Gated DeltaNet con fla 0.4.2)
 #   * la línea con holdout imprime no_vistas[forma+pos]
+#   * al final de cada línea, "[test] ...": inferencia en 64 imágenes de test con adapter_best
+#     (runs/finetuned_..._m20_test_n64/test_metrics.json); en Qwen3.5, que las respuestas terminen solas
+#     (n_new_tokens en predictions.jsonl muy por debajo de 128)
 # Train COMPLETO (sin límite): solo se corta en 20 pasos con train.max_steps (exp_id ..._m20, nunca choca con el
 # run principal). Sin calentamiento, para que en 20 pasos el lr sea el del presupuesto y la loss alcance a bajar.
 # val de 64 imágenes.
-model=vljepa     train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1
-model=qwen35     train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1
-model=internvl3  train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1
-model=llava_ov   train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1
-model=qwen35     train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1 data.holdout=compositional
+model=vljepa     train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1 test.limit=64
+model=qwen35     train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1 test.limit=64
+model=internvl3  train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1 test.limit=64
+model=llava_ov   train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1 test.limit=64
+model=qwen35     train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1 data.holdout=compositional test.limit=64
