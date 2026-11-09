@@ -1,0 +1,26 @@
+\begin{tabular}{llrrrrr}
+\toprule
+ &  & 3 aciertos & ρ CIDEr-D original & ρ ROUGE-L original & ρ CIDEr-D canónica & ρ ROUGE-L canónica \\
+modelo & condición &  &  &  &  &  \\
+\midrule
+\multirow[t]{3}{*}{VL-JEPA} & ZS p1 & 0.032 & 0.597 & 0.273 & 0.719 & 0.199 \\
+ & ZS mejor & 0.034 & 0.597 & 0.278 & 0.721 & 0.196 \\
+ & FT & 0.631 & 0.303 & 0.318 & 0.524 & 0.752 \\
+\cline{1-7}
+\multirow[t]{3}{*}{Qwen3.5 Base} & ZS p1 & 0.072 & 0.097 & 0.183 & 0.149 & 0.316 \\
+ & ZS mejor & 0.072 & 0.097 & 0.183 & 0.149 & 0.316 \\
+ & FT & 0.999 & 0.012 & -0.006 & 0.076 & 0.105 \\
+\cline{1-7}
+\multirow[t]{3}{*}{InternVL3 1B} & ZS p1 & 0.030 & 0.053 & 0.187 & 0.159 & 0.288 \\
+ & ZS mejor & 0.030 & 0.053 & 0.187 & 0.159 & 0.288 \\
+ & FT & 0.999 & 0.024 & 0.021 & 0.077 & 0.105 \\
+\cline{1-7}
+\multirow[t]{3}{*}{LLaVA-OV 0.5B} & ZS p1 & 0.034 & 0.161 & 0.165 & 0.237 & 0.259 \\
+ & ZS mejor & 0.038 & 0.628 & 0.204 & 0.799 & 0.722 \\
+ & FT & 0.998 & 0.032 & 0.022 & 0.101 & 0.131 \\
+\cline{1-7}
+\multirow[t]{2}{*}{Qwen3.5 Instruct} & ZS p1 & 0.041 & 0.109 & 0.202 & 0.140 & 0.285 \\
+ & ZS mejor & 0.166 & 0.566 & 0.262 & 0.824 & 0.807 \\
+\cline{1-7}
+\bottomrule
+\end{tabular}
