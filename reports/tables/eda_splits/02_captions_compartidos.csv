@@ -1,0 +1,4 @@
+split,captions únicos,únicos / filas,filas con caption en train,filas con caption en banco VL-JEPA,canónicos únicos,filas con canónico en train
+train,10936,0.087488,,0.87348,231,
+val,5372,0.5372,0.9943,0.8549,231,1.0
+test,5385,0.5385,0.9943,0.8551,231,1.0

@@ -1,0 +1,4 @@
+split,nombres distintos,nombres ausentes en train,filas con nombre ausente en train,H(nombre) bits,nombre más frecuente,frac. más frecuente
+train,100,0,0.0,5.961357250525272,tab:cyan,0.060568
+val,99,0,0.0,5.957844757081884,tab:cyan,0.0606
+test,99,0,0.0,5.95444212124436,tab:cyan,0.0579

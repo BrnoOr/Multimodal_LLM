@@ -1,0 +1,7 @@
+par,ids,rutas de imagen,escenas idénticas (latentes)
+train ∩ val,0,0,0
+train ∩ test,0,0,0
+val ∩ test,0,0,0
+train (dentro),0,0,0
+val (dentro),0,0,0
+test (dentro),0,0,0
