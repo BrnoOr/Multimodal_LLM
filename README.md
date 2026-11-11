@@ -40,8 +40,7 @@ Multimodal_LLM/
 ├── external/open-vljepa/     submodule fijado a un commit
 ├── notebooks/                ANÁLISIS INTERACTIVO (solo lee data/ y runs/)
 │   ├── 00_eda_m3di.ipynb
-│   ├── 01_inspeccion_predicciones.ipynb
-│   └── legacy/               EDA y evaluación de la etapa 1 anterior (rutas y exp_id antiguos)
+│   └── 01_inspeccion_predicciones.ipynb
 ├── reports/                  figuras y tablas del informe (figures/, tables/)
 ├── docs/                     contexto del proyecto y guía laptop -> GitHub -> cluster
 ├── scripts/                  PUNTOS DE ENTRADA (cómo se corre)
