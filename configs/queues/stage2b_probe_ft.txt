@@ -1,0 +1,8 @@
+# Etapa 2 reformulada — las mismas sondas lineales sobre los modelos AJUSTADOS (después de stage2b_main).
+#   SCRIPT=scripts/probe.py GPU=1 scripts/launch.sh s2b_probe_ft scripts/run_queue.sh configs/queues/stage2b_probe_ft.txt
+# Comparadas con stage2b_probe.txt miden si el ajuste cambió la REPRESENTACIÓN (la sonda sube) o solo cómo
+# se verbaliza (la sonda queda igual y la exactitud de las respuestas sube). exp_id ..._ft_tcan.
+model=qwen35     prompt=p1_attributes probe.tag=ft_tcan model.adapter_path=runs/train_qwen35_08b_base_nf4_p1_attributes_tcan_r16_e1/adapter_best
+model=vljepa     prompt=p1_attributes probe.tag=ft_tcan model.adapter_path=runs/train_vljepa_open_msrvtt_nf4_p1_attributes_tcan_r16_e1/adapter_best model.bank.target_format=canonical
+model=internvl3  prompt=p1_attributes probe.tag=ft_tcan model.adapter_path=runs/train_internvl3_1b_nf4_p1_attributes_tcan_r16_e1/adapter_best
+model=llava_ov   prompt=p1_attributes probe.tag=ft_tcan model.adapter_path=runs/train_llava_ov_05b_nf4_p1_attributes_tcan_r16_e1/adapter_best

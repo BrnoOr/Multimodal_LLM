@@ -1,0 +1,7 @@
+,ZS mejor,FT
+mejor modelo individual,0.0738,0.999
+mejor modelo,Qwen3.5 Base,Qwen3.5 Base
+algún modelo acierta (oráculo),0.1733,1.0
+todos aciertan,0.0,0.6424
+ningún modelo acierta,0.8267,0.0
+n imágenes,10000,10000

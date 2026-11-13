@@ -1,0 +1,15 @@
+# Etapa 2 reformulada — controles y ablaciones (después de stage2b_main; en orden de prioridad).
+#   SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2b_abl scripts/run_queue.sh configs/queues/stage2b_ablations.txt
+#
+# 1) Objetivo ORIGINAL (diseño previo de la etapa 2): canónico vs original con todo lo demás igual.
+#    Responde cuánto costaba aprender las 5 plantillas y los ~100 nombres de color. exp_id ..._torig_...
+model=qwen35     target.format=original
+model=vljepa     target.format=original
+model=internvl3  target.format=original
+model=llava_ov   target.format=original
+# 2) Precisión: LoRA sobre la base en bf16 en vez de NF4 (con 0,5-1 B parámetros cabe sin cuantizar).
+#    Comparar contra el zero-shot bf16 de la etapa 1 si existe; si no, correrlo (ver docs §6).
+model=qwen35     model.quant=bf16
+# 3) Semilla: cuánto de una diferencia entre modelos es ruido de entrenamiento (exp_id ..._s1).
+model=qwen35     seed=1
+model=llava_ov   seed=1

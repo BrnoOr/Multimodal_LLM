@@ -1,0 +1,22 @@
+# VL-JEPA (open-vljepa, MSRVTT Stage B) — etapa 2. Solo claves permitidas (ver configs/train/budget.yaml).
+#
+# Prompt: p1_attributes, como los otros tres (reformulación, docs/ETAPA2B_REFORMULACION.md). La regla
+# "mejor zero-shot" elegía p4m_multiexample (Índice macro 0,2910), pero en VL-JEPA los seis prompts
+# quedaron entre 0,285 y 0,291, dentro del ruido, y p4m (≈80-90 tokens de Llama-3) se truncaba a
+# max_query_len = 64. p1 cabe entero y deja el prompt igual en los 4 modelos.
+prompt: p1_attributes
+
+train:
+  # Con negatives=bank cada muestra aporta un término independiente del lote, así que se podría acumular
+  # gradiente; se deja 64 porque cabe en memoria (VL-JEPA es el modelo más liviano en entrenamiento).
+  micro_batch_size: 64
+
+lora:
+  connector_modules: [vis_proj]   # predictor.vis_proj: Linear 1024 -> 2048 (V-JEPA 2 -> Llama)
+
+objective:
+  kind: infonce
+  # Negativos = TODOS los textos objetivo únicos (504 canónicos), no las otras 63 muestras del lote: es
+  # clasificar sobre el mismo banco con que se decodifica por recuperación en inferencia. Con un lote
+  # de 64 y 504 clases, casi todos los negativos del lote difieren en varios atributos a la vez.
+  negatives: bank

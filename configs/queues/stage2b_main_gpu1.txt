@@ -1,0 +1,6 @@
+# Etapa 2 reformulada — entrenamiento principal repartido en 2 GPU (mitad B). Mismos runs que stage2b_main.txt.
+#   SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2b_main_g1 scripts/run_queue.sh configs/queues/stage2b_main_gpu1.txt
+# La otra mitad va en stage2b_main_gpu0.txt (GPU 0). No lanzar stage2b_main.txt mientras corran estas dos.
+model=vljepa
+model=qwen35
+model=internvl3

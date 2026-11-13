@@ -1,0 +1,13 @@
+# Qwen3.5-0.8B-Base — etapa 2. Solo claves permitidas (ver configs/train/budget.yaml).
+#
+# Prompt: mejor zero-shot de la etapa 1 para la versión Base, p1_attributes (Índice macro 0,527).
+# LoRA: usa el regex de configs/models/qwen35.yaml (atención completa, Gated DeltaNet y MLP del
+# language_model). in_proj_a / in_proj_b (compuertas por cabeza de DeltaNet) quedan fuera, como ya
+# estaba definido para la etapa 2.
+prompt: p1_attributes
+
+train:
+  micro_batch_size: 32      # ≈64 tokens visuales por imagen: secuencias cortas
+
+lora:
+  connector_modules: [merger]   # model.visual.merger: fusión 2×2 de parches + MLP hacia el LM

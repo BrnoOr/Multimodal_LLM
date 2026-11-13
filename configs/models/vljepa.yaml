@@ -25,4 +25,8 @@ bank:                   # "decodificador" por recuperación y prototipos por atr
   seed: 0
   # auto = latentes de texto discretos detectados en el manifiesto; o una lista explícita
   attributes: auto
+  # textos del banco: original (captions de M3DI, etapa 1) | canonical (objetivo de la etapa 2
+  # reformulada). Al entrenar lo fija target.format; en test con un adaptador canónico hay que pasar
+  # model.bank.target_format=canonical (ver configs/queues/stage2b_test.txt).
+  target_format: original
 adapter_path: null

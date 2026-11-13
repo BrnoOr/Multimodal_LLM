@@ -1,0 +1,5 @@
+modelo,paso elegido,pasos,Forma+pos (paso 0),Forma (paso 0),"Posición (x,y) (paso 0)",Color (paso 0),Forma+pos (elegido),Forma (elegido),"Posición (x,y) (elegido)",Color (elegido)
+VL-JEPA,1800,1954,0.219,0.304,0.134,0.142,0.82,1.0,0.64,0.762
+Qwen3.5 Base,1800,1954,0.297,0.158,0.436,0.716,1.0,1.0,1.0,0.906
+InternVL3 1B,1000,1954,0.174,0.216,0.132,0.66,1.0,1.0,1.0,0.888
+LLaVA-OV 0.5B,800,1954,0.206,0.3,0.112,0.694,1.0,1.0,1.0,0.87

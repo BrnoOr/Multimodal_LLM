@@ -1,0 +1,9 @@
+# Etapa 2 reformulada — split composicional: train sin 14 de las 63 combinaciones forma × posición.
+#   SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2b_comp scripts/run_queue.sh configs/queues/stage2b_compositional.txt
+# exp_id: ..._tcan_r16_e1_hc. Train queda con ≈ 97 000 imágenes (≈ 1 520 pasos de 64, todas las no retiradas).
+# El checkpoint se elige con las combinaciones VISTAS de val (seen_shape_pos); las retiradas se registran
+# como unseen_* en val_log.jsonl y se miden en test con el notebook 04.
+model=qwen35     data.holdout=compositional
+model=vljepa     data.holdout=compositional
+model=internvl3  data.holdout=compositional
+model=llava_ov   data.holdout=compositional
