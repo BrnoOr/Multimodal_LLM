@@ -5,10 +5,16 @@ hf_id: OpenGVLab/InternVL3-1B-hf
 revision: null
 model_class: AutoModelForImageTextToText     # -> InternVLForConditionalGeneration
 quant: nf4
-quant_skip_modules: ['.*\.vision_tower', '.*\.multi_modal_projector', 'lm_head']
-vision_modules: [vision_tower, multi_modal_projector]
+# Cuantización (docs/metodologia.md §2.1, D5): todo componente congelado va en NF4, incluido el encoder
+# visual. Quedan en precisión completa solo el conector (se entrena completo en la etapa 2) y lm_head
+# (práctica estándar de bitsandbytes para la capa de salida). Los patrones son regex anclados al nombre
+# completo del módulo (ver src/vlmfid/models/quant.py).
+quant_skip_modules: ['.*\.multi_modal_projector', 'lm_head']
+vision_modules: [vision_tower]
+connector_modules: [multi_modal_projector]
 attn_implementation: sdpa
-# una imagen de 224 px cabe en una tesela de 448 -> 256 tokens visuales
+# Tokens visuales por imagen: SIN VERIFICAR (scripts/inspect_models.py lo mide). Se esperan 256 por
+# tesela de 448 px (pixel unshuffle, InternVL3 §2.1).
 batch_size: 64
 generation:
   max_new_tokens: 128

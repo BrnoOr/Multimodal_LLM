@@ -1,0 +1,24 @@
+# Paso 1.2 — piloto zero-shot de los VLM autorregresivos: 3 modelos x 6 prompts sobre 200 imagenes de VAL,
+# las mismas para todos (subconjunto determinista). Sirve para revisar a mano respuestas y extraccion
+# ANTES de la corrida completa; no se usa para elegir prompts.
+#   GPU=0 scripts/launch.sh s1_piloto scripts/run_queue.sh configs/queues/stage1_pilot_val.txt
+#   uv run --no-sync python scripts/score.py runs/zeroshot_*_val_n200 --table piloto
+# VL-JEPA no esta aqui: necesita su Y-Decoder (docs/metodologia.md §2.4), que se entrena aparte.
+model=llava_ov   prompt=p0_minimal         data.limit=200
+model=llava_ov   prompt=p1_attributes      data.limit=200
+model=llava_ov   prompt=p2_constrained     data.limit=200
+model=llava_ov   prompt=p3_json            data.limit=200
+model=llava_ov   prompt=p4_dataset_format  data.limit=200
+model=llava_ov   prompt=p4m_multiexample   data.limit=200
+model=internvl3  prompt=p0_minimal         data.limit=200
+model=internvl3  prompt=p1_attributes      data.limit=200
+model=internvl3  prompt=p2_constrained     data.limit=200
+model=internvl3  prompt=p3_json            data.limit=200
+model=internvl3  prompt=p4_dataset_format  data.limit=200
+model=internvl3  prompt=p4m_multiexample   data.limit=200
+model=qwen35     prompt=p0_minimal         data.limit=200
+model=qwen35     prompt=p1_attributes      data.limit=200
+model=qwen35     prompt=p2_constrained     data.limit=200
+model=qwen35     prompt=p3_json            data.limit=200
+model=qwen35     prompt=p4_dataset_format  data.limit=200
+model=qwen35     prompt=p4m_multiexample   data.limit=200

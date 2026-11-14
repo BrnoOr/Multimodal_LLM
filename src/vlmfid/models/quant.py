@@ -1,14 +1,21 @@
 """Esquema de cuantización común: NF4 (bitsandbytes) con doble cuantización y cómputo bf16.
 
-Criterio uniforme en los cuatro modelos: se cuantiza el *transformer de lenguaje* (decodificador o
-predictor); el encoder visual, el proyector y la cabeza de salida quedan en bf16. Así la
-comparación no confunde errores de cuantización del encoder visual con diferencias de paradigma.
+Criterio uniforme en los cuatro modelos (docs/metodologia.md §2.1, decisión D5): TODO componente
+congelado va en NF4, incluido el encoder visual (en VL-JEPA: X-Encoder, Predictor e Y-Encoder). Quedan
+en precisión completa solo los módulos que la etapa 2 entrena completos (el conector o las
+proyecciones) y la cabeza de salida `lm_head`. Fundamento: el enunciado pide modelos cuantizados sin
+excepciones y QLoRA cuantiza el modelo base completo (Dettmers et al., 2023, §3). El control sin
+cuantizar es `quant: bf16`.
+
+bitsandbytes solo reemplaza capas `nn.Linear`: convoluciones (p. ej. la de parches), normalizaciones
+y embeddings quedan en bf16. `quantization_report` mide qué fracción de los parámetros quedó
+efectivamente en 4 bits; ese número se registra por modelo y se reporta.
 
 Sobre `skip_modules` (transformers >= 5.17, quantizers_utils.should_convert_module): cada patrón se
 compara con `re.match` contra el nombre COMPLETO del módulo (anclado al inicio) o con `endswith`.
-Un patrón "vision_tower" NO excluye "model.vision_tower.encoder.layers.0.q_proj"; hay que escribir
-".*\\.vision_tower". Las configs usan esa forma y `HFGenerativeDescriber` verifica tras la carga
-que ninguna capa visual haya quedado cuantizada.
+Un patrón "multi_modal_projector" NO excluye "model.multi_modal_projector.linear_1"; hay que escribir
+".*\\.multi_modal_projector". Las configs usan esa forma y `HFGenerativeDescriber` verifica tras la
+carga que el conector NO quedó cuantizado y que el encoder visual SÍ.
 """
 
 from __future__ import annotations
@@ -65,3 +72,37 @@ def swap_linear_to_nf4(module: nn.Module, device: torch.device) -> int:
         else:
             n += swap_linear_to_nf4(child, device)
     return n
+
+
+def quantization_report(model: nn.Module, groups: dict[str, list[str]] | None = None) -> dict:
+    """Cuántas capas y qué fracción de los parámetros quedaron en 4/8 bits.
+
+    `groups` = {nombre: [subcadenas]}: conteo de capas cuantizadas cuyo nombre contiene alguna de las
+    subcadenas (p. ej. {"vision": ["vision_tower"], "connector": ["multi_modal_projector"]}).
+
+    Los pesos de una capa cuantizada están empaquetados, así que su tamaño original se calcula como
+    in_features × out_features y no con `numel()`.
+    """
+    try:
+        import bitsandbytes as bnb
+
+        qtypes: tuple = (bnb.nn.Linear4bit, bnb.nn.Linear8bitLt)
+    except ImportError:
+        qtypes = ()
+    groups = groups or {}
+    n_layers, q_params, q_param_ids = 0, 0, set()
+    per_group = {g: 0 for g in groups}
+    for name, m in model.named_modules():
+        if qtypes and isinstance(m, qtypes):
+            n_layers += 1
+            q_params += m.in_features * m.out_features
+            q_param_ids.add(id(m.weight))
+            for g, keys in groups.items():
+                if any(k in name for k in keys):
+                    per_group[g] += 1
+    other = sum(p.numel() for p in model.parameters() if id(p) not in q_param_ids)
+    total = q_params + other
+    out = {"quantized_linears": n_layers, "params_quantized": int(q_params), "params_total": int(total),
+           "fraction_quantized": round(q_params / total, 4) if total else 0.0}
+    out.update({f"quantized_in_{g}": n for g, n in per_group.items()})
+    return out

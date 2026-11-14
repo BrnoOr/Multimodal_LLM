@@ -1,0 +1,24 @@
+# Paso 1.2 — etapa 1 completa de los VLM autorregresivos: 3 modelos x 6 prompts sobre VAL completo
+# (10 000 imagenes). Con esta corrida se elige el mejor prompt por modelo (criterio: attr_mean).
+# NO LANZAR hasta haber revisado el piloto (configs/queues/stage1_pilot_val.txt).
+#   GPU=0 scripts/launch.sh s1_val scripts/run_queue.sh configs/queues/stage1_val.txt
+#   uv run --no-sync python scripts/score.py runs/zeroshot_*_val --table etapa1_val --baselines
+# Control sin cuantizar: tras elegir el prompt, repetir SOLO esa linea de cada modelo con model.quant=bf16.
+model=llava_ov   prompt=p0_minimal
+model=llava_ov   prompt=p1_attributes
+model=llava_ov   prompt=p2_constrained
+model=llava_ov   prompt=p3_json
+model=llava_ov   prompt=p4_dataset_format
+model=llava_ov   prompt=p4m_multiexample
+model=internvl3  prompt=p0_minimal
+model=internvl3  prompt=p1_attributes
+model=internvl3  prompt=p2_constrained
+model=internvl3  prompt=p3_json
+model=internvl3  prompt=p4_dataset_format
+model=internvl3  prompt=p4m_multiexample
+model=qwen35     prompt=p0_minimal
+model=qwen35     prompt=p1_attributes
+model=qwen35     prompt=p2_constrained
+model=qwen35     prompt=p3_json
+model=qwen35     prompt=p4_dataset_format
+model=qwen35     prompt=p4m_multiexample

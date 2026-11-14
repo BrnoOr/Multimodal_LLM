@@ -1,3 +1,6 @@
+# VL-JEPA: reimplementación abierta open-vljepa, checkpoint MSRVTT Stage B (docs/metodologia.md §1.5).
+# X-Encoder V-JEPA 2 ViT-L (congelado) + Predictor (últimas 8 capas de Llama-3.2-1B) + Y-Encoder
+# EmbeddingGemma-300M. Predice un embedding; el texto lo produce un Y-Decoder aparte (§2.4).
 name: vljepa_open_msrvtt
 family: vljepa
 repo_path: external/open-vljepa          # submodule fijado a un commit
@@ -6,27 +9,21 @@ ckpt_file: best.pt
 ckpt_path: null
 revision: null
 # Arquitectura y tokenizador del predictor. null -> el del checkpoint (meta-llama/Llama-3.2-1B,
-# requiere aprobación de Meta). La réplica de unsloth tiene los mismos pesos y tokenizador.
+# requiere aprobación de Meta). La réplica de unsloth declara los mismos pesos y tokenizador
+# (sin verificar: ver docs/auditoria.md).
 llama_name: unsloth/Llama-3.2-1B
-quant: nf4              # NF4 en las capas del predictor; X-Encoder e Y-Encoder en bf16
+# NF4 en X-Encoder, capas del Predictor y transformer del Y-Encoder; las proyecciones lineales
+# (vis_proj, out_proj, y_encoder.projector) quedan en precisión completa. Control: quant: bf16.
+quant: nf4
 batch_size: 32
 num_frames: null        # null -> el del checkpoint (8): imagen tratada como video estático
 image_size: null        # null -> 256
-max_query_len: null     # null -> el del checkpoint (64)
-max_caption_len: 96     # los captions de M3DI son más largos que los de MSRVTT
-# El checkpoint vio consultas tipo "Describe the video." en entrenamiento. Con null se usa el prompt
-# del experimento (mide la sensibilidad al prompt); fijarlo aísla el efecto del prompt.
+# Longitudes máximas en tokens. PENDIENTES de fijar con scripts/inspect_models.py, que mide los
+# prompts y los captions de M3DI: si un texto excede el límite, el adaptador falla (no trunca).
+max_query_len: null     # null -> el del checkpoint (64); el paper usa 512
+max_caption_len: 96
+# El checkpoint vio consultas tipo "Describe the image." en entrenamiento. Con null se usa el prompt
+# del experimento; fijarlo aísla el efecto del prompt.
 query_override: null
-topk: 3
-return_embeddings: true # se guardan en runs/<exp>/embeddings si infer.save_embeddings=true
-bank:                   # "decodificador" por recuperación y prototipos por atributo
-  split: train          # nunca test
-  max_captions: 20000   # filas muestreadas del split (determinista)
-  seed: 0
-  # auto = latentes de texto discretos detectados en el manifiesto; o una lista explícita
-  attributes: auto
-  # textos del banco: original (captions de M3DI, etapa 1) | canonical (objetivo de la etapa 2
-  # reformulada). Al entrenar lo fija target.format; en test con un adaptador canónico hay que pasar
-  # model.bank.target_format=canonical (ver configs/queues/stage2b_test.txt).
-  target_format: original
+return_embeddings: true # Ŝ_Y por imagen; se guarda en runs/<exp>/embeddings si infer.save_embeddings=true
 adapter_path: null

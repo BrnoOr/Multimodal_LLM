@@ -5,8 +5,9 @@ Todos siguen el mismo patrón:
 
 Lo que cambia entre modelos se declara en configs/models/<modelo>.yaml, no en código:
     model_class            clase de transformers (defecto AutoModelForImageTextToText)
-    quant_skip_modules     regex de módulos que quedan en bf16 al cuantizar
-    vision_modules         subcadenas que identifican la parte visual (verificación post-carga)
+    quant_skip_modules     regex de módulos que quedan sin cuantizar (conector y lm_head)
+    vision_modules         subcadenas que identifican el encoder visual: DEBE quedar cuantizado
+    connector_modules      subcadenas que identifican el conector: NO debe quedar cuantizado
     chat_template_kwargs   argumentos extra de la plantilla (p. ej. enable_thinking: false)
     chat_template_from     repo del que tomar la plantilla si el checkpoint no trae una (modelos base)
     lora_target_modules    regex PEFT para la etapa 2
@@ -21,7 +22,7 @@ from PIL import Image
 
 from ..config import as_dict
 from .base import Description, Describer
-from .quant import hf_quantization_config
+from .quant import hf_quantization_config, quantization_report
 
 # LoRA solo sobre el transformer de lenguaje (los encoders visuales también tienen *_proj)
 LM_LORA_REGEX = r".*language_model.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)$"
@@ -131,31 +132,35 @@ class HFGenerativeDescriber(Describer):
         print(f"[hf] {self.cfg.hf_id} sin plantilla de chat: se usa la de {origin}", flush=True)
 
     def _verify_quantization(self) -> None:
-        """Cuenta capas 4/8-bit y falla si alguna quedó en la parte visual.
+        """Comprueba el criterio de cuantización del proyecto y registra cuánto quedó en 4 bits.
 
-        El criterio del proyecto es cuantizar solo el transformer de lenguaje; un patrón de
-        `quant_skip_modules` mal escrito cuantizaría el encoder visual sin ningún error.
+        Todo componente congelado va en NF4, incluido el encoder visual; el conector queda en
+        precisión completa porque la etapa 2 lo entrena completo (docs/metodologia.md §2.1). Un
+        patrón de `quant_skip_modules` mal escrito rompería esto sin ningún error, así que se falla si:
+          * no hay ninguna capa cuantizada;
+          * el encoder visual no tiene ninguna capa cuantizada;
+          * alguna capa del conector quedó cuantizada.
+        Con `quant: bf16` (control sin cuantizar) no debe haber ninguna capa cuantizada.
         """
+        groups = {"vision": list(self.cfg.get("vision_modules") or []),
+                  "connector": list(self.cfg.get("connector_modules") or [])}
+        self.quant_report = quantization_report(self.model, groups)
+        r = self.quant_report
         if self.cfg.quant == "bf16":
-            self.quant_report = {"quantized_linears": 0}
+            if r["quantized_linears"]:
+                raise RuntimeError(f"quant=bf16 pero hay {r['quantized_linears']} capas cuantizadas")
             return
-        import bitsandbytes as bnb
-
-        qtypes = (bnb.nn.Linear4bit, bnb.nn.Linear8bitLt)
-        vision_keys = list(self.cfg.get("vision_modules") or [])
-        total, in_vision = 0, []
-        for name, m in self.model.named_modules():
-            if isinstance(m, qtypes):
-                total += 1
-                if any(k in name for k in vision_keys):
-                    in_vision.append(name)
-        self.quant_report = {"quantized_linears": total, "quantized_in_vision": len(in_vision)}
-        if total == 0:
+        if r["quantized_linears"] == 0:
             raise RuntimeError(f"quant={self.cfg.quant} pero no hay capas cuantizadas: revisa bitsandbytes")
-        if in_vision:
+        if groups["vision"] and r["quantized_in_vision"] == 0:
             raise RuntimeError(
-                f"{len(in_vision)} capas visuales quedaron cuantizadas (p. ej. {in_vision[:3]}). "
-                "Corrige `quant_skip_modules` en la config del modelo."
+                f"El encoder visual ({groups['vision']}) no tiene capas cuantizadas. El criterio del proyecto "
+                "es NF4 en todo componente congelado: revisa `quant_skip_modules` y `vision_modules`."
+            )
+        if r["quantized_in_connector"]:
+            raise RuntimeError(
+                f"{r['quantized_in_connector']} capas del conector ({groups['connector']}) quedaron "
+                "cuantizadas; debe quedar en precisión completa. Corrige `quant_skip_modules`."
             )
 
     def info(self) -> dict:

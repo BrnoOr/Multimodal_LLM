@@ -6,11 +6,16 @@ hf_id: llava-hf/llava-onevision-qwen2-0.5b-ov-hf
 revision: null
 model_class: AutoModelForImageTextToText     # -> LlavaOnevisionForConditionalGeneration
 quant: nf4              # nf4 | int8 | bf16
-# regex anclados al nombre completo del módulo (ver src/vlmfid/models/quant.py)
-quant_skip_modules: ['.*\.vision_tower', '.*\.multi_modal_projector', 'lm_head']
-vision_modules: [vision_tower, multi_modal_projector]
+# Cuantización (docs/metodologia.md §2.1, D5): todo componente congelado va en NF4, incluido el encoder
+# visual. Quedan en precisión completa solo el conector (se entrena completo en la etapa 2) y lm_head
+# (práctica estándar de bitsandbytes para la capa de salida). Los patrones son regex anclados al nombre
+# completo del módulo (ver src/vlmfid/models/quant.py).
+quant_skip_modules: ['.*\.multi_modal_projector', 'lm_head']
+vision_modules: [vision_tower]                 # debe quedar cuantizado (verificación post-carga)
+connector_modules: [multi_modal_projector]     # no debe quedar cuantizado
 attn_implementation: sdpa
-# AnyRes: una imagen de 224 px da ≈ 2×729 tokens visuales (vista global + 1 recorte)
+# Tokens visuales por imagen: SIN VERIFICAR (scripts/inspect_models.py lo mide). Con AnyRes se esperan
+# 729 por vista (SigLIP a 384 px) más los recortes.
 batch_size: 32
 generation:
   max_new_tokens: 128

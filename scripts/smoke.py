@@ -1,7 +1,7 @@
-"""Smoke test: carga cada modelo en secuencia, describe N imágenes de test y libera la GPU.
+"""Smoke test: carga cada modelo en secuencia, describe N imágenes de val y libera la GPU.
 
-    uv run --no-sync python scripts/smoke.py                         # los 4 modelos, 2 imágenes
-    uv run --no-sync python scripts/smoke.py --models vljepa --n 4 --set model.bank.max_captions=2000
+    uv run --no-sync python scripts/smoke.py                         # los 3 VLM, 2 imágenes
+    uv run --no-sync python scripts/smoke.py --models qwen35 --n 4 --set model.quant=bf16
 
 No escribe en runs/: sirve para verificar descargas, cuantización y plantillas de chat.
 """
@@ -20,7 +20,9 @@ from vlmfid.models import build_describer
 from vlmfid.paths import CONFIGS
 from vlmfid.prompts import render
 
-DEFAULT_ORDER = ["vljepa", "llava_ov", "qwen35", "internvl3"]  # VL-JEPA primero: mayor riesgo
+# Solo los VLM autorregresivos: VL-JEPA no genera texto sin su Y-Decoder (docs/metodologia.md §2.4);
+# para comprobar su carga y cuantización usa scripts/inspect_models.py model=vljepa.
+DEFAULT_ORDER = ["llava_ov", "qwen35", "internvl3"]
 AVAILABLE = sorted(p.stem for p in (CONFIGS / "models").glob("*.yaml"))
 
 
@@ -33,7 +35,7 @@ def main(argv=None):
     ap.add_argument("--set", nargs="*", default=[], help="overrides dotlist adicionales")
     a = ap.parse_args(argv)
 
-    recs = load_manifest("test", limit=a.n, subset_seed=0)
+    recs = load_manifest("val", limit=a.n, subset_seed=0)          # nunca test
     ds = ImageRecordDataset(recs, data_root())
     recs, imgs = ImageRecordDataset.collate([ds[i] for i in range(len(ds))])
     failures = []

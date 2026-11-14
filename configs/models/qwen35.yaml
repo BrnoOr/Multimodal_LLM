@@ -2,16 +2,22 @@
 # Requiere transformers >= 5.17.
 #
 # OJO: es un modelo *solo preentrenado* (sin ajuste por instrucciones). En la etapa 1 su
-# desempeño zero-shot mezcla dos cosas: percepción y capacidad de seguir instrucciones. Para
-# separarlas existe qwen35_instruct.yaml (Qwen/Qwen3.5-0.8B): misma arquitectura, derivado del mismo preentrenamiento.
+# desempeño zero-shot mezcla dos cosas: percepción y capacidad de seguir instrucciones
+# (docs/metodologia.md §5, C13). El ID está PENDIENTE de verificar en HF.
 name: qwen35_08b_base
 family: qwen_vl
 hf_id: Qwen/Qwen3.5-0.8B-Base
 revision: null
 model_class: AutoModelForImageTextToText     # -> Qwen3_5ForConditionalGeneration
 quant: nf4
-quant_skip_modules: ['.*\.visual', 'lm_head']
+# Cuantización (docs/metodologia.md §2.1, D5): todo componente congelado va en NF4, incluido el encoder
+# visual. Quedan en precisión completa solo el conector (se entrena completo en la etapa 2) y lm_head
+# (práctica estándar de bitsandbytes para la capa de salida). Los patrones son regex anclados al nombre
+# completo del módulo (ver src/vlmfid/models/quant.py).
+# En Qwen el conector (merger) vive DENTRO del módulo visual.
+quant_skip_modules: ['.*\.visual\.merger', 'lm_head']
 vision_modules: [visual]
+connector_modules: [visual.merger]
 attn_implementation: sdpa
 # Capas Gated DeltaNet: sin kernels rápidos se usa la implementación en PyTorch (más lenta,
 # mismo resultado). use_kernels: true descarga kernels precompilados del Hub (paquete `kernels`);
@@ -21,9 +27,9 @@ use_kernels: false
 # 256² px, así que las imágenes de 224 px se agrandan a 256 -> 8×8 = 64 tokens visuales.
 min_pixels: null
 max_pixels: null
-# El processor del checkpoint Base no trae plantilla de chat (solo su tokenizador la tiene).
-# Se toma la de la versión Instruct (mismo tokenizador): así el control Base vs Instruct usa
-# exactamente el mismo formato de entrada.
+# El processor del checkpoint Base no trae plantilla de chat (solo su tokenizador la tiene). Se toma
+# la de la versión Instruct (mismo tokenizador). Es una decisión de diseño a declarar en el informe:
+# un modelo sin ajuste por instrucciones recibe un formato de chat (docs/auditoria.md §4).
 chat_template_from: Qwen/Qwen3.5-0.8B
 chat_template_kwargs:
   enable_thinking: false    # sin bloque <think>: la respuesta es directamente la descripción
@@ -32,7 +38,8 @@ generation:
   max_new_tokens: 128
   do_sample: false          # greedy por reproducibilidad (Qwen recomienda muestreo para chat)
   num_beams: 1
-# LoRA: atención completa (q/k/v/o), Gated DeltaNet (in_proj_qkv, in_proj_z, out_proj) y MLP,
-# solo en el language_model (el encoder visual usa qkv/proj/linear_fc*: no calza).
-lora_target_modules: '.*language_model.*\.(q_proj|k_proj|v_proj|o_proj|in_proj_qkv|in_proj_z|out_proj|gate_proj|up_proj|down_proj)$'
+# LoRA en TODAS las capas lineales de los bloques del language_model (QLoRA §4): atención (q/k/v/o),
+# Gated DeltaNet (in_proj_qkv, in_proj_z, in_proj_a, in_proj_b, out_proj) y MLP. El encoder visual usa
+# qkv/proj/linear_fc*: no calza. Los nombres deben confirmarse con scripts/inspect_models.py.
+lora_target_modules: '.*language_model.*\.(q_proj|k_proj|v_proj|o_proj|in_proj_qkv|in_proj_z|in_proj_a|in_proj_b|out_proj|gate_proj|up_proj|down_proj)$'
 adapter_path: null

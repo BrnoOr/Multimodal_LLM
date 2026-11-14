@@ -7,6 +7,7 @@ submodule open-vljepa, token de HF y espacio en disco de las cachés.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import os
 import shutil
 import sys
@@ -105,8 +106,19 @@ for var in ("HF_HOME", "UV_CACHE_DIR"):
     else:
         report(WARN, f"{var} no definido (¿cargaste .env?)")
 
-man = ROOT / "data" / "manifests" / "m3di_base_test.parquet"
-report(OK if man.exists() else WARN, f"manifiesto {'presente' if man.exists() else 'ausente'}: {man}")
+for split in ("train", "val", "test"):
+    man = ROOT / "data" / "manifests" / f"m3di_base_{split}.parquet"
+    report(OK if man.exists() else WARN, f"manifiesto {'presente' if man.exists() else 'ausente'}: {man}")
+
+# Métricas de texto: pycocoevalcap y su tokenizador PTB, que necesita Java (docs/metodologia.md §2.1)
+if version("pycocoevalcap") is None and importlib.util.find_spec("pycocoevalcap") is None:
+    report(FAIL, "pycocoevalcap no instalado (uv sync --extra eval)")
+else:
+    report(OK, "pycocoevalcap instalado")
+java = shutil.which("java")
+report(OK if java else FAIL, f"java {'en ' + java if java else 'NO está en el PATH'}: lo necesita el tokenizador PTB "
+       "de pycocoevalcap (Bleu/ROUGE/CIDEr). Sin Java, scripts/score.py solo corre con --no-text")
+report(OK if version("matplotlib") else FAIL, "matplotlib (tablas de nombres de color del extractor; uv sync --extra dev)")
 
 print("\nEntorno listo." if not failures else f"\n{failures} falla(s).")
 sys.exit(1 if failures else 0)

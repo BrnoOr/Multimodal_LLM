@@ -1,49 +1,55 @@
 """VL-JEPA (reimplementación abierta `open-vljepa`, checkpoint MSRVTT Stage B).
 
-Arquitectura (Chen et al., 2025, arXiv:2512.10942; reimpl. de J. Baek):
-    X-Encoder  V-JEPA 2 ViT-L (congelado)                     imagen -> tokens visuales
-    Predictor  últimas 8 capas de Llama-3.2-1B, no causal     (tokens visuales, consulta) -> ŝ_Y ∈ R^1536
-    Y-Encoder  EmbeddingGemma-300M + proyección               texto -> s_Y ∈ R^1536
+Arquitectura (Chen et al., 2025, arXiv:2512.10942, §3.1; reimpl. de J. Baek):
+    X-Encoder  V-JEPA 2 ViT-L (congelado)                     imagen -> tokens visuales S_V
+    Predictor  últimas 8 capas de Llama-3.2-1B, no causal     (S_V, consulta) -> Ŝ_Y ∈ R^1536
+    Y-Encoder  EmbeddingGemma-300M + proyección               texto -> S_Y ∈ R^1536
 
-El modelo NO genera tokens: predice un embedding continuo del texto objetivo. Para producir texto
-legible se usa un "decodificador" por recuperación, que es la opción ligera que el propio paradigma
-permite: se codifica con el Y-Encoder un banco de descripciones del split de *entrenamiento*
-(nunca de test) y se devuelve la más cercana a ŝ_Y en coseno. Además, con el mismo banco se
-construyen prototipos por valor de atributo (media normalizada de los embeddings de las
-descripciones con ese valor), lo que da una predicción por atributo sin pasar por texto.
+El modelo NO genera tokens: predice el embedding del texto objetivo. Para obtener texto, Ŝ_Y pasa
+por un Y-Decoder (docs/metodologia.md §2.4), que se entrena aparte y se adjunta con
+`attach_decoder`. Sin decodificador, `describe` falla: no hay forma de producir texto. El paper no
+especifica ese decodificador; es diseño propio del proyecto.
 
-Banco de referencias (`bank.kind`, ver vlmfid.models.bank y docs/VLJEPA_AJUSTE_V3.pdf):
-    captions     frases completas del split de train (504 canónicas o ~11 000 originales). Es el banco
-                 de las etapas 1 y 2: una consulta (el prompt), un ŝ, vecino más cercano.
-    factorized   una frase por valor de atributo (21 en total) y una consulta por atributo: cuatro ŝ por
-                 imagen, cada uno comparado solo con las frases de su atributo. El caption se compone
-                 con la plantilla canónica. Cada decisión trae probabilidades y margen en nats.
+Cuantización (docs/metodologia.md §2.1, D5): NF4 en las capas lineales de los tres componentes
+congelados (X-Encoder, capas del Predictor y transformer del Y-Encoder). Quedan en precisión completa
+las proyecciones lineales que la etapa 2 entrena: `predictor.vis_proj`, `predictor.out_proj` e
+`y_encoder.projector`.
+
+Puntos de medición para la pérdida de información (docs/metodologia.md §2.5), con `predict_stages`:
+    E1  vis_mean      media de los tokens del X-Encoder
+    E2  pred_hidden   estado del Predictor promediado sobre tokens reales, antes de `out_proj`
+    E3  pred          Ŝ_Y
+    T1  encode_texts  S_Y del caption
+Todos se devuelven SIN normalizar; la comparación entre Ŝ_Y y S_Y usa coseno.
 
 Nota de dominio: el checkpoint procesa *video* (tubelets temporales). Una imagen se trata como un
-video estático repitiendo el fotograma `num_frames` veces (8, como en Stage B).
+video estático repitiendo el fotograma `num_frames` veces (8, como en Stage B); el paper también
+duplica la imagen para igualar la forma de entrada (§3.1).
+
+El Y-Encoder recibe el caption tal cual, sin el prefijo de tarea de EmbeddingGemma: así se entrenó el
+checkpoint (`openvljepa.models.y_encoder` usa el transformer base, no el envoltorio
+SentenceTransformer).
 """
 
 from __future__ import annotations
 
-import hashlib
 import sys
 from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from omegaconf import DictConfig
 from PIL import Image
 
-from ..data.m3di import select_discrete_attributes
-from ..data.manifest import load_manifest
-from ..paths import CACHE, resolve
-from .bank import ATTRS, BANK_KINDS, QUERIES, FactorizedBank
+from ..paths import resolve
 from .base import Description, Describer
+from .quant import quantization_report, swap_linear_to_nf4
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 LLAMA32_PAD = "<|finetune_right_pad_id|>"
+# Proyecciones que la etapa 2 entrena en precisión completa (nunca se cuantizan)
+PROJECTIONS = ("predictor.vis_proj", "predictor.out_proj", "y_encoder.projector")
 
 
 def _ensure_pad_token(tok):
@@ -65,10 +71,8 @@ class VLJEPADescriber(Describer):
     def __init__(self, cfg: DictConfig):
         super().__init__(cfg)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.bank_texts: list[str] = []
-        self.bank_emb: torch.Tensor | None = None
-        self.prototypes: dict[str, tuple[list, torch.Tensor]] = {}
-        self.fbank: FactorizedBank | None = None       # solo con bank.kind = factorized
+        self.decoder = None            # Y-Decoder; se adjunta con attach_decoder
+        self.quant_report: dict = {}
 
     # ---------------------------------------------------------------- carga
     def _checkpoint_path(self) -> Path:
@@ -106,6 +110,7 @@ class VLJEPADescriber(Describer):
         model = OpenVLJEPA(self.arch["encoder"], self.arch["y_encoder"], self.arch["predictor"],
                            torch_dtype=torch.bfloat16)
         missing, unexpected = model.load_state_dict(ckpt["model_state_dict"], strict=False)
+        # el X-Encoder no viene en el checkpoint: está congelado y se carga de su repo original
         bad = [k for k in missing if not k.startswith("x_encoder.model.")]
         if bad or unexpected:
             raise RuntimeError(f"Checkpoint incompatible. missing={bad[:5]} unexpected={unexpected[:5]}")
@@ -113,13 +118,24 @@ class VLJEPADescriber(Describer):
 
         model = model.to(dtype=torch.bfloat16).eval()
         if c.quant == "nf4":
-            from .quant import swap_linear_to_nf4
-
-            n = swap_linear_to_nf4(model.predictor.layers, self.device)
-            print(f"[vljepa] NF4 aplicado a {n} capas lineales del predictor")
+            # todo componente congelado en NF4; las proyecciones quedan fuera (ver PROJECTIONS)
+            n = {"x_encoder": swap_linear_to_nf4(model.x_encoder.model, self.device),
+                 "predictor": swap_linear_to_nf4(model.predictor.layers, self.device),
+                 "y_encoder": swap_linear_to_nf4(model.y_encoder.model, self.device)}
+            print(f"[vljepa] NF4 aplicado a capas lineales: {n}", flush=True)
+            if not all(n.values()):
+                raise RuntimeError(f"Algún componente quedó sin capas cuantizadas: {n}")
         elif c.quant != "bf16":
             raise ValueError("VL-JEPA admite quant = nf4 | bf16")
         self.model = model.to(self.device)
+        self.quant_report = quantization_report(
+            self.model, {"x_encoder": ["x_encoder."], "predictor": ["predictor.layers."],
+                         "y_encoder": ["y_encoder.model."], "projections": list(PROJECTIONS)})
+        if self.quant_report.get("quantized_in_projections"):
+            raise RuntimeError("Las proyecciones de VL-JEPA quedaron cuantizadas; deben ir en precisión completa")
+        if c.quant == "bf16" and self.quant_report["quantized_linears"]:
+            raise RuntimeError("quant=bf16 pero hay capas cuantizadas")
+
         if c.get("adapter_path"):
             from peft import PeftModel
 
@@ -141,219 +157,114 @@ class VLJEPADescriber(Describer):
             T.Resize(size, antialias=True), T.CenterCrop(size), T.ToTensor(),
             T.Normalize(IMAGENET_MEAN, IMAGENET_STD),
         ])
-        self._build_bank()
-
-    # ------------------------------------------------------------- banco
-    def _tok(self, tok, texts: list[str], max_len: int):
-        enc = tok(texts, max_length=max_len, padding="max_length", truncation=True, return_tensors="pt")
-        return enc["input_ids"].to(self.device), enc["attention_mask"].to(self.device)
-
-    @torch.inference_mode()
-    def encode_texts(self, texts: list[str], batch_size: int = 256) -> torch.Tensor:
-        """Embeddings normalizados del Y-Encoder (espacio compartido de 1536 D)."""
-        out = []
-        for i in range(0, len(texts), batch_size):
-            ids, mask = self._tok(self.target_tok, texts[i:i + batch_size], self.max_caption_len)
-            with torch.autocast("cuda", dtype=torch.bfloat16, enabled=self.device.type == "cuda"):
-                e = self.model.y_encoder(ids, mask)
-            out.append(F.normalize(e.float(), dim=-1).half())
-        return torch.cat(out)
 
     def _inner(self):
         """El OpenVLJEPA sin el envoltorio de PEFT (si lo hay)."""
         m = self.model
         return m.get_base_model() if hasattr(m, "get_base_model") else m
 
-    def encode_pooled(self, texts: list[str], batch_size: int = 256) -> torch.Tensor:
-        """Salida del transformer del Y-Encoder (EmbeddingGemma) promediada sobre los tokens reales, ANTES
-        de la proyección lineal al espacio compartido. Con el transformer congelado no cambia durante el
-        ajuste, así que se calcula una vez; la proyección (entrenable) se aplica con `project_pooled`."""
-        ye = self._inner().y_encoder
+    # ---------------------------------------------------------------- texto
+    def _tok(self, tok, texts: list[str], max_len: int):
+        enc = tok(texts, max_length=max_len, padding="max_length", truncation=True, return_tensors="pt")
+        return enc["input_ids"].to(self.device), enc["attention_mask"].to(self.device)
+
+    def token_lengths(self, texts: list[str], which: str = "query") -> list[int]:
+        """Tokens reales de cada texto (sin truncar ni rellenar)."""
+        tok = self.query_tok if which == "query" else self.target_tok
+        return [len(tok([t], add_special_tokens=True)["input_ids"][0]) for t in texts]
+
+    def _check_fits(self, texts: list[str], which: str) -> None:
+        """Falla si algún texto excede el límite: truncar en silencio cambiaría la consulta o el objetivo."""
+        limit = self.max_query_len if which == "query" else self.max_caption_len
+        for text in set(texts):
+            n = self.token_lengths([text], which)[0]
+            if n > limit:
+                raise ValueError(
+                    f"Texto de {n} tokens > límite {limit} ({which}): {text[:80]!r}. "
+                    "Sube max_query_len / max_caption_len en la config del modelo."
+                )
+
+    @torch.inference_mode()
+    def encode_texts(self, texts: list[str], batch_size: int = 256) -> torch.Tensor:
+        """S_Y: embeddings del Y-Encoder en el espacio compartido. (N, 1536) float32, sin normalizar."""
+        self._check_fits(texts, "target")
         out = []
-        with torch.no_grad():
-            for i in range(0, len(texts), batch_size):
-                ids, mask = self._tok(self.target_tok, texts[i:i + batch_size], self.max_caption_len)
-                with torch.autocast(self.device.type, dtype=torch.bfloat16):
-                    h = ye.model(input_ids=ids, attention_mask=mask).last_hidden_state
-                m = mask.unsqueeze(-1).to(h.dtype)
-                out.append(((h * m).sum(1) / m.sum(1).clamp(min=1.0)).float())
+        for i in range(0, len(texts), batch_size):
+            ids, mask = self._tok(self.target_tok, texts[i:i + batch_size], self.max_caption_len)
+            with torch.autocast(self.device.type, dtype=torch.bfloat16, enabled=self.device.type == "cuda"):
+                e = self._inner().y_encoder(ids, mask)
+            out.append(e.float())
         return torch.cat(out)
 
-    def project_pooled(self, pooled: torch.Tensor) -> torch.Tensor:
-        """Proyección del Y-Encoder al espacio compartido, con gradiente si está entrenable. Sin normalizar."""
-        with torch.autocast(self.device.type, dtype=torch.bfloat16):
-            return self._inner().y_encoder.projector(pooled.to(self.device)).float()
-
-    def _bank_kind(self) -> str:
-        kind = str(self.cfg.bank.get("kind") or "captions")
-        if kind not in BANK_KINDS:
-            raise ValueError(f"model.bank.kind='{kind}' inválido ({' | '.join(BANK_KINDS)})")
-        return kind
-
-    def _bank_format(self) -> str:
-        """Formato de los textos del banco: `original` (captions de M3DI, etapa 1) o `canonical` (el
-        objetivo de la etapa 2 reformulada; ver vlmfid.data.targets)."""
-        return str(self.cfg.bank.get("target_format") or "original")
-
-    def _bank_key(self) -> str:
-        b = self.cfg.bank
-        st = self.ckpt_path.stat()
-        ident = (f"{self.ckpt_path.name}|{st.st_size}|{b.split}|{b.max_captions}|{b.seed}|"
-                 f"{self.max_caption_len}|{self.cfg.get('adapter_path')}")
-        if self._bank_format() != "original":          # la clave de los bancos ya cacheados no cambia
-            ident += f"|{self._bank_format()}"
-        return hashlib.sha1(ident.encode()).hexdigest()[:12]
-
-    def _build_factorized_bank(self) -> None:
-        """21 frases de referencia. No se cachea en disco: son pocas y, si la proyección del Y-Encoder se
-        ajustó, dependen del adaptador cargado (una caché por ruta de adaptador quedaría obsoleta)."""
-        if self._bank_format() != "canonical":
-            raise ValueError("bank.kind=factorized compone el caption canónico: requiere "
-                             "bank.target_format=canonical (target.format=canonical al entrenar).")
-        self.fbank = FactorizedBank.build()
-        self.bank_texts = list(self.fbank.texts)
-        self.bank_pooled = self.encode_pooled(self.bank_texts)
-        self.refresh_bank()
-        n_real = {a: len(self.query_tok([QUERIES[a]], add_special_tokens=True)["input_ids"][0]) for a in ATTRS}
-        too_long = {a: n for a, n in n_real.items() if n > self.max_query_len}
-        if too_long:
-            raise ValueError(f"Consultas por atributo truncadas a max_query_len={self.max_query_len}: {too_long}")
-        self.attr_query = {a: self._tok(self.query_tok, [QUERIES[a]], self.max_query_len) for a in ATTRS}
-        print(f"[vljepa] banco factorizado: {len(self.bank_texts)} frases de referencia, "
-              f"{len(ATTRS)} consultas por imagen")
-
-    def refresh_bank(self) -> None:
-        """Recalcula los embeddings del banco factorizado con la proyección actual del Y-Encoder. Lo
-        llama el entrenamiento antes de cada evaluación en val cuando esa proyección es entrenable."""
-        if self.fbank is None:
-            return
-        with torch.no_grad():
-            self.bank_emb = F.normalize(self.project_pooled(self.bank_pooled), dim=-1).half()
-
-    def _build_bank(self) -> None:
-        from ..data.targets import target_text
-
-        if self._bank_kind() == "factorized":
-            return self._build_factorized_bank()
-        b = self.cfg.bank
-        fmt = self._bank_format()
-        rows = load_manifest(b.split, limit=b.max_captions, subset_seed=b.seed)
-        row_text = [target_text(r, fmt) for r in rows]
-        cache = CACHE / f"vljepa_bank_{self._bank_key()}.pt"
-        if cache.exists():
-            blob = torch.load(cache, map_location="cpu", weights_only=False)
-            texts, emb = blob["texts"], blob["emb"]
-        else:
-            texts = sorted(set(row_text))
-            print(f"[vljepa] codificando banco: {len(texts)} descripciones únicas de '{b.split}' (formato {fmt})")
-            emb = self.encode_texts(texts).cpu()
-            cache.parent.mkdir(parents=True, exist_ok=True)
-            torch.save({"texts": texts, "emb": emb}, cache)
-        self.bank_texts = texts
-        self.bank_emb = emb.to(self.device)
-
-        # prototipos por valor de atributo (factores discretos del texto)
-        index = {t: i for i, t in enumerate(texts)}
-        row_idx = torch.tensor([index[t] for t in row_text])
-        for attr in self._bank_attributes(rows):
-            vals = np.array([r["latents_text"][attr] for r in rows])
-            uniq = sorted(set(vals.tolist()))
-            protos = torch.stack([
-                F.normalize(emb[row_idx[torch.from_numpy(vals == v)]].float().mean(0), dim=-1) for v in uniq
-            ])
-            self.prototypes[attr] = (uniq, protos.half().to(self.device))
-
-    def _bank_attributes(self, rows: list[dict]) -> list[str]:
-        """`bank.attributes: auto` -> latentes de texto discretos según el criterio compartido con la
-        evaluación (vlmfid.data.select_discrete_attributes). Una lista explícita se respeta, pero los
-        atributos ausentes del manifiesto se omiten con aviso en vez de fallar."""
-        wanted = self.cfg.bank.attributes
-        keys = list(rows[0]["latents_text"]) if rows else []
-        if wanted in (None, "auto"):
-            out = select_discrete_attributes({k: [r["latents_text"][k] for r in rows] for k in keys})
-            print(f"[vljepa] atributos detectados para prototipos: {out}")
-            return out
-        missing = [a for a in wanted if a not in keys]
-        if missing:
-            print(f"[vljepa] aviso: atributos ausentes en el manifiesto, se omiten: {missing}")
-        return [a for a in wanted if a in keys]
-
-    # -------------------------------------------------------- inferencia
-    @torch.inference_mode()
-    def predict_embeddings(self, images: list[Image.Image], prompts: list[str]) -> torch.Tensor:
+    # ----------------------------------------------------------- inferencia
+    def _pixel_values(self, images: list[Image.Image]) -> torch.Tensor:
         frames = torch.stack([self.transform(im) for im in images])                    # (B,3,H,W)
         pv = frames.unsqueeze(1).repeat(1, self.num_frames, 1, 1, 1)                  # (B,T,3,H,W)
-        pv = pv.to(self.device, dtype=torch.bfloat16)
-        q = [self.cfg.get("query_override") or p for p in prompts]
-        ids, mask = self._tok(self.query_tok, q, self.max_query_len)
-        with torch.autocast("cuda", dtype=torch.bfloat16, enabled=self.device.type == "cuda"):
-            pred = self.model(pv, ids, mask)
-        return F.normalize(pred.float(), dim=-1)
+        return pv.to(self.device, dtype=torch.bfloat16)
 
     @torch.inference_mode()
-    def predict_attribute_embeddings(self, images: list[Image.Image]) -> dict[str, torch.Tensor]:
-        """Banco factorizado: una ŝ normalizada por atributo. El X-Encoder corre una sola vez por imagen
-        y el predictor una vez por consulta."""
+    def predict_stages(self, images: list[Image.Image], prompts: list[str]) -> dict[str, torch.Tensor]:
+        """Representación de cada etapa de la cadena, una fila por imagen (float32, sin normalizar).
+
+            vis_mean     (B, 1024)  E1: media de los tokens del X-Encoder
+            pred_hidden  (B, 2048)  E2: estado del Predictor promediado, antes de la proyección de salida
+            pred         (B, 1536)  E3: Ŝ_Y
+        """
+        q = [self.cfg.get("query_override") or p for p in prompts]
+        self._check_fits(q, "query")
+        ids, mask = self._tok(self.query_tok, q, self.max_query_len)
         inner = self._inner()
-        frames = torch.stack([self.transform(im) for im in images])
-        pv = frames.unsqueeze(1).repeat(1, self.num_frames, 1, 1, 1).to(self.device, dtype=torch.bfloat16)
-        B, out = len(images), {}
-        with torch.autocast(self.device.type, dtype=torch.bfloat16):
-            vis = inner.x_encoder(pv)
-            for a in ATTRS:
-                ids, mask = self.attr_query[a]
-                pred = inner.predictor(vis, ids.expand(B, -1), mask.expand(B, -1))
-                out[a] = F.normalize(pred.float(), dim=-1)
+        captured: dict[str, torch.Tensor] = {}
+
+        def grab(_module, args):
+            # `Predictor.forward` solo devuelve out_proj(promedio): el promedio es la entrada de out_proj
+            captured["pred_hidden"] = args[0].detach().float()
+
+        hook = inner.predictor.out_proj.register_forward_pre_hook(grab)
+        try:
+            with torch.autocast(self.device.type, dtype=torch.bfloat16, enabled=self.device.type == "cuda"):
+                vis = inner.x_encoder(self._pixel_values(images))                     # (B, Nv, 1024)
+                pred = inner.predictor(vis, ids, mask)                                # (B, 1536)
+        finally:
+            hook.remove()
+        out = {"vis_mean": vis.float().mean(1), "pred_hidden": captured["pred_hidden"], "pred": pred.float()}
+        for k, v in out.items():
+            if v.ndim != 2 or v.shape[0] != len(images):
+                raise RuntimeError(f"Forma inesperada en {k}: {tuple(v.shape)} para {len(images)} imágenes")
+        out["n_visual_tokens"] = torch.tensor(vis.shape[1])
         return out
 
-    def _describe_factorized(self, images: list[Image.Image]) -> list[Description]:
-        pred = self.predict_attribute_embeddings(images)
-        tau = float(self.cfg.bank.get("temperature") or 0.07)
-        decoded = self.fbank.decode(pred, self.bank_emb, tau)
-        stacked = torch.stack([pred[a] for a in ATTRS], dim=1)                       # (B, 4, D)
-        outs = []
-        for j, d in enumerate(decoded):
-            outs.append(Description(
-                text=d["text"],
-                extra={"bank": "factorized", "attr_pred": d["values"], "attr_prob": d["prob"],
-                       "attr_margin_nats": d["margin_nats"], "attr_order": list(ATTRS)},
-                embedding=stacked[j].cpu().numpy().astype(np.float16) if self.cfg.get("return_embeddings") else None,
-            ))
-        return outs
+    def predict_embeddings(self, images: list[Image.Image], prompts: list[str]) -> torch.Tensor:
+        """Ŝ_Y sin normalizar, (B, 1536) float32."""
+        return self.predict_stages(images, prompts)["pred"]
+
+    def attach_decoder(self, decoder) -> None:
+        """Adjunta el Y-Decoder: un objeto con `decode(embeddings: Tensor[B, D]) -> list[str]`."""
+        self.decoder = decoder
 
     def describe(self, images: list[Image.Image], prompts: list[str]) -> list[Description]:
-        if self.fbank is not None:
-            return self._describe_factorized(images)
+        if self.decoder is None:
+            raise RuntimeError(
+                "VL-JEPA no genera texto por sí mismo: falta el Y-Decoder (docs/metodologia.md §2.4). "
+                "Adjúntalo con `attach_decoder` antes de llamar a describe()."
+            )
         pred = self.predict_embeddings(images, prompts)
-        k = int(self.cfg.get("topk", 3))
-        sims = pred.half() @ self.bank_emb.T
-        top_s, top_i = sims.topk(k, dim=-1)
-
-        attr_pred, attr_margin = [{} for _ in images], [{} for _ in images]
-        for attr, (vals, protos) in self.prototypes.items():
-            s = (pred.half() @ protos.T).float()
-            best = s.topk(min(2, len(vals)), dim=-1)
-            for j in range(len(images)):
-                attr_pred[j][attr] = vals[best.indices[j, 0].item()]
-                if best.values.shape[1] > 1:
-                    attr_margin[j][attr] = round((best.values[j, 0] - best.values[j, 1]).item(), 4)
-
-        outs = []
-        for j in range(len(images)):
-            topk = [[self.bank_texts[i], round(s, 4)] for i, s in zip(top_i[j].tolist(), top_s[j].float().tolist())]
-            outs.append(Description(
-                text=topk[0][0],
-                extra={"topk": topk, "attr_pred_proto": attr_pred[j], "attr_margin_proto": attr_margin[j]},
-                embedding=pred[j].cpu().numpy().astype(np.float16) if self.cfg.get("return_embeddings") else None,
-            ))
-        return outs
+        texts = self.decoder.decode(pred)
+        if len(texts) != len(images):
+            raise RuntimeError(f"El Y-Decoder devolvió {len(texts)} textos para {len(images)} imágenes")
+        keep = bool(self.cfg.get("return_embeddings"))
+        return [Description(text=t, extra={},
+                            embedding=pred[j].cpu().numpy().astype(np.float16) if keep else None)
+                for j, t in enumerate(texts)]
 
     def lora_target_modules(self) -> str:
+        # Etapa 2 (fase 5): falta agregar las capas lineales del Y-Encoder (opción A del paper).
         return r"predictor\.layers\.\d+\..*(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)$"
 
     def info(self) -> dict:
         out = super().info()
-        out.update({"ckpt": str(self.ckpt_path), "bank_size": len(self.bank_texts), "bank_format": self._bank_format(),
-                    "bank_kind": self._bank_kind(),
-                    "num_frames": self.num_frames, "attributes": list(self.prototypes)})
+        out.update(self.quant_report)
+        out.update({"ckpt": str(self.ckpt_path), "num_frames": self.num_frames,
+                    "max_query_len": self.max_query_len, "max_caption_len": self.max_caption_len,
+                    "has_decoder": self.decoder is not None})
         return out

@@ -1,0 +1,13 @@
+# Paso 1.0 — inspeccion de los modelos cargados (docs/plan_reconstruccion.md, docs/auditoria.md §6).
+# No entrena ni escribe predicciones; usa 4 imagenes de VAL. Reporte en runs/inspect_<modelo>_<quant>/report.json.
+#   SCRIPT=scripts/inspect_models.py GPU=0 scripts/launch.sh inspect scripts/run_queue.sh configs/queues/stage1_inspect.txt
+# VL-JEPA va primero: es el de mayor riesgo (cuantizacion manual de sus tres componentes).
+model=vljepa
+model=llava_ov
+model=internvl3
+model=qwen35
+# Control sin cuantizar: mismas comprobaciones en bf16.
+model=vljepa     model.quant=bf16
+model=llava_ov   model.quant=bf16
+model=internvl3  model.quant=bf16
+model=qwen35     model.quant=bf16

@@ -106,6 +106,7 @@ def compose(args: list[str] | None = None) -> DictConfig:
         OmegaConf.update(cfg, dotted, value, merge=True)
     cli = OmegaConf.from_dotlist([f"{k}={v}" for k, v in kv.items()])
     cfg = OmegaConf.merge(cfg, cli)
+    check_split_allowed(cfg)
 
     if cfg.get("exp_id") in (None, "", "null"):
         limit = cfg.data.get("limit")
@@ -116,6 +117,20 @@ def compose(args: list[str] | None = None) -> DictConfig:
     if cfg.infer.get("batch_size") is None:
         cfg.infer.batch_size = cfg.model.get("batch_size", 8)
     return cfg
+
+
+def check_split_allowed(cfg: DictConfig) -> None:
+    """Candado de test (CLAUDE.md §3 y §5): test se usa una sola vez, en el reporte final.
+
+    Cualquier configuración con `data.split=test` falla salvo que traiga `allow_test=true`, que solo
+    fija `scripts/final_test.py`. Así ninguna cola, prueba de humo o selección puede leer test por
+    descuido (docs/auditoria.md, H1).
+    """
+    if str(cfg.data.get("split")) == "test" and not bool(cfg.get("allow_test", False)):
+        raise ValueError(
+            "data.split=test está bloqueado: test se evalúa una sola vez con scripts/final_test.py. "
+            "Para seleccionar prompts o checkpoints usa data.split=val."
+        )
 
 
 def to_yaml(cfg: DictConfig) -> str:

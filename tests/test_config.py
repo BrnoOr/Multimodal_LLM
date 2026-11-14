@@ -4,26 +4,35 @@ from vlmfid.config import compose
 from vlmfid.models.registry import MODELS
 
 
-@pytest.mark.parametrize("model", ["llava_ov", "qwen35", "internvl3", "vljepa", "qwen35_instruct"])
+@pytest.mark.parametrize("model", ["llava_ov", "qwen35", "internvl3", "vljepa"])
 def test_every_model_config_resolves(model):
     cfg = compose([f"model={model}", "prompt=p2_constrained", "data.limit=50"])
     assert cfg.model.family in MODELS
     assert cfg.model.quant == "nf4"                   # esquema común
     assert cfg.infer.batch_size == cfg.model.batch_size
-    assert cfg.exp_id == f"zeroshot_{cfg.model.name}_nf4_p2_constrained_test_n50"
+    assert cfg.exp_id == f"zeroshot_{cfg.model.name}_nf4_p2_constrained_val_n50"
 
 
-def test_experiment_and_cli_precedence():
-    cfg = compose(["experiment=e01_zeroshot_llava_p0", "infer.batch_size=3", "model.quant=bf16"])
-    assert cfg.exp_id == "e01_zeroshot_llava_p0"
+def test_cli_precedence():
+    cfg = compose(["model=llava_ov", "infer.batch_size=3", "model.quant=bf16"])
     assert cfg.model.name == "llava_ov_05b" and cfg.model.quant == "bf16"
     assert cfg.infer.batch_size == 3
+    assert cfg.exp_id == "zeroshot_llava_ov_05b_bf16_p0_minimal_val"
+
+
+def test_test_split_is_locked():
+    # test se usa una sola vez (scripts/final_test.py): cualquier otra config que lo pida falla
+    assert compose(["model=llava_ov"]).data.split == "val"
+    with pytest.raises(ValueError, match="bloqueado"):
+        compose(["model=llava_ov", "data.split=test"])
+    cfg = compose(["model=llava_ov", "data.split=test", "allow_test=true"])
+    assert cfg.exp_id.endswith("_test")
 
 
 def test_variant_in_exp_id():
     cfg = compose(["model=llava_ov", "prompt=p0_minimal", "data.variant=ood_colors"])
-    assert cfg.exp_id == "zeroshot_llava_ov_05b_nf4_p0_minimal_test_ood_colors"
-    assert compose(["model=llava_ov"]).exp_id.endswith("_test")      # base no aparece
+    assert cfg.exp_id == "zeroshot_llava_ov_05b_nf4_p0_minimal_val_ood_colors"
+    assert compose(["model=llava_ov"]).exp_id.endswith("_val")       # base no aparece
 
 
 def test_bad_group():
