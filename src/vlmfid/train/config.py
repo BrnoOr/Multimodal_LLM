@@ -33,7 +33,12 @@ from ..paths import CONFIGS
 
 TRAIN_CONFIGS = CONFIGS / "train"
 ALLOWED_MODEL_KEYS = {"prompt", "train.micro_batch_size", "lora.connector_modules", "objective.kind",
-                      "objective.temperature", "objective.mask_duplicate_captions", "objective.negatives"}
+                      "objective.temperature", "objective.mask_duplicate_captions", "objective.negatives",
+                      # ajuste v3 de VL-JEPA (docs/VLJEPA_AJUSTE_V3.pdf): lado de texto entrenable e
+                      # InfoNCE bidireccional. Las épocas NO están aquí: van por línea de comandos y al exp_id.
+                      # Viven solo en configs/train/models/vljepa_fac.yaml (no en budget.yaml) para que la
+                      # config resuelta de los runs ya hechos no cambie y sigan siendo reanudables.
+                      "lora.text_modules", "objective.symmetric", "train.text_lr"}
 SELECTION_METRICS = ("macro", "shape_pos", "macro_cat", "shape", "pos", "color", "color_adj", "name", "val_loss")
 TARGET_TAG = {"canonical": "tcan", "original": "torig"}
 # Claves que pueden cambiar al reanudar un entrenamiento sin alterar su resultado.
@@ -105,6 +110,17 @@ def compose_train(args: list[str] | None = None) -> DictConfig:
         raise ValueError("objective=infonce con negatives=batch: los negativos salen del micro-lote, que debe ser "
                          "igual al lote efectivo (acumular gradientes cambia la pérdida). Ajusta "
                          "train.effective_batch_size o usa objective.negatives=bank.")
+    symmetric = bool(cfg.objective.get("symmetric", False))
+    if symmetric and (cfg.objective.kind != "infonce" or negatives != "bank"):
+        raise ValueError("objective.symmetric=true solo aplica a objective.kind=infonce con negatives=bank")
+    if symmetric and t.micro_batch_size != t.effective_batch_size:
+        raise ValueError("objective.symmetric=true: el término texto -> predictor usa las predicciones de todo el "
+                         "lote, así que micro_batch_size debe ser igual a effective_batch_size.")
+    factorized = cfg.model.family == "vljepa" and cfg.model.bank.get("kind", "captions") == "factorized"
+    if cfg.lora.get("text_modules") and not factorized:
+        raise ValueError("lora.text_modules solo aplica a VL-JEPA con model.bank.kind=factorized")
+    if factorized and (cfg.target.format != "canonical" or negatives != "bank"):
+        raise ValueError("model.bank.kind=factorized requiere target.format=canonical y objective.negatives=bank")
     if cfg.model.get("adapter_path"):
         raise ValueError("model.adapter_path debe ser null al entrenar (el adaptador se crea desde cero)")
     if cfg.target.format not in TARGET_FORMATS:
@@ -123,7 +139,9 @@ def compose_train(args: list[str] | None = None) -> DictConfig:
         cfg.model.bank.target_format = cfg.target.format
 
     if cfg.get("exp_id") in (None, "", "null"):
-        cfg.exp_id = (f"train_{cfg.model.name}_{cfg.model.quant}_{cfg.prompt.id}_{TARGET_TAG[cfg.target.format]}"
+        # banco factorizado: el modelo no ve el prompt sino una consulta por atributo (vlmfid.models.bank)
+        prompt_tag = "qattr" if factorized else cfg.prompt.id
+        cfg.exp_id = (f"train_{cfg.model.name}_{cfg.model.quant}_{prompt_tag}_{TARGET_TAG[cfg.target.format]}"
                       f"_r{cfg.lora.r}_e{t.epochs}"
                       + ("_hc" if cfg.data.holdout == "compositional" else "")
                       + (f"_s{cfg.seed}" if int(cfg.seed) != 0 else "")

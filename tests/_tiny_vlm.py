@@ -212,7 +212,7 @@ class TensorCharTokenizer(CharTokenizer):
         return {"input_ids": torch.tensor(ids), "attention_mask": torch.tensor(att)}
 
 
-def tiny_vljepa_describer(tmp, records_by_split, target_format: str = "original"):
+def tiny_vljepa_describer(tmp, records_by_split, target_format: str = "original", model: str = "vljepa"):
     """VLJEPADescriber con un OpenVLJEPA diminuto (V-JEPA 2 + Llama + Gemma3 aleatorios, guardados en
     `tmp`). `records_by_split` alimenta el banco de recuperación en lugar del manifiesto real; el banco
     queda en `target_format` (original | canonical), como lo fija compose_train al entrenar."""
@@ -244,7 +244,7 @@ def tiny_vljepa_describer(tmp, records_by_split, target_format: str = "original"
                    {"llama_name": str(tmp / "llama"), "n_keep_layers": 2, "proj_dim": 24},
                    torch_dtype=torch.bfloat16).to(torch.bfloat16).eval()
 
-    mcfg = _load_model("vljepa")
+    mcfg = _load_model(model)
     mcfg.quant = "bf16"
     mcfg.batch_size = 4
     mcfg.bank.max_captions = 1000
@@ -253,7 +253,8 @@ def tiny_vljepa_describer(tmp, records_by_split, target_format: str = "original"
     d.model = m
     d.ckpt_path = tmp / "best.pt"
     d.ckpt_path.write_bytes(b"x")
-    d.max_query_len, d.max_caption_len, d.num_frames = 16, 64, 8
+    # las consultas por atributo del banco factorizado no se pueden truncar (tokenizador por caracteres)
+    d.max_query_len, d.max_caption_len, d.num_frames = (72 if model == "vljepa_fac" else 16), 64, 8
     d.query_tok = d.target_tok = TensorCharTokenizer()
     d.transform = TV.Compose([TV.Resize(32, antialias=True), TV.CenterCrop(32), TV.ToTensor()])
     orig = vj.load_manifest

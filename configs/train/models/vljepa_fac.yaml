@@ -1,0 +1,26 @@
+# VL-JEPA, ajuste v3: banco factorizado + InfoNCE bidireccional + lado de texto entrenable.
+# Justificación de cada elección: docs/VLJEPA_AJUSTE_V3.pdf. Solo claves permitidas (configs/train/budget.yaml).
+#
+# Prompt: se registra p1_attributes como en los otros modelos, pero con el banco factorizado NO llega al
+# modelo: cada imagen recibe una consulta por atributo (vlmfid.models.bank.QUERIES). Por eso el exp_id
+# lleva "qattr" en vez del id del prompt.
+prompt: p1_attributes
+
+train:
+  # La InfoNCE simétrica usa las predicciones de todo el lote: micro-lote = lote efectivo (no se acumula).
+  micro_batch_size: 64
+  # lr de la proyección del Y-Encoder: 0,05 × lr de LoRA (2e-4), el multiplicador del paper de VL-JEPA.
+  text_lr: 1.0e-5
+
+lora:
+  # LoRA r=16 en las 8 capas Llama del predictor (lo fija el presupuesto común) + entrada y salida del
+  # predictor completas: vis_proj (V-JEPA 2 -> Llama) y out_proj (Llama -> espacio compartido de 1536 D).
+  connector_modules: [predictor.vis_proj, predictor.out_proj]
+  # Proyección lineal del Y-Encoder (768 -> 1536), con train.text_lr = 0,05 × lr. El transformer de texto
+  # (EmbeddingGemma-300M) y el X-Encoder (V-JEPA 2) quedan congelados.
+  text_modules: [y_encoder.projector]
+
+objective:
+  kind: infonce
+  negatives: bank       # término directo: softmax sobre las 21 frases de referencia
+  symmetric: true       # + término texto -> predictor sobre el lote (bidireccional, como el paper)

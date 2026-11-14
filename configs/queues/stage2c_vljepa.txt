@@ -1,0 +1,27 @@
+# Etapa 2, ajuste v3 de VL-JEPA: banco factorizado + InfoNCE bidireccional + lado de texto entrenable.
+# Diseño y justificación: docs/VLJEPA_AJUSTE_V3.pdf.
+#   SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2c_vljepa scripts/run_queue.sh configs/queues/stage2c_vljepa.txt
+# exp_id: train_vljepa_open_msrvtt_fac_nf4_qattr_tcan_r16_e<épocas>[_s<semilla>]. Relanzar reanuda.
+# Cada línea: train -> val (elige adapter_best con forma + posición) -> test (10 000 imágenes del zero-shot).
+#
+# 0) Humo (minutos): carga, la pérdida baja, cabe en memoria. Train completo cortado en 20 pasos (exp_id ..._m20).
+model=vljepa_fac train.max_steps=20 train.warmup_ratio=0 data.val_limit=64 train.eval_every=10 train.save_every=10 train.log_every=1 test.limit=64
+#
+# 1) Mismo presupuesto que los otros modelos: 1 época (1954 pasos, 125 000 pasadas de imagen). Cada imagen
+#    responde UNA de las cuatro consultas. Es la fila comparable con la tabla principal de la etapa 2.
+model=vljepa_fac
+#
+# 2) Presupuesto extendido: 4 épocas (7816 pasos). La rotación de consultas hace que cada imagen responda
+#    exactamente una vez cada atributo. Se reporta aparte, rotulado como 4× pasadas de imagen.
+model=vljepa_fac train.epochs=4 train.eval_every=400
+#
+# 3) Semilla 1 del run de 4 épocas: cuánto de la diferencia con el run publicado es ruido de entrenamiento.
+model=vljepa_fac train.epochs=4 train.eval_every=400 seed=1
+#
+# 4) Ablaciones (una variable por línea, todas a 4 épocas; exp_id explícito porque el automático no las distingue):
+#    a) lado de texto congelado: ¿cuánto aporta ajustar la proyección del Y-Encoder?
+model=vljepa_fac train.epochs=4 train.eval_every=400 lora.text_modules=[] exp_id=train_vljepa_open_msrvtt_fac_nf4_qattr_tcan_r16_e4_ytfrozen
+#    b) solo el término directo (sin texto -> predictor): ¿cuánto aporta la dirección inversa?
+model=vljepa_fac train.epochs=4 train.eval_every=400 objective.symmetric=false exp_id=train_vljepa_open_msrvtt_fac_nf4_qattr_tcan_r16_e4_fwd
+#    c) salida del predictor congelada, como en el run publicado
+model=vljepa_fac train.epochs=4 train.eval_every=400 lora.connector_modules=[predictor.vis_proj] exp_id=train_vljepa_open_msrvtt_fac_nf4_qattr_tcan_r16_e4_outfrozen

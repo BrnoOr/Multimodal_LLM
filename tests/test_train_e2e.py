@@ -217,3 +217,80 @@ def test_vljepa_entrena_con_lora_en_el_predictor(data, tmp_path, negatives):
         ea = d.predict_embeddings(img, ["q"])
         eb = fresh.predict_embeddings(img, ["q"])
     assert torch.nn.functional.cosine_similarity(ea, eb).item() > 0.99
+
+
+def test_vljepa_v3_banco_factorizado_y_texto_entrenable(data, tmp_path):
+    """Ajuste v3: una consulta por atributo, InfoNCE bidireccional contra 21 frases, proyección del
+    Y-Encoder y salida del predictor entrenables; X-Encoder y transformer de texto congelados."""
+    from vlmfid.models.bank import ATTRS, FactorizedBank
+
+    cfg = train_cfg(**{"model": "vljepa_fac", "train.micro_batch_size": 8, "model.batch_size": 4,
+                       "train.epochs": 2, "train.text_lr": 5e-3})
+    assert cfg.exp_id.endswith("_qattr_tcan_r4_e2")
+    d = tiny_vljepa_describer(tmp_path, data, target_format="canonical", model="vljepa_fac")
+    assert d.bank_texts == FactorizedBank.build().texts and d.bank_emb.shape[0] == 21
+    bank_before = d.bank_emb.clone()
+    frozen_before = {n: p.detach().clone() for n, p in d.model.named_parameters()
+                     if n.startswith(("x_encoder.", "y_encoder.model."))}
+    rc, tr = _run(cfg, d, tmp_path / "runs")
+    assert rc == 0
+    rd = tmp_path / "runs" / cfg.exp_id
+
+    names = [n for n, p in d.model.named_parameters() if p.requires_grad]
+    assert any("predictor.layers" in n and "lora_" in n for n in names)
+    for mod in ("predictor.vis_proj", "predictor.out_proj", "y_encoder.projector"):
+        assert any(f"{mod}.modules_to_save" in n for n in names), mod
+    assert not any("x_encoder" in n or "y_encoder.model" in n for n in names)
+    inner = d.model.get_base_model()
+    for n, p in inner.named_parameters():
+        if n in frozen_before:
+            assert torch.equal(p, frozen_before[n]), n            # X-Encoder y EmbeddingGemma intactos
+    assert not torch.equal(bank_before, d.bank_emb)              # el banco siguió a la proyección de texto
+    groups = {g["name"]: g["lr"] for g in tr.optimizer.param_groups}
+    assert set(groups) == {"lora", "connector", "text"}
+
+    info = json.loads((rd / "status.json").read_text())["model_info"]
+    assert info["bank_kind"] == "factorized" and info["symmetric"] and info["text_trainable"]
+    assert info["n_target_texts"] == 21 and not info["query_truncated"] and info["trainable_text"] > 0
+
+    val = _lines(rd / "val_log.jsonl")
+    assert [r["step"] for r in val] == [0, 2, 4, 6, 8, 10, 12, 14, 16]
+    assert all(0 <= r["val_loss"] for r in val)
+    preds = _lines(rd / "val_predictions" / "step_00016.jsonl")
+    for p in preds:
+        assert p["prediction"].startswith("A ") and p["prediction"].endswith(" of the image.")
+        ex = p["extra"]
+        assert set(ex["attr_pred"]) == set(ATTRS) == set(ex["attr_prob"]) == set(ex["attr_margin_nats"])
+        assert p["prediction"] == FactorizedBank.compose(ex["attr_pred"])
+
+    # recarga por el camino de model.adapter_path: la proyección de texto ajustada viaja con el adaptador
+    from peft import PeftModel
+
+    (tmp_path / "f").mkdir()
+    fresh = tiny_vljepa_describer(tmp_path / "f", data, target_format="canonical", model="vljepa_fac")
+    fresh.model = PeftModel.from_pretrained(fresh.model, str(rd / "adapter_last")).eval()
+    fresh.refresh_bank()
+    assert torch.allclose(fresh.bank_emb.float(), d.bank_emb.float(), atol=2e-2)
+    img = [Image.new("RGB", (64, 64), (200, 30, 30))]
+    d.model.eval()
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        a, b = d.describe(img, ["q"])[0], fresh.describe(img, ["q"])[0]
+    assert a.embedding.shape == (4, 24)
+    assert a.text == b.text or min(a.extra["attr_margin_nats"].values()) < 0.05
+
+
+def test_vljepa_v3_reanudar_es_identico(data, tmp_path):
+    kw = {"model": "vljepa_fac", "train.micro_batch_size": 8, "model.batch_size": 4, "train.text_lr": 5e-3}
+    cfg = train_cfg(**kw)
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    rc, _ = _run(cfg, tiny_vljepa_describer(tmp_path / "a", data, "canonical", "vljepa_fac"), tmp_path / "ra")
+    assert rc == 0
+    rc, _ = _run(cfg, tiny_vljepa_describer(tmp_path / "b", data, "canonical", "vljepa_fac"), tmp_path / "rb",
+                 stop_after=3)
+    assert rc != 0
+    (tmp_path / "c").mkdir()
+    rc, _ = _run(cfg, tiny_vljepa_describer(tmp_path / "c", data, "canonical", "vljepa_fac"), tmp_path / "rb")
+    assert rc == 0
+    la, lb = _lines(tmp_path / "ra" / cfg.exp_id / "train_log.jsonl"), _lines(tmp_path / "rb" / cfg.exp_id / "train_log.jsonl")
+    assert [r["loss"] for r in la] == pytest.approx([r["loss"] for r in lb], rel=1e-3)

@@ -3,7 +3,8 @@
     config.py      composición budget ⊕ modelo ⊕ prompt ⊕ CLI, con validación del presupuesto común
     data.py        orden de datos determinista y reanudable (mismos lotes para los 4 modelos)
     collate.py     prompt de chat + caption objetivo con etiquetas enmascaradas; lotes de VL-JEPA
-    objectives.py  entropía cruzada normalizada por tokens del lote efectivo; InfoNCE con máscara de duplicados
+    objectives.py  entropía cruzada normalizada por tokens del lote efectivo; InfoNCE (lote, banco, bidireccional)
+    jepa.py        objetivo de VL-JEPA: tabla de embeddings objetivo, banco factorizado, lado de texto entrenable
     lora.py        LoRA + conector entrenable sobre la base NF4; grupos de lr; estado entrenable
     evaluate.py    exactitud por atributo en val con el mismo camino de inferencia que test
     loop.py        bucle reanudable con selección del mejor checkpoint en val

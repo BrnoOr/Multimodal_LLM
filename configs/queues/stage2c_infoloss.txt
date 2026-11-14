@@ -1,0 +1,16 @@
+# Pérdida de información por etapa en VL-JEPA y geometría del banco (docs/VLJEPA_AJUSTE_V3.pdf, §7).
+#   SCRIPT=scripts/info_loss.py GPU=1 scripts/launch.sh infoloss scripts/run_queue.sh configs/queues/stage2c_infoloss.txt
+# Sondas y τ se ajustan con 10 000 imágenes de train y se mide en 2 000 de val; test no se usa.
+# Salida: runs/infoloss_<model>_<quant>[_<tag>]/{infoloss.jsonl, bank_geometry.json}. Los runs completos se saltan.
+#
+# 1) Antes de ajustar: el modelo congelado con cada banco (la geometría del banco no depende de las imágenes).
+model=vljepa     prompt=p1_attributes model.bank.target_format=canonical info.tag=zs_tcan
+model=vljepa_fac prompt=p1_attributes info.tag=zs
+#
+# 2) Run publicado (banco de 504 captions canónicos): ¿dónde se pierde la información de y?
+model=vljepa     prompt=p1_attributes model.bank.target_format=canonical model.adapter_path=runs/train_vljepa_open_msrvtt_nf4_p1_attributes_tcan_r16_e1/adapter_best info.tag=ft_tcan
+#
+# 3) Ajuste v3 (después de configs/queues/stage2c_vljepa.txt; las líneas sin adaptador fallan y la cola sigue).
+model=vljepa_fac prompt=p1_attributes model.adapter_path=runs/train_vljepa_open_msrvtt_fac_nf4_qattr_tcan_r16_e1/adapter_best info.tag=ft_e1
+model=vljepa_fac prompt=p1_attributes model.adapter_path=runs/train_vljepa_open_msrvtt_fac_nf4_qattr_tcan_r16_e4/adapter_best info.tag=ft_e4
+model=vljepa_fac prompt=p1_attributes model.adapter_path=runs/train_vljepa_open_msrvtt_fac_nf4_qattr_tcan_r16_e4_ytfrozen/adapter_best info.tag=ft_e4_ytfrozen

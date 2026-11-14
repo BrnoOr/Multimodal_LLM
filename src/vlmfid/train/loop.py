@@ -15,6 +15,9 @@ Reformulación (docs/ETAPA2B_REFORMULACION.md): el texto objetivo sale de `targe
 canónico), train se usa completo (sin límite; solo `data.holdout` puede excluir combinaciones
 forma × posición) y VL-JEPA puede usar el banco completo de objetivos como negativos.
 
+El objetivo de VL-JEPA vive en `vlmfid.train.jepa.JEPAObjective` (tabla de embeddings objetivo, pérdidas
+InfoNCE, banco factorizado, lado de texto entrenable): el bucle solo le pide una pérdida.
+
 runs/<exp_id>/
     config.yaml, env.jsonl, status.json     como en inferencia (vlmfid.tracking.RunTracker)
     train_log.jsonl                         una línea cada `log_every` pasos
@@ -28,7 +31,6 @@ runs/<exp_id>/
 
 from __future__ import annotations
 
-import hashlib
 import itertools
 import json
 import math
@@ -51,12 +53,13 @@ from ..models import build_describer
 from ..paths import CACHE, RUNS
 from ..prompts import render
 from ..tracking import RunTracker
-from .collate import GenerativeFeaturizer, JEPAFeaturizer
+from .collate import GenerativeFeaturizer
 from .config import strip_resume_safe
 from .data import EpochSampler, steps_per_epoch
 from .evaluate import generate_and_score
 from .lora import attach_lora, load_trainable_state, param_groups, set_train_mode, trainable_state
-from .objectives import bank_infonce_loss, infonce_loss, lm_loss
+from .jepa import JEPAObjective
+from .objectives import lm_loss
 
 _STOP = {"flag": False, "signum": None}
 
@@ -107,7 +110,7 @@ class Trainer:
         self.dir = Path(run_root or RUNS) / cfg.exp_id
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.jepa = cfg.objective.kind == "infonce"
-        self.bank_negatives = self.jepa and cfg.objective.get("negatives", "batch") == "bank"
+        self.objective: JEPAObjective | None = None    # solo VL-JEPA; se crea en _setup
         self.prompt_text = render(cfg.prompt)
         self.micro = int(cfg.train.micro_batch_size)
         self.target_fn = target_fn(str(cfg.target.format))
@@ -154,25 +157,6 @@ class Trainer:
             return {}
         return {"seen": lambda r: not is_held_out(r), "unseen": is_held_out}
 
-    def _target_table(self, captions: list[str]):
-        """VL-JEPA: embeddings del Y-Encoder congelado para cada caption único (caché en disco)."""
-        uniq = sorted(set(captions))
-        h = hashlib.sha1("\n".join(uniq).encode()).hexdigest()[:12]
-        key = f"{self.describer.ckpt_path.name}|{self.describer.ckpt_path.stat().st_size}|{self.describer.max_caption_len}|{h}"
-        cache = CACHE / f"vljepa_targets_{hashlib.sha1(key.encode()).hexdigest()[:12]}.pt"
-        emb = None
-        if cache.exists():
-            blob = torch.load(cache, map_location="cpu", weights_only=False)
-            if blob["texts"] == uniq:
-                emb = blob["emb"]
-        if emb is None:
-            print(f"[train] codificando {len(uniq)} captions únicos con el Y-Encoder (congelado)", flush=True)
-            emb = self.describer.encode_texts(uniq).cpu()
-            cache.parent.mkdir(parents=True, exist_ok=True)
-            torch.save({"texts": uniq, "emb": emb}, cache)
-        self.target_index = {t: i for i, t in enumerate(uniq)}
-        self.target_emb = emb.to(self.device)
-
     # ------------------------------------------------------------------- forward
     def _to_device(self, inputs: dict) -> dict:
         out = {}
@@ -183,31 +167,10 @@ class Trainer:
                 out[k] = v
         return out
 
-    def _jepa_pred(self, batch: dict):
-        inner = self.describer.model.get_base_model()
-        pv = batch["pixel_values"].to(self.device, dtype=torch.bfloat16)
-        qi, qm = batch["query_ids"].to(self.device), batch["query_mask"].to(self.device)
-        with self.amp():
-            vis = inner.x_encoder(pv)
-            pred = inner.predictor(vis, qi, qm)
-        idx = torch.tensor([self.target_index[c] for c in batch["captions"]], device=self.device)
-        return pred, idx
-
-    def _jepa_loss(self, batch: dict, mask: bool):
-        """InfoNCE con negativos del lote (media sobre el lote)."""
-        pred, idx = self._jepa_pred(batch)
-        caps = batch["captions"] if mask else None
-        return infonce_loss(pred, self.target_emb[idx], float(self.cfg.objective.temperature), caps)
-
-    def _jepa_bank_loss_sum(self, batch: dict):
-        """InfoNCE contra el banco completo de objetivos (suma sobre el micro-lote)."""
-        pred, idx = self._jepa_pred(batch)
-        return bank_infonce_loss(pred, self.target_emb, idx, float(self.cfg.objective.temperature))
-
     def _micro_loss(self, model, batch: dict, n_eff: int):
         """(pérdida para backward ya normalizada por el lote efectivo, suma sin normalizar)."""
         if self.jepa:
-            s = self._jepa_bank_loss_sum(batch)
+            s = self.objective.bank_loss_sum(batch)
             return s / n_eff, float(s.detach())
         batch["inputs"] = self._to_device(batch["inputs"])
         with self.amp():
@@ -216,11 +179,11 @@ class Trainer:
 
     def _step(self, samples: list, model) -> dict:
         """Un paso de optimización sobre `samples` (= un lote efectivo). Devuelve estadísticas."""
-        if self.jepa and not self.bank_negatives:
-            batch = self.featurizer.pad(samples)
-            loss = self._jepa_loss(batch, bool(self.cfg.objective.mask_duplicate_captions))
+        if self.jepa and self.objective.whole_batch:
+            # negativos del lote o InfoNCE simétrica: la pérdida depende del lote completo (no se parte)
+            loss, logged = self.objective.batch_loss(self.featurizer.pad(samples))
             loss.backward()
-            return {"loss": float(loss.detach()), "tokens": len(samples)}
+            return {"loss": logged, "tokens": len(samples)}
         # VLM: normaliza por tokens objetivo; VL-JEPA con banco: por muestras
         n_eff = len(samples) if self.jepa else sum(len(s["target"]) for s in samples)
         while True:
@@ -242,17 +205,19 @@ class Trainer:
 
     @torch.no_grad()
     def _val_loss(self, model, val_records) -> float:
+        # VL-JEPA con banco factorizado: el featurizer de val hace las cuatro consultas de cada imagen
         loader = DataLoader(ImageRecordDataset(val_records, self.root), batch_size=self.micro if not self.jepa else
                             int(self.cfg.train.effective_batch_size), num_workers=2,
-                            collate_fn=self.featurizer, shuffle=False, generator=torch.Generator())
+                            collate_fn=self.val_featurizer, shuffle=False, generator=torch.Generator())
         tot, n = 0.0, 0
         for samples in loader:
-            if self.bank_negatives:
-                tot, n = tot + float(self._jepa_bank_loss_sum(self.featurizer.pad(samples))), n + len(samples)
+            if self.jepa and self.objective.bank_negatives:
+                # término directo contra el banco (también con la simétrica): I(ŝ; texto) ≥ log N − val_loss
+                tot += float(self.objective.bank_loss_sum(self.val_featurizer.pad(samples)))
+                n += len(samples)
             elif self.jepa:
-                batch = self.featurizer.pad(samples)
-                loss = self._jepa_loss(batch, bool(self.cfg.objective.mask_duplicate_captions))
-                tot, n = tot + float(loss) * len(samples), n + len(samples)
+                _, loss = self.objective.batch_loss(self.val_featurizer.pad(samples))
+                tot, n = tot + loss * len(samples), n + len(samples)
             else:
                 batch = self.featurizer.pad(samples)
                 batch["inputs"] = self._to_device(batch["inputs"])
@@ -266,6 +231,8 @@ class Trainer:
         t0 = time.time()
         model.eval()
         val_loss = self._val_loss(model, val_records)
+        if self.jepa:
+            self.objective.before_eval()       # banco de recuperación con la proyección de texto actual
         bs = int(self.cfg.model.get("batch_size", 16))
         metrics, preds = generate_and_score(self.describer, val_records, self.root, self.prompt_text, bs, self.amp,
                                             target_fn=self.target_fn, groups=self._val_groups())
@@ -390,14 +357,15 @@ class Trainer:
             if bank_fmt != cfg.target.format:
                 raise RuntimeError(f"El banco de recuperación de VL-JEPA está en formato '{bank_fmt}' y el objetivo en "
                                    f"'{cfg.target.format}': val mediría textos de otro formato.")
-            self.featurizer = JEPAFeaturizer(self.describer, self.prompt_text, self.target_fn)
+            self.objective = JEPAObjective(cfg, self.describer, self.device, self.amp, CACHE)
+            self.featurizer, self.val_featurizer = self.objective.featurizers(self.prompt_text, self.target_fn)
+            self.objective.build_targets([self.target_fn(r) for r in train_records + val_records])
             info |= {"query_tokens": self.featurizer.query_tokens, "query_truncated": self.featurizer.query_truncated,
-                     "negatives": "bank" if self.bank_negatives else "batch"}
-            self._target_table([self.target_fn(r) for r in train_records + val_records])
-            info["n_target_texts"] = len(self.target_index)
+                     **self.objective.info()}
         else:
             self.featurizer = GenerativeFeaturizer(self.describer, self.prompt_text, int(t.max_target_tokens),
                                                    self.target_fn)
+            self.val_featurizer = self.featurizer
             info |= {"turn_end": self.featurizer.turn_end}
             # falla temprano si algún objetivo excede max_target_tokens (todos los textos distintos de train y val)
             for txt in {self.target_fn(r) for r in train_records + val_records}:
@@ -421,6 +389,8 @@ class Trainer:
                 epoch, step_in_epoch = divmod(state["global_step"], n_steps_epoch)
                 sampler = EpochSampler(len(train_records), int(t.effective_batch_size), int(cfg.seed), epoch,
                                        step_in_epoch, bool(t.drop_last))
+                if hasattr(self.featurizer, "epoch"):
+                    self.featurizer.epoch = epoch       # VL-JEPA factorizado: rotación de consultas por época
                 loader = DataLoader(ImageRecordDataset(train_records, self.root), batch_size=int(t.micro_batch_size),
                                     sampler=sampler, num_workers=int(cfg.data.num_workers),
                                     collate_fn=self.featurizer, persistent_workers=False,
@@ -490,6 +460,8 @@ class Trainer:
 
         _atomic_dir(self.dir / "adapter_last", lambda d: model.save_pretrained(d))
         gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
+        if self.jepa:
+            self.objective.before_eval()
         summary = {
             "exp_id": cfg.exp_id, "model": cfg.model.name, "prompt": cfg.prompt.id, "steps": state["global_step"],
             "target_format": str(cfg.target.format), "holdout": self.holdout, "n_train": len(train_records),

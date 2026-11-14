@@ -12,6 +12,13 @@ permite: se codifica con el Y-Encoder un banco de descripciones del split de *en
 construyen prototipos por valor de atributo (media normalizada de los embeddings de las
 descripciones con ese valor), lo que da una predicción por atributo sin pasar por texto.
 
+Banco de referencias (`bank.kind`, ver vlmfid.models.bank y docs/VLJEPA_AJUSTE_V3.pdf):
+    captions     frases completas del split de train (504 canónicas o ~11 000 originales). Es el banco
+                 de las etapas 1 y 2: una consulta (el prompt), un ŝ, vecino más cercano.
+    factorized   una frase por valor de atributo (21 en total) y una consulta por atributo: cuatro ŝ por
+                 imagen, cada uno comparado solo con las frases de su atributo. El caption se compone
+                 con la plantilla canónica. Cada decisión trae probabilidades y margen en nats.
+
 Nota de dominio: el checkpoint procesa *video* (tubelets temporales). Una imagen se trata como un
 video estático repitiendo el fotograma `num_frames` veces (8, como en Stage B).
 """
@@ -31,6 +38,7 @@ from PIL import Image
 from ..data.m3di import select_discrete_attributes
 from ..data.manifest import load_manifest
 from ..paths import CACHE, resolve
+from .bank import ATTRS, BANK_KINDS, QUERIES, FactorizedBank
 from .base import Description, Describer
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
@@ -60,6 +68,7 @@ class VLJEPADescriber(Describer):
         self.bank_texts: list[str] = []
         self.bank_emb: torch.Tensor | None = None
         self.prototypes: dict[str, tuple[list, torch.Tensor]] = {}
+        self.fbank: FactorizedBank | None = None       # solo con bank.kind = factorized
 
     # ---------------------------------------------------------------- carga
     def _checkpoint_path(self) -> Path:
@@ -150,6 +159,37 @@ class VLJEPADescriber(Describer):
             out.append(F.normalize(e.float(), dim=-1).half())
         return torch.cat(out)
 
+    def _inner(self):
+        """El OpenVLJEPA sin el envoltorio de PEFT (si lo hay)."""
+        m = self.model
+        return m.get_base_model() if hasattr(m, "get_base_model") else m
+
+    def encode_pooled(self, texts: list[str], batch_size: int = 256) -> torch.Tensor:
+        """Salida del transformer del Y-Encoder (EmbeddingGemma) promediada sobre los tokens reales, ANTES
+        de la proyección lineal al espacio compartido. Con el transformer congelado no cambia durante el
+        ajuste, así que se calcula una vez; la proyección (entrenable) se aplica con `project_pooled`."""
+        ye = self._inner().y_encoder
+        out = []
+        with torch.no_grad():
+            for i in range(0, len(texts), batch_size):
+                ids, mask = self._tok(self.target_tok, texts[i:i + batch_size], self.max_caption_len)
+                with torch.autocast(self.device.type, dtype=torch.bfloat16):
+                    h = ye.model(input_ids=ids, attention_mask=mask).last_hidden_state
+                m = mask.unsqueeze(-1).to(h.dtype)
+                out.append(((h * m).sum(1) / m.sum(1).clamp(min=1.0)).float())
+        return torch.cat(out)
+
+    def project_pooled(self, pooled: torch.Tensor) -> torch.Tensor:
+        """Proyección del Y-Encoder al espacio compartido, con gradiente si está entrenable. Sin normalizar."""
+        with torch.autocast(self.device.type, dtype=torch.bfloat16):
+            return self._inner().y_encoder.projector(pooled.to(self.device)).float()
+
+    def _bank_kind(self) -> str:
+        kind = str(self.cfg.bank.get("kind") or "captions")
+        if kind not in BANK_KINDS:
+            raise ValueError(f"model.bank.kind='{kind}' inválido ({' | '.join(BANK_KINDS)})")
+        return kind
+
     def _bank_format(self) -> str:
         """Formato de los textos del banco: `original` (captions de M3DI, etapa 1) o `canonical` (el
         objetivo de la etapa 2 reformulada; ver vlmfid.data.targets)."""
@@ -164,9 +204,37 @@ class VLJEPADescriber(Describer):
             ident += f"|{self._bank_format()}"
         return hashlib.sha1(ident.encode()).hexdigest()[:12]
 
+    def _build_factorized_bank(self) -> None:
+        """21 frases de referencia. No se cachea en disco: son pocas y, si la proyección del Y-Encoder se
+        ajustó, dependen del adaptador cargado (una caché por ruta de adaptador quedaría obsoleta)."""
+        if self._bank_format() != "canonical":
+            raise ValueError("bank.kind=factorized compone el caption canónico: requiere "
+                             "bank.target_format=canonical (target.format=canonical al entrenar).")
+        self.fbank = FactorizedBank.build()
+        self.bank_texts = list(self.fbank.texts)
+        self.bank_pooled = self.encode_pooled(self.bank_texts)
+        self.refresh_bank()
+        n_real = {a: len(self.query_tok([QUERIES[a]], add_special_tokens=True)["input_ids"][0]) for a in ATTRS}
+        too_long = {a: n for a, n in n_real.items() if n > self.max_query_len}
+        if too_long:
+            raise ValueError(f"Consultas por atributo truncadas a max_query_len={self.max_query_len}: {too_long}")
+        self.attr_query = {a: self._tok(self.query_tok, [QUERIES[a]], self.max_query_len) for a in ATTRS}
+        print(f"[vljepa] banco factorizado: {len(self.bank_texts)} frases de referencia, "
+              f"{len(ATTRS)} consultas por imagen")
+
+    def refresh_bank(self) -> None:
+        """Recalcula los embeddings del banco factorizado con la proyección actual del Y-Encoder. Lo
+        llama el entrenamiento antes de cada evaluación en val cuando esa proyección es entrenable."""
+        if self.fbank is None:
+            return
+        with torch.no_grad():
+            self.bank_emb = F.normalize(self.project_pooled(self.bank_pooled), dim=-1).half()
+
     def _build_bank(self) -> None:
         from ..data.targets import target_text
 
+        if self._bank_kind() == "factorized":
+            return self._build_factorized_bank()
         b = self.cfg.bank
         fmt = self._bank_format()
         rows = load_manifest(b.split, limit=b.max_captions, subset_seed=b.seed)
@@ -222,7 +290,40 @@ class VLJEPADescriber(Describer):
             pred = self.model(pv, ids, mask)
         return F.normalize(pred.float(), dim=-1)
 
+    @torch.inference_mode()
+    def predict_attribute_embeddings(self, images: list[Image.Image]) -> dict[str, torch.Tensor]:
+        """Banco factorizado: una ŝ normalizada por atributo. El X-Encoder corre una sola vez por imagen
+        y el predictor una vez por consulta."""
+        inner = self._inner()
+        frames = torch.stack([self.transform(im) for im in images])
+        pv = frames.unsqueeze(1).repeat(1, self.num_frames, 1, 1, 1).to(self.device, dtype=torch.bfloat16)
+        B, out = len(images), {}
+        with torch.autocast(self.device.type, dtype=torch.bfloat16):
+            vis = inner.x_encoder(pv)
+            for a in ATTRS:
+                ids, mask = self.attr_query[a]
+                pred = inner.predictor(vis, ids.expand(B, -1), mask.expand(B, -1))
+                out[a] = F.normalize(pred.float(), dim=-1)
+        return out
+
+    def _describe_factorized(self, images: list[Image.Image]) -> list[Description]:
+        pred = self.predict_attribute_embeddings(images)
+        tau = float(self.cfg.bank.get("temperature") or 0.07)
+        decoded = self.fbank.decode(pred, self.bank_emb, tau)
+        stacked = torch.stack([pred[a] for a in ATTRS], dim=1)                       # (B, 4, D)
+        outs = []
+        for j, d in enumerate(decoded):
+            outs.append(Description(
+                text=d["text"],
+                extra={"bank": "factorized", "attr_pred": d["values"], "attr_prob": d["prob"],
+                       "attr_margin_nats": d["margin_nats"], "attr_order": list(ATTRS)},
+                embedding=stacked[j].cpu().numpy().astype(np.float16) if self.cfg.get("return_embeddings") else None,
+            ))
+        return outs
+
     def describe(self, images: list[Image.Image], prompts: list[str]) -> list[Description]:
+        if self.fbank is not None:
+            return self._describe_factorized(images)
         pred = self.predict_embeddings(images, prompts)
         k = int(self.cfg.get("topk", 3))
         sims = pred.half() @ self.bank_emb.T
@@ -253,5 +354,6 @@ class VLJEPADescriber(Describer):
     def info(self) -> dict:
         out = super().info()
         out.update({"ckpt": str(self.ckpt_path), "bank_size": len(self.bank_texts), "bank_format": self._bank_format(),
+                    "bank_kind": self._bank_kind(),
                     "num_frames": self.num_frames, "attributes": list(self.prototypes)})
         return out

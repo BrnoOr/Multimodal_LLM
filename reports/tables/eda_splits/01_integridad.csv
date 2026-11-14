@@ -1,4 +1,4 @@
 split,filas,columnas,ids únicos,rutas únicas,row_idx contiguo,columna split ok,nulos,NaN,z constante,imágenes accesibles (50)
-train,125000,25,125000,125000,True,True,0,0,True,0.0
-val,10000,25,10000,10000,True,True,0,0,True,0.0
-test,10000,25,10000,10000,True,True,0,0,True,0.0
+train,125000,25,125000,125000,True,True,0,0,True,1.0
+val,10000,25,10000,10000,True,True,0,0,True,1.0
+test,10000,25,10000,10000,True,True,0,0,True,1.0

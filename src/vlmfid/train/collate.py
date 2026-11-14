@@ -173,26 +173,58 @@ class GenerativeFeaturizer:
 
 
 class JEPAFeaturizer:
-    def __init__(self, describer, prompt_text: str, target_fn=_caption):
+    """Muestras de VL-JEPA. En la clave "caption" va el texto cuyo embedding se aprende.
+
+    Banco de captions (`per_attribute=False`): una consulta (el prompt) y el caption objetivo.
+    Banco factorizado (`per_attribute=True`): una consulta por atributo y, como objetivo, la frase de
+    referencia del valor verdadero de ese atributo.
+      * entrenamiento (`expand=False`): UNA consulta por imagen y por época, elegida por la rotación
+        determinista `vlmfid.models.bank.query_rotation` (el bucle fija `self.epoch` antes de crear el
+        DataLoader de cada época). El lote sigue teniendo `effective_batch_size` muestras.
+      * validación (`expand=True`): las cuatro consultas de cada imagen.
+    """
+
+    def __init__(self, describer, prompt_text: str, target_fn=_caption, per_attribute: bool = False,
+                 expand: bool = False, seed: int = 0):
         self.target_fn = target_fn
         self.transform = describer.transform
         self.num_frames = describer.num_frames
-        q = describer.cfg.get("query_override") or prompt_text
-        enc = describer.query_tok([q], max_length=describer.max_query_len, padding="max_length",
+        self.per_attribute, self.expand, self.seed, self.epoch = per_attribute, expand, int(seed), 0
+        if per_attribute:
+            from ..models.bank import ATTRS, QUERIES
+
+            self.attrs, self.fbank = ATTRS, describer.fbank
+            queries = [QUERIES[a] for a in ATTRS]
+        else:
+            queries = [describer.cfg.get("query_override") or prompt_text]
+        enc = describer.query_tok(queries, max_length=describer.max_query_len, padding="max_length",
                                   truncation=True, return_tensors="pt")
-        self.query_ids, self.query_mask = enc["input_ids"], enc["attention_mask"]
-        n_real = len(describer.query_tok([q], add_special_tokens=True)["input_ids"][0])
+        self.query_ids, self.query_mask = enc["input_ids"], enc["attention_mask"]      # (Q, L)
+        n_real = max(len(describer.query_tok([q], add_special_tokens=True)["input_ids"][0]) for q in queries)
         self.query_truncated = n_real > describer.max_query_len
         self.query_tokens = n_real
 
     def __call__(self, batch):
-        return [{"frame": self.transform(img), "id": rec["id"], "caption": self.target_fn(rec)} for rec, img in batch]
+        if not self.per_attribute:
+            return [{"frame": self.transform(img), "id": rec["id"], "caption": self.target_fn(rec), "q": 0}
+                    for rec, img in batch]
+        from ..models.bank import query_rotation
+
+        out = []
+        for rec, img in batch:
+            frame, phrases = self.transform(img), self.fbank.target_phrases(rec)
+            asked = self.attrs if self.expand else (query_rotation(rec["id"], self.seed, self.epoch),)
+            out += [{"frame": frame, "id": rec["id"], "caption": phrases[a], "q": self.attrs.index(a), "attr": a}
+                    for a in asked]
+        return out
 
     def pad(self, samples: list[dict]) -> dict:
         frames = torch.stack([s["frame"] for s in samples])                       # (B,3,H,W)
         pv = frames.unsqueeze(1).repeat(1, self.num_frames, 1, 1, 1)               # (B,T,3,H,W)
         B = len(samples)
-        return {"pixel_values": pv, "query_ids": self.query_ids.expand(B, -1).clone(),
-                "query_mask": self.query_mask.expand(B, -1).clone(),
+        q = torch.tensor([s["q"] for s in samples], dtype=torch.long)
+        return {"pixel_values": pv, "query_ids": self.query_ids[q].clone(),
+                "query_mask": self.query_mask[q].clone(),
                 "captions": [s["caption"] for s in samples], "ids": [s["id"] for s in samples],
+                "attrs": [s.get("attr") for s in samples],
                 "n_target_tokens": B, "max_target_len": 0}

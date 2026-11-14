@@ -5,7 +5,7 @@
 
 - train/val/test = 125,000 / 10,000 / 10,000 filas; ids únicos, row_idx contiguo y sin nulos/NaN: ✓.
 - object_zpos es constante en los tres splits (no aporta información; se excluye).
-- imágenes accesibles en disco: no (raíz C:\Users\bruno\Documents\MDS\Redes_Neuronales_Teoria_Informacion\Proyecto T7\data\raw\m3di); las secciones que las usan se omiten.
+- imágenes accesibles en disco: sí (raíz C:\Users\bruno\Documents\MDS\Redes_Neuronales_Teoria_Informacion\Proyecto T7\data\raw\m3di); 
 
 ## Fuga
 

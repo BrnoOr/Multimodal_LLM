@@ -1,0 +1,32 @@
+# VL-JEPA con banco de referencias FACTORIZADO (ajuste v3, docs/VLJEPA_AJUSTE_V3.pdf).
+# Mismo checkpoint, cuantización y preprocesado que configs/models/vljepa.yaml; solo cambia el banco.
+# El nombre distinto (…_fac) separa los exp_id de los runs ya hechos con el banco de captions.
+name: vljepa_open_msrvtt_fac
+family: vljepa
+repo_path: external/open-vljepa
+hf_id: cun-bjy/open-vljepa
+ckpt_file: best.pt
+ckpt_path: null
+revision: null
+llama_name: unsloth/Llama-3.2-1B
+quant: nf4
+batch_size: 32
+num_frames: null
+image_size: null
+max_query_len: null
+max_caption_len: 96
+# Con el banco factorizado el prompt del experimento no llega al modelo: cada imagen recibe las cuatro
+# consultas de vlmfid.models.bank.QUERIES (forma, color, vertical, horizontal). query_override no aplica.
+query_override: null
+topk: 3
+return_embeddings: true # (N, 4, 1536): una ŝ por atributo, en el orden de vlmfid.models.bank.ATTRS
+bank:
+  kind: factorized      # 21 frases de referencia: 7 formas + 8 colores + 3 verticales + 3 horizontales
+  target_format: canonical   # el caption se compone con la plantilla canónica
+  temperature: 0.07     # τ del softmax con que se reportan probabilidades y márgenes (la del entrenamiento)
+  # sin uso con kind=factorized (el banco no se muestrea de ningún split); se dejan por compatibilidad
+  split: train
+  max_captions: 20000
+  seed: 0
+  attributes: auto
+adapter_path: null
