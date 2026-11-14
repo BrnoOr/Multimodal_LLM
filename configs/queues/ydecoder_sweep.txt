@@ -1,0 +1,9 @@
+# Paso 1.3 — Y-Decoder de la etapa 1 (sobre el Y-Encoder preentrenado): barrido del largo del prefijo.
+# Solo texto de train; elige el mejor paso por el techo Y-Decoder(S_Y) en 500 captions de val.
+#   SCRIPT=scripts/train_ydecoder.py GPU=0 scripts/launch.sh ydec scripts/run_queue.sh configs/queues/ydecoder_sweep.txt
+# Antes, una prueba de humo (2-3 minutos):
+#   uv run --no-sync python scripts/train_ydecoder.py model=vljepa smoke_steps=40 decoder.train.eval_every=20 decoder.train.val_limit=32 exp_id=ydec_humo
+# Al terminar, comparar runs/ydec_*/summary.json (best.attr_mean) y revisar val_ceiling.jsonl a mano.
+model=vljepa decoder.prefix_len=8
+model=vljepa decoder.prefix_len=4
+model=vljepa decoder.prefix_len=1

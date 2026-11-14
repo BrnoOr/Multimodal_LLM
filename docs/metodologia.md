@@ -624,7 +624,10 @@ Los valores "nuestro" marcados **PENDIENTE** no se fijan: no hay justificación 
 | Módulos entrenados (VL-JEPA) | predictor completo (490M) + Y-Encoder con LR ×0.05; X-Encoder congelado [5, §3.1] | opción A del paper con LoRA: LoRA en Predictor e Y-Encoder (×0.05) + proyecciones lineales; X-Encoder congelado | El paper fija qué componentes aprenden; LoRA y NF4 los exige el enunciado. Ver §2.3. |
 | Multiplicador de LR del Y-Encoder | ×0.05 (modelo de 1.6B) [5, §3.1, Tabla 7b] | ×0.05 | Es una razón entre LRs, no un valor absoluto; el paper muestra que 0.05–0.10 es el óptimo. |
 | Pérdida de VL-JEPA | InfoNCE bidireccional [5, §2] | igual | Protocolo. |
-| Y-Decoder | no especificado [5]; solo *lightweight* | prefijo sobre Llama-3.2-1B, NF4 + LoRA; *k*, rango y LR PENDIENTE | Decisión del usuario (§2.4). Sin fuente en el paper. |
+| Y-Decoder: arquitectura | no especificado [5]; solo *lightweight* | prefijo sobre Llama-3.2-1B, NF4 + LoRA | Decisión del usuario (§2.4). Sin fuente en el paper. |
+| Y-Decoder: LoRA y optimización | r = 64, α = 16, dropout 0.1, LR 2e-4, lote 16, LR constante, max grad norm 0.3 (LLaMA 7B/13B) [8, Ap. B.2] | los mismos, como punto de partida | Acordado con el usuario: valores de QLoRA como inicio, no justificados para 1B. Revisables tras el barrido. |
+| Y-Decoder: vectores de prefijo y épocas | sin fuente | barrido de *k* ∈ {1, 4, 8}; hasta 3 épocas, eligiendo el mejor paso | Se elige en val por el techo `Y-Decoder(S_Y)` (`configs/queues/ydecoder_sweep.txt`). |
+| Y-Decoder: entrada | sin fuente | embedding normalizado a norma 1 | InfoNCE no supervisa la norma de `Ŝ_Y`; sin normalizar, una diferencia de norma con `S_Y` sacaría al decodificador de distribución. Diseño propio. |
 | Cuantización del encoder visual | no aplica: los papers de los VLM no cuantizan; [8] cuantiza el modelo base completo | NF4, igual en los 4 modelos | Enunciado y comparabilidad. Ver §2.1. |
 | Sonda de información | MLP de 1 capa oculta (discretos), kernel ridge (continuos) [1, §5.2] | igual; tamaños PENDIENTE | Protocolo de [1]; no detalla hiperparámetros. |
 | Temperatura InfoNCE | no indicada en [5]; 0.07 en `open-vljepa` | PENDIENTE (candidato: la del checkpoint) | Mantener la del checkpoint evita desajustar el espacio preentrenado. |
@@ -632,7 +635,7 @@ Los valores "nuestro" marcados **PENDIENTE** no se fijan: no hay justificación 
 | Resolución (InternVL3) | teselas de 448 px, 256 tokens por tesela [2504.10479, §2.1] | preprocesado por defecto; PENDIENTE el máximo de teselas | Ídem. |
 | Resolución (Qwen3.5) | sin fuente en la carpeta | PENDIENTE (model card) | — |
 | Resolución y cuadros (VL-JEPA) | 256² px; 1, 8 o 32 cuadros según fase [5, §3.2] | los del checkpoint (8 cuadros, 256 px [repo, sin verificar]) | Debe coincidir con el entrenamiento del checkpoint. |
-| Longitud máxima de consulta (VL-JEPA) | 512 tokens [5, §3.1] | PENDIENTE (el checkpoint usó 64) | Debe cubrir el prompt más largo. |
+| Longitud máxima de consulta (VL-JEPA) | 512 tokens [5, §3.1] | 512 | Valor del paper. El checkpoint usó 64, donde los prompts con ejemplos no caben; el relleno va enmascarado. Decisión del usuario: mismos prompts en los 4 modelos. |
 | Longitud máxima de generación | 128 a 1 024 tokens objetivo según dataset [8, Tabla 9] | PENDIENTE | Los captions tienen 10–19 palabras [repo, sin verificar]. Debe ser igual para los tres VLM. |
 
 ---

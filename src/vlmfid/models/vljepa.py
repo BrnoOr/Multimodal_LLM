@@ -157,6 +157,27 @@ class VLJEPADescriber(Describer):
             T.Resize(size, antialias=True), T.CenterCrop(size), T.ToTensor(),
             T.Normalize(IMAGENET_MEAN, IMAGENET_STD),
         ])
+        if c.get("decoder_path"):
+            self._load_decoder(resolve(c.decoder_path))
+
+    def _load_decoder(self, path: Path) -> None:
+        """Carga el Y-Decoder entrenado y comprueba que corresponde a ESTE Y-Encoder.
+
+        El decodificador aprende a invertir un Y-Encoder concreto. Usar el de la etapa 1 con un VL-JEPA
+        ajustado (o al revés) daría texto sin sentido sin ningún error, así que se compara el adaptador
+        con que se entrenó (docs/metodologia.md §2.3, interacción con el Y-Decoder).
+        """
+        from .ydecoder import YDecoder
+
+        dec = YDecoder.from_dir(path)
+        trained_on = dec.meta.get("vljepa_adapter_path")
+        current = self.cfg.get("adapter_path")
+        if (trained_on or None) != (current or None):
+            raise RuntimeError(
+                f"El Y-Decoder de {path} se entrenó con adapter_path={trained_on!r} y el modelo actual usa "
+                f"{current!r}. Cada etapa necesita su propio decodificador."
+            )
+        self.attach_decoder(dec)
 
     def _inner(self):
         """El OpenVLJEPA sin el envoltorio de PEFT (si lo hay)."""

@@ -18,12 +18,17 @@ quant: nf4
 batch_size: 32
 num_frames: null        # null -> el del checkpoint (8): imagen tratada como video estático
 image_size: null        # null -> 256
-# Longitudes máximas en tokens. PENDIENTES de fijar con scripts/inspect_models.py, que mide los
-# prompts y los captions de M3DI: si un texto excede el límite, el adaptador falla (no trunca).
-max_query_len: null     # null -> el del checkpoint (64); el paper usa 512
+# Longitudes máximas en tokens. Si un texto excede el límite, el adaptador falla (no trunca).
+# max_query_len: 512 es el valor del paper (VL-JEPA §3.1). El checkpoint se entrenó con 64, pero los
+# prompts con ejemplos no caben en 64; las posiciones de relleno van enmascaradas, así que subir el
+# límite no cambia la entrada de los prompts cortos. Decisión del usuario: mismos prompts para los 4
+# modelos. scripts/inspect_models.py mide los tokens reales de cada prompt y de los captions.
+max_query_len: 512
 max_caption_len: 96
 # El checkpoint vio consultas tipo "Describe the image." en entrenamiento. Con null se usa el prompt
 # del experimento; fijarlo aísla el efecto del prompt.
 query_override: null
 return_embeddings: true # Ŝ_Y por imagen; se guarda en runs/<exp>/embeddings si infer.save_embeddings=true
 adapter_path: null
+# Y-Decoder entrenado (runs/<ydec...>/decoder_best). null -> describe() falla: VL-JEPA no genera texto.
+decoder_path: null

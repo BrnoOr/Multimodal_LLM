@@ -1,0 +1,11 @@
+# Paso 1.3 — VL-JEPA zero-shot en VAL con su Y-Decoder (docs/metodologia.md §2.2 y §2.4).
+# REQUIERE haber entrenado y elegido el decodificador (configs/queues/ydecoder_sweep.txt): reemplaza
+# <YDEC> por el exp_id elegido, p. ej. ydec_vljepa_open_msrvtt_nf4_zs_nf4_k8_r64.
+# Piloto (200 imagenes) primero; despues quitar data.limit para val completo.
+#   GPU=0 scripts/launch.sh s1_vljepa scripts/run_queue.sh configs/queues/stage1_vljepa_val.txt
+model=vljepa prompt=p0_minimal         data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC>/decoder_best
+model=vljepa prompt=p1_attributes      data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC>/decoder_best
+model=vljepa prompt=p2_constrained     data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC>/decoder_best
+model=vljepa prompt=p3_json            data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC>/decoder_best
+model=vljepa prompt=p4_dataset_format  data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC>/decoder_best
+model=vljepa prompt=p4m_multiexample   data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC>/decoder_best

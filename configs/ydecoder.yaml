@@ -1,0 +1,38 @@
+# (No va en configs/models/: no es un modelo evaluado, es el lector de VL-JEPA.)
+# Y-Decoder de VL-JEPA: prefijo sobre Llama-3.2-1B (docs/metodologia.md §2.4; vlmfid.models.ydecoder).
+# DISEÑO PROPIO: el paper de VL-JEPA no especifica el decodificador.
+#
+# Procedencia de cada valor (ningún paper cubre este componente a esta escala):
+#   lora.*, train.lr, train.batch_size, train.schedule, train.max_grad_norm, train.betas
+#       QLoRA (Dettmers et al., 2023), Ap. B.2 y Tabla 9, medidos en LLaMA 7B/13B. Se usan como PUNTO DE
+#       PARTIDA acordado con el usuario, no como valores justificados para un LM de 1B.
+#   prefix_len, train.epochs
+#       sin fuente. Se barren en val (configs/queues/ydecoder_sweep.txt) y se elige por el techo del
+#       decodificador: exactitud por atributo de Y-Decoder(S_Y) en val.
+#   train.noise_std = 0
+#       sin ruido: el protocolo entrena con S_Y limpio (docs/metodologia.md §2.4).
+decoder:
+  name: ydecoder_llama32_1b
+  llama_name: unsloth/Llama-3.2-1B     # mismo LM de origen que el Predictor; réplica sin restricción de acceso
+  quant: nf4                            # nf4 | bf16 (control sin cuantizar)
+  embed_dim: 1536                       # espacio compartido de VL-JEPA
+  prefix_len: 8                         # k vectores de prefijo (barrido: 1, 4, 8)
+  normalize_input: true                 # el embedding entra con norma 1 (ver vlmfid.models.ydecoder)
+  lora:
+    r: 64
+    alpha: 16
+    dropout: 0.1
+  generation:
+    max_new_tokens: 128                 # igual que los VLM (configs/models/*.yaml)
+  train:
+    lr: 2.0e-4                          # LoRA y proyección de prefijo
+    batch_size: 16
+    epochs: 3                           # sobre los captions distintos de train; se elige el mejor paso en val
+    schedule: constant
+    betas: [0.9, 0.999]
+    weight_decay: 0.0
+    max_grad_norm: 0.3
+    noise_std: 0.0
+    eval_every: 200                     # pasos entre evaluaciones en val
+    val_limit: 500                      # imágenes de val para elegir el paso (subconjunto determinista)
+    log_every: 20
