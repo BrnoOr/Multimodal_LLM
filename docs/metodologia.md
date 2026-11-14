@@ -629,7 +629,7 @@ Los valores "nuestro" marcados **PENDIENTE** no se fijan: no hay justificación 
 | Y-Decoder: vectores de prefijo y épocas | sin fuente | barrido de *k* ∈ {1, 4, 8}; hasta 3 épocas, eligiendo el mejor paso | Se elige en val por el techo `Y-Decoder(S_Y)` (`configs/queues/ydecoder_sweep.txt`). |
 | Y-Decoder: entrada | sin fuente | embedding normalizado a norma 1 | InfoNCE no supervisa la norma de `Ŝ_Y`; sin normalizar, una diferencia de norma con `S_Y` sacaría al decodificador de distribución. Diseño propio. |
 | Cuantización del encoder visual | no aplica: los papers de los VLM no cuantizan; [8] cuantiza el modelo base completo | NF4, igual en los 4 modelos | Enunciado y comparabilidad. Ver §2.1. |
-| Sonda de información | MLP de 1 capa oculta (discretos), kernel ridge (continuos) [1, §5.2] | igual; tamaños PENDIENTE | Protocolo de [1]; no detalla hiperparámetros. |
+| Sonda de información | MLP de 1 capa oculta (discretos), kernel ridge (continuos) [1, §5.2]; sin hiperparámetros | igual; grilla elegida en un 20 % retenido: capa oculta ∈ {64, 256, 1024}, weight decay ∈ {1e-4, 1e-2}; núcleo RBF con ancho ∈ {0.25, 1, 4} × heurística de la mediana y α ∈ {1e-3, 1e-1, 10} | Protocolo de [1]. La grilla es propuesta propia (D8), igual en todos los puntos de medición; debe declararse en el informe. |
 | Temperatura InfoNCE | no indicada en [5]; 0.07 en `open-vljepa` | PENDIENTE (candidato: la del checkpoint) | Mantener la del checkpoint evita desajustar el espacio preentrenado. |
 | Resolución (LLaVA-OV) | 384 px + AnyRes hasta 729×10 tokens [2408.03326, Ap. C.1] | preprocesado por defecto del checkpoint; PENDIENTE si se limita AnyRes | Las imágenes de M3DI son pequeñas (224 px [repo, sin verificar]); el model card manda [CLAUDE.md §2]. |
 | Resolución (InternVL3) | teselas de 448 px, 256 tokens por tesela [2504.10479, §2.1] | preprocesado por defecto; PENDIENTE el máximo de teselas | Ídem. |
@@ -799,7 +799,7 @@ forma explícita y testeada.
 
 | # | Decisión | Propuesta de este documento | Bloquea |
 |---|---|---|---|
-| D8 | Tamaño de la capa oculta y entrenamiento de las sondas de §2.5; kernel y regularización de la regresión. | Sin propuesta: [1] no los detalla. | análisis |
+| D8 | Grilla de las sondas de §2.5 (implementada en `src/vlmfid/eval/probes.py`, ver §4). | Propuesta implementada; falta la confirmación del usuario. | análisis |
 | §4 | Valores PENDIENTE de la tabla de adaptaciones (r, α, dropout, LR, esquema, lote efectivo, longitudes) y los del Y-Decoder. | Barrido corto en val o model cards, a acordar. | etapa 2 |
 | §7 | Agregar a `docs/papers/` las referencias externas y verificarlas antes de citarlas. | — | informe |
 

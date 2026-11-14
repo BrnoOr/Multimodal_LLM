@@ -1,0 +1,10 @@
+# Paso 1.4 — perdida de informacion por etapa de VL-JEPA, etapa 1 (docs/metodologia.md §2.5).
+# 10 000 imagenes de TRAIN para ajustar las sondas, 2 000 de VAL para medir. Test no se usa.
+# REQUIERE el Y-Decoder elegido (configs/queues/ydecoder_sweep.txt): reemplaza <YDEC> por su exp_id.
+# Sin model.decoder_path corre igual, pero solo con las sondas (E1, E2, E3, T1), sin E4 ni T2.
+#   SCRIPT=scripts/info_loss.py GPU=0 scripts/launch.sh infoloss scripts/run_queue.sh configs/queues/stage1_infoloss.txt
+# Antes, una prueba de humo:
+#   uv run --no-sync python scripts/info_loss.py model=vljepa prompt=p1_attributes info.fit_limit=256 info.eval_limit=128 info.tag=humo
+model=vljepa prompt=p1_attributes model.decoder_path=runs/<YDEC>/decoder_best
+# Control sin cuantizar (necesita un decodificador entrenado sobre VL-JEPA en bf16; si no existe, quitar decoder_path):
+# model=vljepa prompt=p1_attributes model.quant=bf16
