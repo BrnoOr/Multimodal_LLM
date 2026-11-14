@@ -205,6 +205,40 @@ def test_cuenta_la_primera_declaracion_de_posicion():
     assert parse_position("A **head** is at the **right** of the image.") == ("right", None)
 
 
+def test_palabras_de_forma_no_son_posicion():
+    # Qwen3.5, p1 con 256 tokens. val/0437: "mid-gallop" y "mid-air" no son y=mid
+    t = ("**Description of the Object** * **Shape:** The object is a 3D model of a horse in mid-gallop. It is "
+         "depicted in a dynamic, mid-air pose with its front legs lifted and its hind legs trailing behind. "
+         "* **Color:** The horse is rendered in a bright, neon pink. * **Position:** The horse is positioned in "
+         "the upper right quadrant of the image. It is casting a shadow directly beneath it, which is a "
+         "circular, glowing area of a lighter beige or tan color.")
+    assert parse_position(t) == ("right", "top")
+    # val/0741: "a distinct dome-like top" describe la forma; la posición declarada es bottom-left
+    t = ("**Description of the Object** * **Shape:** It is a 3D model of a small, orange, spherical object with "
+         "a distinct dome-like top. It has a small, protruding nose and a small, pointed tail extending from "
+         "the back. * **Color:** The main body is a bright, solid orange. * **Position:** The object is located "
+         "in the bottom-left quadrant of the image. It is positioned slightly off-center to the left, with its "
+         "nose pointing towards the upper-left corner.")
+    assert parse_position(t) == ("left", "bottom")
+    # LLaVA-OV, p1, val/0203
+    assert parse_position("The object in the image is a red, irregularly shaped figure with a pointed top and a "
+                          "rounded bottom. It is positioned in the upper right quadrant of the image.") == ("right", "top")
+    # InternVL3, p0, val/0018
+    assert parse_position("The image shows a small, green, spherical object floating in mid-air against a brown "
+                          "background.") == (None, None)
+    # construidos: sin contexto de lugar no hay posición; con etiqueta o preposición, sí
+    assert parse_position("A teapot with a flat top.") == (None, None)
+    assert parse_position("Vertical: top. Horizontal: left.") == ("left", "top")
+    assert parse_position("It sits in the upper third, on the right-hand side.") == ("right", "top")
+
+
+def test_color_compuesto_no_es_el_nombre_simple():
+    # Qwen3.5, p1, val/0018: dice "neon yellow-green"; la referencia es "neon yellow"
+    e = extract("The object is a bright, neon yellow-green color.")
+    assert e["color"] != "neon yellow"
+    assert extract("A teal-colored figure.")["color"] == "teal"                 # "-colored" no es un compuesto
+
+
 def test_fuente_de_luz_no_es_posicion():
     # LLaVA-OV, p0_minimal: casi todas sus respuestas cierran con "a light source from the upper left side"
     t = ("The image features a single object, which appears to be a teapot, positioned centrally against a solid "

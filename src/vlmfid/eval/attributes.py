@@ -116,8 +116,24 @@ V_MAP = {"top": "top", "upper": "top", "bottom": "bottom", "lower": "bottom",
 H_MAP = {"left": "left", "right": "right", "center": "center", "centre": "center", "middle": "center",
          "mid": "center"}
 PAIR_RE = re.compile(r"\b(top|upper|mid|middle|center|centre|bottom|lower)[\s-]+(left|right|center|centre|middle)\b")
-V_RE = re.compile(r"\b(top|upper|bottom|lower|mid)\b")
-H_RE = re.compile(r"\b(left|right)\b")
+# Una palabra suelta ("top", "left") solo es posición con contexto de lugar: tras una preposición
+# ("at the top", "to the right"), tras una etiqueta ("Vertical: top") o seguida de un sustantivo de
+# zona ("upper third", "left side", "top of the image"). Así "a dome-like top" o "a rounded bottom",
+# que describen la forma del objeto, no cuentan.
+_CTX = r"(?:\b(?:at|in|on|to|toward|towards|near|into|along)\s+(?:the\s+)?(?:very\s+|far\s+|extreme\s+)?|:\s*)"
+_LOC = (r"(?:side|half|part|portion|third|corner|quadrant|area|section|region|edge|"
+        r"of\s+the\s+(?:image|frame|picture|scene|photo|canvas|screen))")
+V_RE = re.compile(rf"{_CTX}(top|upper|bottom|lower|mid)\b|\b(top|upper|bottom|lower)[\s-]+{_LOC}\b")
+H_RE = re.compile(rf"{_CTX}(left|right)\b|\b(left|right)[\s-]+(?:hand[\s-]+)?{_LOC}\b")
+# "mid-air", "mid-gallop", "mid-flight": no son la altura del objeto en la imagen
+MID_RE = re.compile(r"\bmid-(?!left|right|cent|middle)[a-z]+|\bmid\s+(?:air|flight|gallop|stride|jump|leap|motion)\b")
+# "**Position:**". No "Vertical Position:" ni "Horizontal Position:": esas frases fijan un solo eje.
+POS_LABEL_RE = re.compile(r"(?<!vertical )(?<!horizontal )\b(?:position|location)\b\W{0,4}:")
+
+
+def _word(rx: re.Pattern, t: str) -> str | None:
+    m = rx.search(t)
+    return (m.group(1) or m.group(2)) if m else None
 C_RE = re.compile(r"\b(center|centre|middle|centered|centred|centrally|central)\b")
 NOISE_RE = re.compile(r"\b(?:on top of|right[\s-]side[\s-]up|right angles?|all right|top[\s-]down)\b")
 # Lo que no es la posición del objeto en la imagen, hasta el siguiente signo de puntuación:
@@ -147,8 +163,8 @@ def _parse_clause(t: str) -> tuple[str | None, str | None, bool]:
     m = PAIR_RE.search(t)
     if m:
         return H_MAP[m.group(2)], V_MAP[m.group(1)], True
-    v, h = V_RE.search(t), H_RE.search(t)
-    v, h = (V_MAP[v.group(1)] if v else None), (H_MAP[h.group(1)] if h else None)
+    v, h = _word(V_RE, t), _word(H_RE, t)
+    v, h = (V_MAP[v] if v else None), (H_MAP[h] if h else None)
     if C_RE.search(t):
         v, h = v or "mid", h or "center"
     return h, v, False
@@ -161,11 +177,25 @@ def parse_position(text: str) -> tuple[str | None, str | None]:
     color cuenta la primera mención): "positioned in the center of the image. [...] top left" se lee
     como center/mid. Una frase que habla de un solo eje ("Vertical position: centered") solo fija ese
     eje, salvo que traiga un par explícito ("upper-left"), que fija los dos.
+
+    Si la respuesta trae una etiqueta "Position:", se lee primero lo que sigue a la etiqueta (es la
+    posición que el modelo declara) y el resto del texto solo completa un eje que falte.
     """
-    t = NOISE_RE.sub(" ", text.lower())
-    for rx in (PART_RE, ORIENT_RE, SHADOW_RE, LIGHT_RE, BG_POS_RE):
+    t = NOISE_RE.sub(" ", text.lower().replace("*", " "))               # sin énfasis de Markdown
+    for rx in (MID_RE, PART_RE, ORIENT_RE, SHADOW_RE, LIGHT_RE, BG_POS_RE):
         t = rx.sub(" ", t)
     t = OFF_CENTER_RE.sub(" center, slightly ", t)
+    label = POS_LABEL_RE.search(t)
+    if not label:
+        return _scan_position(t)
+    h, v = _scan_position(t[label.end():])
+    if h is None or v is None:
+        h2, v2 = _scan_position(t)
+        h, v = h or h2, v or v2
+    return h, v
+
+
+def _scan_position(t: str) -> tuple[str | None, str | None]:
     h = v = None
     for sent in SENT_SPLIT_RE.split(t):
         only_v = "vertical" in sent and "horizontal" not in sent
@@ -176,11 +206,11 @@ def parse_position(text: str) -> tuple[str | None, str | None]:
         if v is None and (pair or not only_h):
             v = pv
         nuance = " ".join(SLIGHT_RE.findall(sent))                      # los matices: solo left/right/top/bottom
-        mh, mv = H_RE.search(nuance), V_RE.search(nuance)
+        mh, mv = _word(H_RE, nuance), _word(V_RE, nuance)
         if h is None and mh and not only_v:
-            h = H_MAP[mh.group(1)]
+            h = H_MAP[mh]
         if v is None and mv and not only_h:
-            v = V_MAP[mv.group(1)]
+            v = V_MAP[mv]
         if h is not None and v is not None:
             break
     return h, v
@@ -229,7 +259,10 @@ def _color_regex() -> re.Pattern:
     # alternativas de la más larga a la más corta: gana la coincidencia más específica
     alts = sorted(color_vocabulary(), key=len, reverse=True)
     body = "|".join(re.escape(a).replace(r"\ ", r"[\s\-]+") for a in alts)
-    return re.compile(r"(?<![a-z])(?:(?:tab|xkcd)\s*:\s*)?(" + body + r")(?![a-z])")
+    # Un nombre seguido de "-<otro color>" es un compuesto distinto ("neon yellow-green" no es "neon
+    # yellow"): no cuenta como ese nombre, igual que "light blue" no cuenta como "blue".
+    compound = r"(?!-(?:green|blue|red|yellow|pink|purple|orange|brown|gr[ae]y|black|white|violet)\b)"
+    return re.compile(r"(?<![a-z])(?:(?:tab|xkcd)\s*:\s*)?(" + body + r")(?![a-z])" + compound)
 
 
 def _entity(text: str, start: int, end: int) -> str:
