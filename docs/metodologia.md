@@ -276,7 +276,8 @@ lineales de los bloques del LLM. Los valores numéricos dependen de la escala (�
   `xkcd:blue`, que son RGB distintos) se tratan como la misma clase. El objetivo de entrenamiento
   de la etapa 2 sigue siendo el caption original, con prefijo.
 - **Métricas de texto**: **Bleu-1, Bleu-4, ROUGE-L y CIDEr**, calculadas con el **código de
-  evaluación de MS COCO**, contra el caption original (una referencia por imagen). Es lo que usan
+  evaluación de MS COCO**, contra el caption original (una referencia por imagen). Implementación:
+  **`pycocoevalcap`** [decisión del usuario]; su tokenizador necesita Java, a comprobar en el cluster. Es lo que usan
   los papers de la carpeta: [9] reporta exactamente esas cuatro y declara *"we use the MS COCO
   evaluation code"* (§5.1–5.3); [5] reporta CIDEr para captioning (§4.5–4.6) sin dar implementación.
   Ningún paper de la carpeta especifica variante de CIDEr ni tokenización más allá de eso; al
@@ -317,6 +318,8 @@ lineales de los bloques del LLM. Los valores numéricos dependen de la escala (�
    §4.5: *"VL-JEPA decodes the predicted embeddings while VLM generates the tokens directly"*].
    El Y-Decoder se define en §2.4.
 4. Varios prompts por modelo; se elige el mejor por exactitud por atributo en **val** [CLAUDE.md §3].
+   El agregado para comparar prompts y checkpoints es la **media de forma, x, y y color**, con
+   cada atributo reportado por separado (valor por defecto, revisable).
 5. **Control bf16**: con el prompt seleccionado, cada modelo se evalúa en val también sin cuantizar.
    Se usa solo para medir el efecto de la cuantización, no para seleccionar prompts.
 6. Test no se toca en esta etapa. En el reporte final sobre test se incluyen, para cada modelo, las
@@ -328,8 +331,9 @@ lineales de los bloques del LLM. Los valores numéricos dependen de la escala (�
 - Objetivo: caption original de M3DI con sus 5 plantillas [CLAUDE.md §3]. Entropía cruzada
   autorregresiva **solo sobre los tokens de la respuesta** [paper [2], ec. 3 y Tabla 2].
 - Entrada: imagen + prompt en el turno de usuario, caption en el turno del asistente, con la
-  plantilla de chat del modelo. Prompt: el mejor zero-shot de cada modelo, salvo LLaVA-OV, que usa
-  `p1` [CLAUDE.md §3].
+  plantilla de chat del modelo. Prompt: **`p1_attributes` en los 4 modelos** [decisión del
+  usuario; reemplaza la regla "mejor zero-shot de cada modelo" de CLAUDE.md §3, que debe
+  actualizarse]. La selección de prompts de la etapa 1 se reporta, pero no decide el del ajuste.
 - Entrenables: **LoRA en el LLM + conector multimodal** [CLAUDE.md §3]. Encoder visual congelado
   [paper [2], §4.2]. LoRA en todas las capas lineales de los bloques del LLM [paper [8], §4].
 - Base cuantizada en NF4 [paper [8]]. El conector se entrena en precisión completa, por lo que no

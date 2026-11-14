@@ -32,9 +32,11 @@ métricas de texto.
 | Qwen3.5-0.8B-Base | (verificar ID exacto en HF) | autorregresivo |
 | VL-JEPA | reimplementación `cun-bjy/open-vljepa`, checkpoint MSRVTT | predictivo en espacio de embeddings |
 
-**VL-JEPA no genera texto**: produce embeddings. Su evaluación y su fine-tuning deben seguir lo que
-indiquen los papers de `docs/papers/` (p. ej. recuperación o decodificación sobre un conjunto de
-candidatos), no BLEU sobre texto generado libremente. No se entrena desde cero: se parte del
+**VL-JEPA no genera texto**: produce embeddings. Su fine-tuning sigue el paper (`docs/metodologia.md`
+§2.3). Para evaluarlo, el embedding predicho pasa por un **Y-Decoder** (prefijo sobre Llama-3.2-1B,
+NF4 + LoRA, entrenado aparte solo con texto; `docs/metodologia.md` §2.4) y el caption resultante se
+mide igual que el de los VLM. El paper no especifica ese decodificador: es diseño propio y así debe
+declararse. No se entrena desde cero: se parte del
 checkpoint preentrenado. (Entrenar VL-JEPA desde cero fue el enfoque de la rama `vl-jepa` y se descartó.)
 
 ### ⚠️ Diferencia de escala respecto de los papers
@@ -65,18 +67,27 @@ mientras que este proyecto usa versiones de **0.5B–1B** por restricciones de h
 
 ### Etapa 1 — Evaluación zero-shot
 - Los 4 modelos, preentrenados, sin entrenamiento adicional.
-- Varios prompts por modelo; se selecciona el mejor prompt por modelo según exactitud por atributo en **val**.
+- Varios prompts por modelo; se selecciona el mejor prompt por modelo según exactitud por atributo en **val**
+  (media de forma, x, y y color). Esta selección se reporta, pero no decide el prompt de la etapa 2.
+- Atributos evaluados: forma, posición x, posición y, color (nombre exacto, sin contar el prefijo de paleta).
 - Extracción de atributos desde el texto generado: método explícito, documentado y testeado.
+- Control sin cuantizar: cada modelo se evalúa también en bf16 con el prompt seleccionado.
+- Métricas de texto con `pycocoevalcap`: Bleu-1, Bleu-4, ROUGE-L, CIDEr.
 
 ### Etapa 2 — Fine-tuning
 - Modelos: los 4 de la etapa 1 (sin variantes Instruct de Qwen).
 - Objetivo: caption original de M3DI con sus 5 plantillas.
-- Prompt: el mejor zero-shot de cada modelo, **excepto LLaVA-OV, que usa `p1`** (su mejor, `p3`, pide JSON).
-- Método: **QLoRA NF4**; se entrenan **LoRA + conector multimodal**.
+- Prompt: **`p1_attributes` en los 4 modelos**.
+- Método: **QLoRA NF4**; se entrenan **LoRA + conector multimodal**. Todo componente congelado va en NF4,
+  incluido el encoder visual. En VL-JEPA: LoRA en Predictor e Y-Encoder (este con LR ×0.05), proyecciones
+  lineales en precisión completa, X-Encoder congelado, InfoNCE bidireccional.
+- Control sin cuantizar: una corrida adicional de LoRA sobre base bf16 por modelo, idéntica en lo demás.
 - Presupuesto igual para todos: **1 época completa de train con el mismo lote efectivo**
   (ajustar con gradient accumulation según la VRAM de cada modelo).
 - Selección de checkpoint: mejor en **val** según exactitud por atributo.
-- Reporte final sobre **test**, usado una sola vez.
+- Reporte final sobre **test**, usado una sola vez. (Los resultados anteriores a la reconstrucción usaron
+  test para elegir prompts; se descartan y el informe declara esa exposición previa.)
+- Además: pérdida de información por etapa de VL-JEPA (`docs/metodologia.md` §2.5).
 
 ### Comparabilidad (no negociable)
 Mismos splits, mismas semillas, mismo lote efectivo y mismo protocolo de evaluación para todos
@@ -108,13 +119,17 @@ Sigue estas fases **en orden**. Al terminar cada fase, detente y espera aprobaci
    `docs/auditoria.md` clasificando cada módulo o script en: *reutilizable tal cual* /
    *reutilizable con cambios* / *descartar*, con el motivo referido a `docs/metodologia.md`
    o a este archivo.
-3. **Proponer la nueva estructura** de directorios y módulos, y el plan de implementación.
+3. **Proponer la nueva estructura** de directorios y módulos, y el plan de implementación
+   (`docs/plan_reconstruccion.md`).
 4. **Implementar la etapa 1** y validarla con una corrida pequeña (pocos ejemplos) antes de la completa.
 5. **Implementar la etapa 2** de la misma forma.
 
 Reglas durante la reconstrucción:
-- No borres ramas ni historial. Trabaja en una rama nueva (`reconstruccion`) creada desde la rama
-  que indique el usuario. Lo descartado se elimina en commits explícitos, no se sobrescribe.
+- No borres ramas ni historial. Trabaja en la rama `reconstruccion` (creada desde `vl-jepa`). Lo
+  descartado se mueve a `_para_borrar/` con su motivo, en commits explícitos; el usuario decide cuándo
+  se elimina.
+- Nada se ejecuta en el laptop: toda corrida (incluidos tests) se deja preparada para el cluster.
+- El split por defecto es `val`. Solo `scripts/final_test.py` lee test.
 - No inventes hiperparámetros: cada valor viene de un paper, de este archivo o de una decisión
   que el usuario confirma. Si falta, pregunta.
 - No asumas que algo funciona porque corre: valida formas de tensores, que solo los parámetros

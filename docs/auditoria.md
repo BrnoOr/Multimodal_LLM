@@ -221,12 +221,13 @@ cargado.
 | # | Decisión | Opciones | Propuesta |
 |---|---|---|---|
 | A1 | Test ya se usó para elegir prompts y se evaluó en cada corrida (H1). | (a) Rehacer todo con selección en val y usar el test publicado una vez, declarando en el informe que hubo exposición previa. (b) Generar un test nuevo con el generador de M3DI. | **Resuelta por el usuario: (a).** Se rehace todo seleccionando en val; el test publicado se usa una sola vez al final y el informe declara la exposición previa. Ningún resultado ni elección de prompt anterior se hereda. |
-| A2 | Métricas de texto (H10). | (a) `pycocoevalcap` como implementación oficial; requiere Java en el cluster para el tokenizador. (b) Conservar la reimplementación sin Java, con un test que la compare contra `pycocoevalcap`. | (a) si hay Java en el cluster; si no, (b) con el test de equivalencia y Bleu-1 agregado. Hay que comprobar primero si el cluster tiene Java. |
-| A3 | Tamaño del subconjunto de val para seleccionar checkpoint (H8). | 500 imágenes (actual), val completo (10 000), o un intermedio. | Sin propuesta: depende del costo de generar en val durante el entrenamiento. |
-| A4 | Agregado de la exactitud por atributo para elegir prompt y checkpoint. M dice "exactitud por atributo" pero no define cómo se combinan los 4 atributos. | Media de los 4 atributos; o solo forma, x, y (el color tiene techo por diseño). | Media de forma, x, y y color, reportando cada uno por separado. |
-| A5 | LoRA en `in_proj_a` / `in_proj_b` de Qwen3.5. | Incluirlas ([8]: todas las lineales) o mantenerlas fuera. | Incluirlas, salvo que haya una razón técnica; no encontré ninguna registrada. |
-| A6 | Rama base de `reconstruccion` y destino del trabajo sin commit. | — | Commit del trabajo pendiente en `vl-jepa` y `reconstruccion` desde ahí. |
-| A7 | Diagnósticos fuera de alcance (copia p4/p4m, sondas sobre VLM, split composicional). | Conservar como opcionales o descartar. | Descartar el split composicional y el control Instruct; conservar la tasa de copia solo si `p4`/`p4m` siguen entre los prompts. |
+| A2 | Métricas de texto (H10). | — | **Resuelta por el usuario: `pycocoevalcap`.** No se sabe si el cluster tiene Java (lo necesita su tokenizador): se comprueba en la primera corrida; si falta, se instala o se vuelve a consultar. `eval/text_metrics.py` pasa a descarte. |
+| A3 | Subconjunto de val para seleccionar checkpoint (H8). | 500 imágenes (actual), val completo (10 000), o un intermedio. | **Abierta.** La selección se hace en val, no en train: elegir el checkpoint con los datos de ajuste premia memorizarlos (CLAUDE.md §3). Falta fijar el tamaño; se propone 500 durante el entrenamiento y val completo para el checkpoint elegido. |
+| A4 | Agregado de la exactitud por atributo para seleccionar. | — | **Por defecto, revisable**: media de forma, x, y y color, reportando cada uno por separado. El usuario no la objetó ni la confirmó. |
+| A4b | Prompt de la etapa 2. | — | **Resuelta por el usuario: `p1_attributes` en los 4 modelos.** Reemplaza la regla "mejor zero-shot de cada modelo" de CLAUDE.md §3, que debe actualizarse. La etapa 1 sigue evaluando varios prompts en val (lo exige el enunciado), pero ya no decide el prompt del ajuste. |
+| A5 | LoRA en `in_proj_a` / `in_proj_b` de Qwen3.5. | — | **Resuelta por el usuario: se incluyen.** |
+| A6 | Rama base de `reconstruccion` y trabajo sin commit. | — | **Hecho.** Trabajo pendiente guardado en `vl-jepa` (`ff83cf9`); `reconstruccion` creada desde ahí, con CLAUDE.md, metodología y auditoría (`ef8e049`). Sin push. |
+| A7 | Diagnósticos fuera de alcance. | — | **Resuelta por el usuario: se descartan** el split composicional, el control Instruct, la tasa de copia p4/p4m y las sondas sobre los VLM. |
 
 ## 6. Pendiente de verificar en el cluster
 
