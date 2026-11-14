@@ -1,84 +1,82 @@
-"""Extracción de atributos desde texto libre y exactitud por atributo.
+"""Extracción de atributos desde texto y exactitud por atributo (docs/metodologia.md §2.1).
 
-Es el extractor del notebook `02_eda_predicciones.ipynb` (celdas 10 y 14) movido al paquete sin
-cambiar su lógica, para que la etapa 2 seleccione el checkpoint con la MISMA métrica con que se
-reportó la etapa 1. Si se modifica aquí, hay que reemplazar la copia del notebook por un import.
+Es la ÚNICA implementación: la usan la inferencia, la selección de checkpoint y los notebooks, para
+los cuatro modelos (los VLM con su texto generado; VL-JEPA con el texto de su Y-Decoder).
 
-Atributos y criterio de acierto (idénticos a la etapa 1):
-    forma            nombre de la forma (léxico con sinónimos: "rabbit" -> hare)
-    posición (x,y)   ambas coordenadas correctas
-    color categoría  categoría básica del color nombrado == categoría del tono latente `object_color`
-    color ±1         categoría a distancia circular <= 1 en la rueda de 8 categorías
-    nombre exacto    nombre literal == `text_object_color_name`
-    macro            (forma + posición(x,y) + color ±1) / 3        <- "Índice macro" de los informes
-    shape_pos        (forma + posición(x,y)) / 2                   <- selección en la etapa 2 (reformulada)
-    macro_cat        (forma + posición(x,y) + color categoría) / 3
+Atributos evaluados y criterio de acierto:
 
-`shape_pos` y `macro_cat` se agregaron en la reformulación de la etapa 2 (docs/ETAPA2B_REFORMULACION.md):
-color ±1 está saturado (≈ 0,98 en los VLM autorregresivos) y diluye el macro. Las métricas de la
-etapa 1 no cambian.
+    shape   forma del objeto. Léxico cerrado con sinónimos ("rabbit" -> hare). Si el texto nombra
+            varias formas, cuenta la primera.
+    x       posición horizontal: left | center | right.
+    y       posición vertical:   top | mid | bottom ("center"/"middle" se aceptan como mid).
+    color   NOMBRE EXACTO del color del caption de referencia (`object_color_name`), sin contar el
+            prefijo de paleta: "blue" acierta para "tab:blue" (decisión D1). No se usan categorías
+            de color ni tolerancias.
 
-Omitir un atributo cuenta como error (exactitud estricta). El color se compara contra el tono de
-la imagen y no contra el nombre del caption, porque el nombre no es función determinista del tono.
+Agregados:
 
-Requiere matplotlib (tablas de nombres CSS4/XKCD/Tableau); viene con el extra `dev`.
+    pos        x e y correctas a la vez (informativo).
+    attr_mean  media de shape, x, y y color: es el criterio para comparar prompts y checkpoints.
+
+Reglas generales:
+  * Omitir un atributo cuenta como error (exactitud estricta).
+  * La verdad de forma y posición sale de los latentes de la imagen, que coinciden con los del texto
+    por construcción del dataset (Daunhawer et al., 2023, Tabla 3: factores de contenido).
+  * El nombre de color NO es función determinista de la imagen: el dataset elige al azar una de tres
+    paletas por muestra. La exactitud de color tiene por eso un techo menor que 1, que se reporta
+    aparte (ver `color_ceiling`).
+
+Cómo se encuentra el color en texto libre. El vocabulario son todos los nombres de las tres paletas
+que usa M3DI (Tableau, CSS4 y XKCD de matplotlib), sin prefijo. Se busca la coincidencia MÁS LARGA
+en cada posición, de modo que "light blue" se lee como "light blue" y no como "blue": decir un
+nombre más específico o más general que el de referencia es un error, que es lo que significa
+"nombre exacto". Un nombre entre comillas tiene prioridad (es el formato del dataset). Cada mención
+se asigna a objeto, fondo o luz según las palabras vecinas, y cuenta la primera mención del objeto.
+
+Requiere matplotlib (tablas de nombres de color).
 """
 
 from __future__ import annotations
 
-import colorsys
 import re
 from functools import lru_cache
 
 from ..prompts.parsing import parse_json_response, strip_think_tags
 
-# ── Categorías de color (celda 10 del notebook) ─────────────────────────────────────────────
-COLOR_CATS = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"]
-HUE_UPPER = [15, 40, 70, 160, 195, 255, 285, 345]
-CAT_CENTER = {"red": 0, "orange": 27.5, "yellow": 55, "green": 115, "cyan": 177.5, "blue": 225,
-              "purple": 270, "pink": 315}
-
-# Códigos de M3DI -> palabras del caption. Verificado en el EDA: mapeo inyectivo y P(w_k|k) = 1.
+# Códigos de M3DI -> palabras del caption (verificado contra data/raw/m3di: filas de
+# latents_text.csv frente a text_raw.txt).
 SHAPE_NAMES = {0: "teapot", 1: "hare", 2: "dragon", 3: "cow", 4: "armadillo", 5: "horse", 6: "head"}
 XPOS_NAMES = {0: "left", 1: "center", 2: "right"}
 YPOS_NAMES = {0: "top", 1: "mid", 2: "bottom"}
 
+ATTRIBUTES = ("shape", "x", "y", "color")
+METRICS = ATTRIBUTES + ("pos", "attr_mean")
 
-def hue_to_cat(h: float) -> str:
-    d = (float(h) * 360) % 360
-    for c, u in zip(COLOR_CATS, HUE_UPPER):
-        if d < u:
-            return c
-    return "red"
-
-
-def cat_distance(a, b) -> int:
-    if a not in COLOR_CATS or b not in COLOR_CATS:
-        return 99
-    d = abs(COLOR_CATS.index(a) - COLOR_CATS.index(b))
-    return min(d, len(COLOR_CATS) - d)
-
-
-# ── Forma ───────────────────────────────────────────────────────────────────────────────────
+# ── Forma ───────────────────────────────────────────────────────────────────────────────────────
 SHAPE_LEXICON = {
-    "teapot": ["teapot", "tea pot", "kettle"], "hare": ["hare", "rabbit", "bunny", "bunnies"],
-    "dragon": ["dragon"], "cow": ["cow", "bull", "ox", "oxen", "cattle", "calf"], "armadillo": ["armadillo"],
-    "horse": ["horse", "pony", "stallion", "mare"], "head": ["head", "bust", "face"],
+    "teapot": ["teapot", "tea pot", "kettle"],
+    "hare": ["hare", "rabbit", "bunny", "bunnies"],
+    "dragon": ["dragon"],
+    "cow": ["cow", "bull", "ox", "oxen", "cattle", "calf"],
+    "armadillo": ["armadillo"],
+    "horse": ["horse", "pony", "stallion", "mare"],
+    "head": ["head", "bust", "face"],
 }
 
 
-def _term_rx(t):
-    return r"\b" + re.escape(t).replace(r"\ ", r"[\s\-]?") + r"(?:s|es)?\b"
+def _term_rx(term: str) -> str:
+    return r"\b" + re.escape(term).replace(r"\ ", r"[\s\-]?") + r"(?:s|es)?\b"
 
 
 SHAPE_RE = {k: re.compile("|".join(_term_rx(t) for t in v), re.IGNORECASE) for k, v in SHAPE_LEXICON.items()}
 
 
-def find_shapes(text):
+def find_shapes(text: str) -> list[tuple[int, str]]:
+    """(posición, forma) de cada mención, en orden de aparición."""
     return sorted((m.start(), k) for k, rx in SHAPE_RE.items() for m in rx.finditer(text))
 
 
-# ── Posición ────────────────────────────────────────────────────────────────────────────────
+# ── Posición ────────────────────────────────────────────────────────────────────────────────────
 V_MAP = {"top": "top", "upper": "top", "bottom": "bottom", "lower": "bottom",
          "mid": "mid", "middle": "mid", "center": "mid", "centre": "mid"}
 H_MAP = {"left": "left", "right": "right", "center": "center", "centre": "center", "middle": "center",
@@ -90,7 +88,8 @@ C_RE = re.compile(r"\b(center|centre|middle|centered|centred)\b")
 NOISE_RE = re.compile(r"\b(?:on top of|right[\s-]side[\s-]up|right angles?|all right|top[\s-]down)\b")
 
 
-def parse_position(text):
+def parse_position(text: str) -> tuple[str | None, str | None]:
+    """(horizontal, vertical). El formato del dataset es "<vertical>-<horizontal>" (p. ej. mid-left)."""
     t = NOISE_RE.sub(" ", text.lower())
     m = PAIR_RE.search(t)
     if m:
@@ -102,200 +101,142 @@ def parse_position(text):
     return h, v
 
 
-# ── Color ───────────────────────────────────────────────────────────────────────────────────
-COLOR_LEXICON = {
-    "red": ["red", "reddish", "crimson", "scarlet", "maroon", "burgundy", "ruby", "cherry"],
-    "orange": ["orange", "orangish", "amber", "tangerine", "peach", "rust", "copper", "salmon", "coral"],
-    "yellow": ["yellow", "yellowish", "gold", "golden", "mustard", "lemon"],
-    "green": ["green", "greenish", "lime", "olive", "chartreuse", "emerald", "mint"],
-    "cyan": ["cyan", "teal", "turquoise", "aqua", "aquamarine"],
-    "blue": ["blue", "bluish", "navy", "azure", "cobalt", "sapphire", "cerulean"],
-    "purple": ["purple", "purplish", "violet", "lavender", "indigo", "lilac", "plum", "mauve"],
-    "pink": ["pink", "pinkish", "magenta", "fuchsia", "rose"],
-    "achromatic": ["white", "black", "gray", "grey", "silver", "brown", "beige", "tan"],
-}
-TERM2CAT = {t: c for c, v in COLOR_LEXICON.items() for t in v}
-# Nombres CSS sin prefijo que usa M3DI (unión de train/val/test). El notebook los leía del split
-# evaluado; la unión solo agrega vocabulario, no cambia ningún acierto.
-M3DI_CSS_NAMES = (
-    "blue", "blueviolet", "chartreuse", "crimson", "cyan", "darkorange", "darkturquoise", "darkviolet",
-    "deeppink", "deepskyblue", "dodgerblue", "gold", "greenyellow", "lawngreen", "lime", "magenta",
-    "mediumspringgreen", "orange", "orangered", "red", "springgreen", "yellow",
-)
-CSS_VOCAB = {n for n in M3DI_CSS_NAMES if n not in TERM2CAT}
-TERM_RE = re.compile(r"\b(" + "|".join(sorted(map(re.escape, set(TERM2CAT) | CSS_VOCAB), key=len, reverse=True)) + r")\b")
-QUOTED_RE = re.compile(r"[\"“”']([^\"“”']{2,40})[\"“”']")
-PREFIX_RE = re.compile(r"\b(?:xkcd|tab):\s?[a-z]+(?:[ /][a-z]+){0,3}")
+# ── Color ───────────────────────────────────────────────────────────────────────────────────────
+_PREFIX_RE = re.compile(r"^(?:tab|xkcd)\s*:\s*")
 BG_WORDS = {"background", "backdrop", "backgrounds", "wall", "floor", "ground", "surface", "sky"}
 LIGHT_WORDS = {"light", "lighting", "lights", "spotlight", "glow", "illumination", "illuminated", "lit",
                "shadow", "shadows"}
-MODIFIERS = {"light", "dark", "bright", "pale", "deep", "vivid", "neon", "pastel", "soft"}
 WORD_RE = re.compile(r"[a-z]+(?:['\-][a-z]+)*")
+QUOTED_RE = re.compile(r"[\"“”']([^\"“”']{2,40})[\"“”']")
 
 
-def _mcolors():
+def normalize_color_name(name: str | None) -> str | None:
+    """Forma canónica de un nombre de color para compararlo: minúsculas, sin comillas, sin prefijo de
+    paleta (`tab:`, `xkcd:`), espacios colapsados y "grey" escrito "gray"."""
+    if name is None:
+        return None
+    s = " ".join(str(name).lower().replace(" ", " ").strip().strip("\"'“”").split())
+    s = _PREFIX_RE.sub("", s).strip()
+    s = re.sub(r"\bgrey\b", "gray", s)
+    return s or None
+
+
+@lru_cache(maxsize=1)
+def color_vocabulary() -> frozenset[str]:
+    """Nombres (normalizados) de las tres paletas que usa M3DI: Tableau, CSS4 y XKCD."""
     try:
         import matplotlib.colors as mcolors
     except ImportError as e:  # pragma: no cover
         raise ImportError("vlmfid.eval.attributes necesita matplotlib: `uv sync --extra dev`") from e
-    return mcolors
+    names = set()
+    for table in (mcolors.TABLEAU_COLORS, mcolors.CSS4_COLORS, mcolors.XKCD_COLORS):
+        names.update(n for n in (normalize_color_name(k) for k in table) if n)
+    return frozenset(names)
 
 
-def norm_name(s):
-    return " ".join(s.lower().replace(" ", " ").split())
+@lru_cache(maxsize=1)
+def _color_regex() -> re.Pattern:
+    # alternativas de la más larga a la más corta: gana la coincidencia más específica
+    alts = sorted(color_vocabulary(), key=len, reverse=True)
+    body = "|".join(re.escape(a).replace(r"\ ", r"[\s\-]+") for a in alts)
+    return re.compile(r"(?<![a-z])(?:(?:tab|xkcd)\s*:\s*)?(" + body + r")(?![a-z])")
 
 
-@lru_cache(maxsize=4096)
-def resolve_color(name):
-    """Nombre -> (categoría, tono en [0,1) o None). None si no es un color."""
-    name = norm_name(name)
-    if name in TERM2CAT:
-        c = TERM2CAT[name]
-        return c, (CAT_CENTER[c] / 360 if c in CAT_CENTER else None)
-    mcolors = _mcolors()
-    if name.startswith("#") or not mcolors.is_color_like(name) or re.fullmatch(r"[\d.\s]+", name):
-        return None
-    h, s, v = colorsys.rgb_to_hsv(*mcolors.to_rgb(name))
-    return ("achromatic", None) if (s < 0.2 or v < 0.2) else (hue_to_cat(h), h)
+def _entity(text: str, start: int, end: int) -> str:
+    """A qué se refiere una mención de color: objeto, fondo o luz, según las palabras vecinas."""
+    after = WORD_RE.findall(text[end:])[:3]
+    before = WORD_RE.findall(text[:start])[-3:]
+    if any(w in BG_WORDS for w in after):
+        return "background"
+    if any(w in LIGHT_WORDS for w in after):
+        return "light"
+    if any(w in BG_WORDS for w in before):
+        return "background"
+    return "object"
 
 
-def color_mentions(text):
+def color_mentions(text: str) -> list[dict]:
+    """Menciones de color del texto, en orden: {s, e, name, quoted, entity}. `name` va normalizado."""
     t = text.lower()
+    vocab = color_vocabulary()
     found, taken = [], []
     for m in QUOTED_RE.finditer(t):
-        name = norm_name(m.group(1))
-        info = resolve_color(name)
-        if info:
-            found.append({"s": m.start(), "e": m.end(), "name": name, "cat": info[0], "hue": info[1], "quoted": True})
+        name = normalize_color_name(m.group(1))
+        if name in vocab:
+            found.append({"s": m.start(), "e": m.end(), "name": name, "quoted": True})
             taken.append((m.start(), m.end()))
-
-    def inside(a, b):
-        return any(a < e and b > s for s, e in taken)
-
-    for m in PREFIX_RE.finditer(t):
-        if inside(m.start(), m.end()):
+    for m in _color_regex().finditer(t):
+        if any(m.start() < e and m.end() > s for s, e in taken):
             continue
-        words = m.group(0).replace(": ", ":").split(" ")
-        for k in range(len(words), 0, -1):                  # prefijo más largo que sea un color
-            info = resolve_color(" ".join(words[:k]))
-            if info:
-                end = m.start() + len(" ".join(words[:k]))
-                found.append({"s": m.start(), "e": end, "name": norm_name(" ".join(words[:k])), "cat": info[0],
-                              "hue": info[1], "quoted": False})
-                taken.append((m.start(), end))
-                break
-    for m in TERM_RE.finditer(t):
-        if inside(m.start(), m.end()):
-            continue
-        info = resolve_color(m.group(1))
-        found.append({"s": m.start(), "e": m.end(), "name": m.group(1), "cat": info[0], "hue": info[1],
-                      "quoted": False})
+        found.append({"s": m.start(), "e": m.end(), "name": normalize_color_name(m.group(1)), "quoted": False})
     found.sort(key=lambda d: d["s"])
-    merged = []                                             # "bluish green", "yellow-green": núcleo = último término
     for f in found:
-        if merged and not merged[-1]["quoted"] and not f["quoted"] and re.fullmatch(r"[\s\-]*", t[merged[-1]["e"]:f["s"]]):
-            f = f | {"s": merged[-1]["s"], "name": t[merged[-1]["s"]:f["e"]]}
-            merged[-1] = f
-        else:
-            merged.append(f)
-    for f in merged:
-        after = WORD_RE.findall(t[f["e"]:])[:3]
-        before = WORD_RE.findall(t[:f["s"]])[-3:]
-        if before and before[-1] in MODIFIERS:
-            before = before[:-1]
-        if any(w in BG_WORDS for w in after):
-            f["entity"] = "background"
-        elif any(w in LIGHT_WORDS for w in after):
-            f["entity"] = "light"
-        elif any(w in BG_WORDS for w in before):
-            f["entity"] = "background"
-        else:
-            f["entity"] = "object"
-    return merged
+        f["entity"] = _entity(t, f["s"], f["e"])
+    return found
 
 
-def _empty():
-    return {"shape": None, "n_shapes": 0, "xpos": None, "ypos": None, "color_name": None, "color_cat": None,
-            "color_hue": None, "color_quoted": False, "n_colors": 0, "bg_cat": None}
+# ── Extracción ──────────────────────────────────────────────────────────────────────────────────
+def _empty() -> dict:
+    return {"shape": None, "n_shapes": 0, "x": None, "y": None, "color": None, "color_quoted": False,
+            "n_colors": 0}
 
 
-def _from_text(text):
+def _from_text(text: str) -> dict:
     out = _empty()
     sh = find_shapes(text)
     out["shape"], out["n_shapes"] = (sh[0][1] if sh else None), len({k for _, k in sh})
-    out["xpos"], out["ypos"] = parse_position(text)
+    out["x"], out["y"] = parse_position(text)
     cm = color_mentions(text)
-    obj = next((c for c in cm if c["entity"] == "object"), None)
-    bg = next((c for c in cm if c["entity"] == "background"), None)
     out["n_colors"] = len(cm)
-    out["bg_cat"] = bg["cat"] if bg else None
+    obj = next((c for c in cm if c["entity"] == "object"), None)
     if obj:
-        out.update(color_name=obj["name"], color_cat=obj["cat"], color_hue=obj["hue"], color_quoted=obj["quoted"])
+        out.update(color=obj["name"], color_quoted=obj["quoted"])
     return out
 
 
-def extract(raw: str | None, json_mode: bool = False, strict_json: bool = True) -> dict:
-    """Atributos mencionados en una respuesta. `json_mode` para prompts con response_format: json."""
-    raw = raw or ""
-    clean = strip_think_tags(raw)
-    base = {"think": "think>" in raw.lower(), "n_words": len(WORD_RE.findall(clean.lower())), "n_chars": len(clean),
-            "ends_clean": bool(re.search(r"[.!?)\"'\]}`]\s*$", clean)), "json_ok": None,
-            "uses_named": bool(re.search(r"\b(?:xkcd|tab):", clean.lower()))}
+def extract(raw: str | None, json_mode: bool = False) -> dict:
+    """Atributos mencionados en una respuesta.
+
+    `json_mode` para prompts con `response_format: json`: los atributos se leen de las claves
+    shape / color / vertical / horizontal. Si no hay un objeto JSON recuperable, todos los atributos
+    quedan vacíos (fallo de formato) y `json_ok` es False.
+    """
+    clean = strip_think_tags(raw or "")
+    base = {"n_words": len(WORD_RE.findall(clean.lower())), "n_chars": len(clean), "json_ok": None}
     if not json_mode:
         return base | _from_text(clean)
     obj = parse_json_response(clean)
     base["json_ok"] = obj is not None
     if obj is None:
-        return base | (_empty() if strict_json else _from_text(clean))
+        return base | _empty()
     f = {k: str(v) for k, v in obj.items() if v is not None}
     out = _empty()
     sh = find_shapes(f.get("shape", ""))
     out["shape"], out["n_shapes"] = (sh[0][1] if sh else None), len({k for _, k in sh})
-    out["xpos"] = H_MAP.get(f.get("horizontal", "").strip().lower())
-    out["ypos"] = V_MAP.get(f.get("vertical", "").strip().lower())
-    col = f.get("color", "").strip()
-    info = resolve_color(col.strip("\"'")) if col else None
-    cm = color_mentions(col) if col and not info else []
-    if info:
-        out.update(color_name=norm_name(col.strip("\"'")), color_cat=info[0], color_hue=info[1], n_colors=1)
-    elif cm:
-        out.update(color_name=cm[-1]["name"], color_cat=cm[-1]["cat"], color_hue=cm[-1]["hue"], n_colors=len(cm))
+    out["x"] = H_MAP.get(f.get("horizontal", "").strip().lower())
+    out["y"] = V_MAP.get(f.get("vertical", "").strip().lower())
+    color = normalize_color_name(f.get("color"))
+    if color:
+        out.update(color=color, n_colors=1)
     return base | out
 
 
-# ── Verdad y puntaje ────────────────────────────────────────────────────────────────────────
+# ── Verdad y puntaje ────────────────────────────────────────────────────────────────────────────
 def truth_from_record(rec: dict) -> dict:
     """Verdad de una muestra (registro de `load_manifest` o línea de predictions.jsonl)."""
     li, lt = rec["latents_image"], rec["latents_text"]
     return {
-        "shape_true": SHAPE_NAMES[int(li["object_shape"])],
-        "x_true": XPOS_NAMES[int(li["object_xpos"])],
-        "y_true": YPOS_NAMES[int(li["object_ypos"])],
-        "cat_true": hue_to_cat(li["object_color"]),
-        "name_true": str(lt["object_color_name"]).lower(),
+        "shape": SHAPE_NAMES[int(li["object_shape"])],
+        "x": XPOS_NAMES[int(li["object_xpos"])],
+        "y": YPOS_NAMES[int(li["object_ypos"])],
+        "color": normalize_color_name(lt["object_color_name"]),
     }
 
 
 def score(ext: dict, truth: dict) -> dict:
-    shape_ok = ext["shape"] == truth["shape_true"]
-    pos_ok = ext["xpos"] == truth["x_true"] and ext["ypos"] == truth["y_true"]
-    color_adj = cat_distance(ext["color_cat"], truth["cat_true"]) <= 1
-    color_ok = ext["color_cat"] == truth["cat_true"]
-    return {
-        "shape": shape_ok,
-        "x": ext["xpos"] == truth["x_true"],
-        "y": ext["ypos"] == truth["y_true"],
-        "pos": pos_ok,
-        "color": color_ok,
-        "color_adj": color_adj,
-        "name": ext["color_name"] == truth["name_true"],
-        "macro": (int(shape_ok) + int(pos_ok) + int(color_adj)) / 3,
-        "shape_pos": (int(shape_ok) + int(pos_ok)) / 2,
-        "macro_cat": (int(shape_ok) + int(pos_ok) + int(color_ok)) / 3,
-    }
-
-
-METRICS = ("shape", "x", "y", "pos", "color", "color_adj", "name", "macro", "shape_pos", "macro_cat")
+    """Acierto por atributo (bool) y agregados de una muestra."""
+    ok = {a: ext[a] is not None and ext[a] == truth[a] for a in ATTRIBUTES}
+    return ok | {"pos": ok["x"] and ok["y"], "attr_mean": sum(ok.values()) / len(ATTRIBUTES)}
 
 
 def score_texts(texts: list[str], records: list[dict], json_mode: bool = False) -> dict:
@@ -310,3 +251,39 @@ def score_texts(texts: list[str], records: list[dict], json_mode: bool = False) 
         for m in METRICS:
             acc[m] += float(s[m])
     return {m: acc[m] / len(texts) for m in METRICS} | {"n": len(texts)}
+
+
+# ── Líneas base sin modelo ──────────────────────────────────────────────────────────────────────
+def majority_baseline(train_records: list[dict], eval_records: list[dict]) -> dict:
+    """Exactitud de responder siempre el valor más frecuente de train, por atributo."""
+    from collections import Counter
+
+    out = {}
+    truths_tr = [truth_from_record(r) for r in train_records]
+    truths_ev = [truth_from_record(r) for r in eval_records]
+    for a in ATTRIBUTES:
+        top = Counter(t[a] for t in truths_tr).most_common(1)[0][0]
+        out[a] = sum(t[a] == top for t in truths_ev) / max(len(truths_ev), 1)
+    out["attr_mean"] = sum(out[a] for a in ATTRIBUTES) / len(ATTRIBUTES)
+    return out
+
+
+def color_ceiling(train_records: list[dict], eval_records: list[dict], n_bins: int = 360) -> dict:
+    """Techo empírico de la exactitud de color dada la imagen.
+
+    El nombre de color depende del matiz verdadero (`object_color`) y de una paleta elegida al azar,
+    que la imagen no revela. El mejor lector posible responde, para cada matiz, el nombre más
+    frecuente. Se estima discretizando el matiz en `n_bins` intervalos con los datos de train y se
+    evalúa en `eval_records`. Es una estimación: con más intervalos sube levemente y con pocos baja.
+    """
+    from collections import Counter, defaultdict
+
+    def hue_bin(rec):
+        return min(int(float(rec["latents_image"]["object_color"]) * n_bins), n_bins - 1)
+
+    by_bin: dict[int, Counter] = defaultdict(Counter)
+    for r in train_records:
+        by_bin[hue_bin(r)][truth_from_record(r)["color"]] += 1
+    best = {b: c.most_common(1)[0][0] for b, c in by_bin.items()}
+    hits = sum(best.get(hue_bin(r)) == truth_from_record(r)["color"] for r in eval_records)
+    return {"color_ceiling": hits / max(len(eval_records), 1), "n_bins": n_bins, "n_eval": len(eval_records)}

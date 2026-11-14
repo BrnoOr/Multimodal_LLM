@@ -1,22 +1,21 @@
-"""Evaluación. Consume runs/<exp_id>/predictions.jsonl.
+"""Evaluación común a los cuatro modelos (docs/metodologia.md §2.1).
 
-Disponible:
-  * copying: tasa de copia de los ejemplos del prompt (experimento p4 vs p4m).
-  * attributes: extractor de atributos y exactitud por atributo (el del notebook 02, sin cambios de
-    lógica); la etapa 2 lo usa para elegir el checkpoint con el mismo "Índice macro" de la etapa 1.
-  * text_metrics: BLEU-4, ROUGE-L y CIDEr-D contra una referencia por imagen (el TextScorer del
-    notebook 03), para comparar el texto generado con el caption original o con el canónico.
+  * attributes: extracción de atributos desde texto y exactitud por atributo (métrica principal).
+  * text_metrics: Bleu-1, Bleu-4, ROUGE-L y CIDEr con `pycocoevalcap`.
 """
 
-from .attributes import METRICS, extract, score, score_texts, truth_from_record
-from .copying import (
-    M3DI_SHAPES,
-    PromptExample,
-    copy_flags,
-    copy_summary,
-    prompt_examples,
-    reference_shape,
+from .attributes import (
+    ATTRIBUTES,
+    METRICS,
+    color_ceiling,
+    extract,
+    majority_baseline,
+    normalize_color_name,
+    score,
+    score_texts,
+    truth_from_record,
 )
-from .text_metrics import TEXT_METRICS, TextScorer, tokenize
+from .text_metrics import TEXT_METRICS, text_metrics
 
-__all__ = ["M3DI_SHAPES", "METRICS", "TEXT_METRICS", "TextScorer", "PromptExample", "copy_flags", "copy_summary", "extract", "prompt_examples", "reference_shape", "score", "score_texts", "tokenize", "truth_from_record"]
+__all__ = ["ATTRIBUTES", "METRICS", "TEXT_METRICS", "color_ceiling", "extract", "majority_baseline",
+           "normalize_color_name", "score", "score_texts", "text_metrics", "truth_from_record"]
