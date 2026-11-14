@@ -53,7 +53,7 @@ def test_exit_code_recorded():
 def test_queue_missing_or_empty_fails(tmp_path):
     missing = sh("scripts/run_queue.sh", "configs/queues/no_existe.txt")
     assert missing.returncode == 2 and "no existe el archivo de cola" in missing.stderr
-    assert "stage1_pilot.txt" in missing.stderr                     # sugiere las colas disponibles
+    assert "stage1_pilot_val.txt" in missing.stderr                     # sugiere las colas disponibles
     empty = tmp_path / "vacia.txt"
     empty.write_text("# solo comentarios\n\n")
     r = sh("scripts/run_queue.sh", str(empty))
@@ -62,7 +62,7 @@ def test_queue_missing_or_empty_fails(tmp_path):
 
 def test_queue_preflight_aborts_when_package_missing():
     env_py = {"PYTHON": "false"}          # simula un intérprete que no puede importar vlmfid
-    r = subprocess.run(["scripts/run_queue.sh", "configs/queues/stage1_pilot.txt"], cwd=ROOT,
+    r = subprocess.run(["scripts/run_queue.sh", "configs/queues/stage1_pilot_val.txt"], cwd=ROOT,
                        env={**os.environ, **env_py}, capture_output=True, text=True)
     assert r.returncode == 4 and "no puede importar el paquete vlmfid" in r.stderr
     assert "=================== [1]" not in r.stdout          # no se lanzó ningún run

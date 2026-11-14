@@ -205,12 +205,23 @@ class HFGenerativeDescriber(Describer):
         new = out[:, inputs["input_ids"].shape[1]:]          # con padding a la izquierda
         decoded = self.processor.batch_decode(new, skip_special_tokens=True, clean_up_tokenization_spaces=False)
 
-        pad_id = self.processor.tokenizer.pad_token_id
-        n_new = (new != pad_id).sum(dim=1).tolist()
+        # Tokens generados por muestra: hasta el primer EOS inclusive. (Contar los distintos de
+        # tokenizer.pad_token_id no sirve: `generate` rellena las filas terminadas con otro id en
+        # LLaVA-OV e InternVL3, y todas las filas daban el largo del lote.) Una fila sin EOS llegó a
+        # max_new_tokens: su respuesta quedó cortada (`truncated`).
+        eos = getattr(self.model.generation_config, "eos_token_id", None)
+        eos_ids = {int(e) for e in (eos if isinstance(eos, (list, tuple)) else [eos]) if e is not None}
+        if self.processor.tokenizer.eos_token_id is not None:
+            eos_ids.add(int(self.processor.tokenizer.eos_token_id))
+        is_eos = torch.isin(new, torch.tensor(sorted(eos_ids), device=new.device))
+        has_eos = is_eos.any(dim=1)
+        first = is_eos.int().argmax(dim=1)
+        n_new = torch.where(has_eos, first + 1, torch.full_like(first, new.shape[1])).tolist()
         n_in = inputs["attention_mask"].sum(dim=1).tolist()
         return [
-            Description(text=t.strip(), extra={"n_new_tokens": int(a), "n_input_tokens": int(b)})
-            for t, a, b in zip(decoded, n_new, n_in)
+            Description(text=t.strip(), extra={"n_new_tokens": int(a), "n_input_tokens": int(b),
+                                               "truncated": not bool(e)})
+            for t, a, b, e in zip(decoded, n_new, n_in, has_eos.tolist())
         ]
 
     def lora_target_modules(self) -> str | list[str]:

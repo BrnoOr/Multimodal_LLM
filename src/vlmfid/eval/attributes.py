@@ -6,9 +6,13 @@ los cuatro modelos (los VLM con su texto generado; VL-JEPA con el texto de su Y-
 Atributos evaluados y criterio de acierto:
 
     shape   forma del objeto. Léxico cerrado con sinónimos ("rabbit" -> hare). Si el texto nombra
-            varias formas, cuenta la primera.
+            varias formas, cuenta la primera. "head"/"face" como PARTE de otro objeto no cuenta
+            ("a bear with a round head", "its head pointing left"): ver `_is_body_part`.
     x       posición horizontal: left | center | right.
     y       posición vertical:   top | mid | bottom ("center"/"middle" se aceptan como mid).
+            La ORIENTACIÓN del objeto no es su posición: se descartan las frases de orientación
+            ("facing towards the right", "tilted to the right"), las partes del objeto ("its top
+            facing the viewer") y las sombras ("a shadow to its lower left").
     color   NOMBRE EXACTO del color del caption de referencia (`object_color_name`), sin contar el
             prefijo de paleta: "blue" acierta para "tab:blue" (decisión D1). No se usan categorías
             de color ni tolerancias.
@@ -32,6 +36,12 @@ en cada posición, de modo que "light blue" se lee como "light blue" y no como "
 nombre más específico o más general que el de referencia es un error, que es lo que significa
 "nombre exacto". Un nombre entre comillas tiene prioridad (es el formato del dataset). Cada mención
 se asigna a objeto, fondo o luz según las palabras vecinas, y cuenta la primera mención del objeto.
+Si la respuesta trae una etiqueta explícita ("**Color:** ...", "color: ..."), cuenta la primera
+mención del objeto DESPUÉS de la etiqueta: es el color que el modelo declara, y evita tomar un
+adjetivo anterior de otra sección ("a dark, rectangular nose").
+
+Las reglas de orientación, parte del cuerpo y etiqueta de color salen de respuestas zero-shot reales
+(inspección del 14-11-2026, 4 imágenes de val por modelo); están en tests/test_attributes.py.
 
 Requiere matplotlib (tablas de nombres de color).
 """
@@ -64,16 +74,40 @@ SHAPE_LEXICON = {
 }
 
 
-def _term_rx(term: str) -> str:
-    return r"\b" + re.escape(term).replace(r"\ ", r"[\s\-]?") + r"(?:s|es)?\b"
+def _term_rx(term: str, plural: bool = True) -> str:
+    return r"\b" + re.escape(term).replace(r"\ ", r"[\s\-]?") + (r"(?:s|es)?" if plural else "") + r"\b"
 
 
-SHAPE_RE = {k: re.compile("|".join(_term_rx(t) for t in v), re.IGNORECASE) for k, v in SHAPE_LEXICON.items()}
+# "head" sin plural: hay un solo objeto por imagen y "faces" suele ser el verbo ("the bear faces right").
+SHAPE_RE = {k: re.compile("|".join(_term_rx(t, plural=k != "head") for t in v), re.IGNORECASE)
+            for k, v in SHAPE_LEXICON.items()}
+
+# "head"/"face" como parte de otro objeto. Dos señales, ambas sobre el texto ANTERIOR a la mención:
+#   posesivo cercano      "its head", "the bear's small head"
+#   cláusula de partes    "with a round head", "it has a rounded body, a small head" (hasta el fin de frase)
+# Excepciones: "the image has/with ...", y "(in) the shape/form of a head", que sí nombran al objeto.
+# ("it's a head" / "that's a head" / "there's a head" son contracciones de "is", no posesivos)
+_PART_OWNER_RE = re.compile(
+    r"(?:\b(?:its|his|her|their)|(?<!\bit)(?<!that)(?<!here)'s|s')\s+(?:[a-z\-]+\s+){0,2}$")
+_PART_CLAUSE_RE = re.compile(
+    r"\b(?<!image )(?<!picture )(?<!photo )(?<!scene )(?:with|has|have|having)\b[^.;:\n]*$")
+_SHAPE_OF_RE = re.compile(
+    r"\b(?:shape|form|figure|model|sculpture|statue|representation|likeness|image|picture)\s+of\s+"
+    r"(?:(?:a|an|the)\s+)?(?:[a-z\-]+,?\s+){0,3}$")
+
+
+def _is_body_part(text_lower: str, start: int) -> bool:
+    before = text_lower[:start]
+    if _SHAPE_OF_RE.search(before):
+        return False
+    return bool(_PART_OWNER_RE.search(before) or _PART_CLAUSE_RE.search(before))
 
 
 def find_shapes(text: str) -> list[tuple[int, str]]:
-    """(posición, forma) de cada mención, en orden de aparición."""
-    return sorted((m.start(), k) for k, rx in SHAPE_RE.items() for m in rx.finditer(text))
+    """(posición, forma) de cada mención, en orden de aparición. Omite "head" como parte de otro objeto."""
+    low = text.lower()
+    return sorted((m.start(), k) for k, rx in SHAPE_RE.items() for m in rx.finditer(text)
+                  if not (k == "head" and _is_body_part(low, m.start())))
 
 
 # ── Posición ────────────────────────────────────────────────────────────────────────────────────
@@ -86,11 +120,21 @@ V_RE = re.compile(r"\b(top|upper|bottom|lower|mid)\b")
 H_RE = re.compile(r"\b(left|right)\b")
 C_RE = re.compile(r"\b(center|centre|middle|centered|centred)\b")
 NOISE_RE = re.compile(r"\b(?:on top of|right[\s-]side[\s-]up|right angles?|all right|top[\s-]down)\b")
+# Lo que no es la posición del objeto en la imagen, hasta el siguiente signo de puntuación:
+#   orientación        "facing towards the right side", "tilted to the right", "oriented horizontally"
+#   partes del objeto  "its top facing the viewer"
+#   sombras            "casts a shadow to its lower left"
+ORIENT_RE = re.compile(r"\b(?:facing|faces|pointing|points|tilted|tilting|leaning|leans|turned|rotated|angled|"
+                       r"oriented|looking|looks)\b[^.,;\n]*")
+PART_RE = re.compile(r"\b(?:its|his|her|their)\s+(?:top|bottom|left|right|upper|lower)\b[^.,;\n]*")
+SHADOW_RE = re.compile(r"\bshadows?\b[^.,;\n]*")
 
 
 def parse_position(text: str) -> tuple[str | None, str | None]:
     """(horizontal, vertical). El formato del dataset es "<vertical>-<horizontal>" (p. ej. mid-left)."""
     t = NOISE_RE.sub(" ", text.lower())
+    for rx in (PART_RE, ORIENT_RE, SHADOW_RE):
+        t = rx.sub(" ", t)
     m = PAIR_RE.search(t)
     if m:
         return H_MAP[m.group(2)], V_MAP[m.group(1)]
@@ -108,6 +152,7 @@ LIGHT_WORDS = {"light", "lighting", "lights", "spotlight", "glow", "illumination
                "shadow", "shadows"}
 WORD_RE = re.compile(r"[a-z]+(?:['\-][a-z]+)*")
 QUOTED_RE = re.compile(r"[\"“”']([^\"“”']{2,40})[\"“”']")
+COLOR_LABEL_RE = re.compile(r"\bcolou?r\b\W{0,4}:")        # "**Color:**", "color:", '"color":'
 
 
 def normalize_color_name(name: str | None) -> str | None:
@@ -188,7 +233,11 @@ def _from_text(text: str) -> dict:
     out["x"], out["y"] = parse_position(text)
     cm = color_mentions(text)
     out["n_colors"] = len(cm)
-    obj = next((c for c in cm if c["entity"] == "object"), None)
+    objs = [c for c in cm if c["entity"] == "object"]
+    label = COLOR_LABEL_RE.search(text.lower())
+    if label:                                   # color declarado tras una etiqueta "Color:"
+        objs = [c for c in objs if c["s"] >= label.end()] or objs
+    obj = objs[0] if objs else None
     if obj:
         out.update(color=obj["name"], color_quoted=obj["quoted"])
     return out

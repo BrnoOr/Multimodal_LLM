@@ -107,6 +107,68 @@ def test_sinonimos_de_forma_y_posicion():
     assert extract("A dragon next to a horse.")["shape"] == "dragon"              # cuenta la primera
 
 
+# Respuestas zero-shot reales (p1_attributes, inspección del 14-11-2026 en val). La lectura esperada
+# de cada una se decidió a mano leyendo el texto, no con el extractor.
+OSO_CENTRO = ("The object in the image is a red toy bear. It is positioned in the center of the image, "
+              "with its head facing towards the right side of the image.")                    # LLaVA-OV, val/0663
+OSO_PARTES = ("The object in the image is a red toy bear. It is a three-dimensional shape with a round head, "
+              "a body, and limbs. The bear is positioned in the center of the image, standing upright on its "
+              "hind legs.")                                                                    # LLaVA-OV, val/0663
+RANA = ("The object in the image is a small, green, cartoon-like frog. It is positioned in the upper right "
+        "quadrant of the image, with its body oriented horizontally and its head pointing towards the bottom "
+        "left quadrant.")                                                                      # LLaVA-OV, val/4242
+ESFERA_INCLINADA = ("The object in the image is a pink, spherical object with a smooth surface. It is positioned "
+                    "in the center of the image, slightly tilted to the right.")              # LLaVA-OV, val/6311
+ESFERA_TOP = ("The object is a green sphere. It is positioned in the center of the image, with its top facing "
+              "the viewer.")                                                                   # LLaVA-OV, val/6890
+BALDE = ("The object in the image is a green, rounded, spherical object that appears to be a bucket or a similar "
+         "container. It is positioned on a flat, purple surface. The bucket is oriented horizontally, with its "
+         "top facing down. The shadow of the bucket is cast on the surface below it.")        # InternVL3, val/6890
+OSO_IZQUIERDA = ("The object in the image is a red, three-dimensional, bear-like figure. It is positioned on the "
+                 "left side of the image, slightly behind the center. The bear is facing towards the right side "
+                 "of the frame.")                                                              # InternVL3, val/0663
+
+
+def test_la_orientacion_no_es_posicion():
+    assert parse_position(OSO_CENTRO) == ("center", "mid")           # "facing towards the right" no es x=right
+    assert parse_position(ESFERA_INCLINADA) == ("center", "mid")     # "tilted to the right"
+    assert parse_position(ESFERA_TOP) == ("center", "mid")           # "its top facing the viewer" no es y=top
+    assert parse_position(BALDE) == (None, None)                     # no dice dónde está
+    assert parse_position(RANA) == ("right", "top")                  # la posición va antes que la orientación
+    assert parse_position(OSO_IZQUIERDA) == ("left", "mid")
+    assert parse_position("It casts a soft shadow to its lower left.") == (None, None)
+    # la orientación no borra una posición dicha después de la coma
+    assert parse_position("The cow is facing left, positioned at the bottom right.") == ("right", "bottom")
+
+
+def test_head_como_parte_de_otro_objeto_no_es_la_forma():
+    for texto in (OSO_CENTRO, OSO_PARTES, RANA):
+        assert extract(texto)["shape"] is None, texto
+    assert extract("It has a rounded body, a small head with a pointed snout, and a small tail.")["shape"] is None
+    assert extract("The bear faces right.")["shape"] is None                    # "faces" es el verbo
+    assert extract("A cow with a large head.")["shape"] == "cow"
+    # cuando la cabeza ES el objeto, cuenta (Qwen3.5 e InternVL3 sobre val/6311, cuya forma es head)
+    assert extract("The object is a stylized, simplified representation of a human head, specifically a bald "
+                   "head with a distinct, dark, rectangular nose bridge.")["shape"] == "head"
+    assert extract("The object is a stylized, 3D model resembling a human head.")["shape"] == "head"
+    assert extract("a pink, abstract shape that resembles a stylized head or a stylized bird's head")["shape"] == "head"
+    assert extract("The image features a pink head in the top right.")["shape"] == "head"
+    assert extract("A pink object with the shape of a head.")["shape"] == "head"
+    assert extract("It's a pink head.")["shape"] == "head"                      # contracción, no posesivo
+
+
+def test_etiqueta_de_color_tiene_prioridad():
+    # Qwen3.5, val/6311 (fragmento): "dark" describe la nariz; el color declarado es pink
+    t = ("**Shape:**\nThe object is a stylized head with a distinct, dark, rectangular nose bridge.\n\n"
+         "**Color:**\nThe object is a vibrant, solid pink color.")
+    assert extract(t)["color"] == "pink"
+    # Qwen3.5, val/0663 (fragmento): declara "bright red"; con nombre exacto no acierta "red"
+    t = ("**Shape:**\nThe object is a small, red, 3D-rendered figure resembling a bear.\n\n"
+         "**Color:**\nThe object is a solid, bright red color.")
+    assert extract(t)["color"] == "bright red"
+    assert not score(extract(t), truth_from_record(rec(3, 2, 2, "red")))["color"]
+
+
 def test_json_y_fallo_de_formato():
     j = '```json\n{"shape": "cow", "color": "tab:blue", "vertical": "bottom", "horizontal": "left"}\n```'
     assert score(extract(j, json_mode=True), truth_from_record(REC))["attr_mean"] == 1.0

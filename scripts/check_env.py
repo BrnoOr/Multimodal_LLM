@@ -45,8 +45,14 @@ else:
     name = torch.cuda.get_device_name(0)
     report(OK, f"GPU 0: {name}  cc={cc}  {torch.cuda.get_device_properties(0).total_memory / 2**30:.1f} GB")
     archs = torch.cuda.get_arch_list()
-    if f"sm_{cc[0]}{cc[1]}" not in archs:
-        report(FAIL, f"el build no incluye sm_{cc[0]}{cc[1]} (archs={archs}); ver SETUP §5")
+    # Los binarios CUDA corren en GPUs de la misma generación (mismo dígito mayor) y revisión igual o
+    # posterior: una RTX 4090 (sm_89) ejecuta los kernels sm_80/sm_86. Los wheels oficiales no traen sm_89.
+    built = [(int(a[3:-1]), int(a[-1])) for a in archs if a.startswith("sm_") and a[3:].isdigit()]
+    usable = [f"sm_{ma}{mi}" for ma, mi in built if ma == cc[0] and mi <= cc[1]]
+    if usable:
+        report(OK, f"el build cubre sm_{cc[0]}{cc[1]} con {usable[-1]} (archs={archs})")
+    else:
+        report(FAIL, f"el build no tiene kernels compatibles con sm_{cc[0]}{cc[1]} (archs={archs}); ver SETUP §5")
     x = torch.randn(256, 256, device="cuda", dtype=torch.bfloat16)
     report(OK if torch.isfinite(x @ x).all() else FAIL, "matmul bf16 en GPU")
 
