@@ -196,6 +196,26 @@ def test_cuenta_la_primera_declaracion_de_posicion():
     assert parse_position("A **head** is at the **right** of the image.") == ("right", None)
 
 
+def test_fuente_de_luz_no_es_posicion():
+    # LLaVA-OV, p0_minimal: casi todas sus respuestas cierran con "a light source from the upper left side"
+    t = ("The image features a single object, which appears to be a teapot, positioned centrally against a solid "
+         "purple background. The teapot is predominantly yellow with a darker rim and handle, and it has a "
+         "traditional design with a spout and a lid. The teapot casts a subtle shadow on the purple surface, "
+         "indicating a light source from the upper left side of the image.")                    # val/0216
+    assert parse_position(t) == ("center", "mid")
+    t = ("The image shows a single object, which appears to be a red, irregularly shaped figure, possibly a toy "
+         "or a model. The figure is positioned in the center of the image and is set against a gradient "
+         "background that transitions from a lighter shade at the top to a darker shade at the bottom. The "
+         "figure casts a shadow on the surface, suggesting a light source from the upper left side of the "
+         "image.")                                                                               # val/0203
+    assert parse_position(t) == ("center", "mid")
+    t = ("The image shows a 3D model of a yellow humanoid figure with a round head, two arms, and two legs. The "
+         "figure is positioned in a dynamic pose, as if it is in motion, with its arms and legs spread out and "
+         "its head tilted back. The figure casts a shadow on the ground, indicating a light source from the "
+         "upper left side of the image.")                                                        # val/0230
+    assert parse_position(t) == (None, None) and extract(t)["shape"] is None
+
+
 def test_color_del_fondo_como_sujeto():
     # InternVL3, p1, val/0265: no dice el color del objeto; "purple" es del fondo
     e = extract("The object in the image is a spherical object that appears to be a ball. It is positioned in "

@@ -118,7 +118,7 @@ H_MAP = {"left": "left", "right": "right", "center": "center", "centre": "center
 PAIR_RE = re.compile(r"\b(top|upper|mid|middle|center|centre|bottom|lower)[\s-]+(left|right|center|centre|middle)\b")
 V_RE = re.compile(r"\b(top|upper|bottom|lower|mid)\b")
 H_RE = re.compile(r"\b(left|right)\b")
-C_RE = re.compile(r"\b(center|centre|middle|centered|centred)\b")
+C_RE = re.compile(r"\b(center|centre|middle|centered|centred|centrally|central)\b")
 NOISE_RE = re.compile(r"\b(?:on top of|right[\s-]side[\s-]up|right angles?|all right|top[\s-]down)\b")
 # Lo que no es la posición del objeto en la imagen, hasta el siguiente signo de puntuación:
 #   orientación        "facing towards the right side", "tilted to the right", "oriented horizontally"
