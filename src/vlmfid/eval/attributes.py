@@ -128,20 +128,52 @@ ORIENT_RE = re.compile(r"\b(?:facing|faces|pointing|points|tilted|tilting|leanin
                        r"oriented|looking|looks)\b[^.,;\n]*")
 PART_RE = re.compile(r"\b(?:its|his|her|their)\s+(?:top|bottom|left|right|upper|lower)\b[^.,;\n]*")
 SHADOW_RE = re.compile(r"\bshadows?\b[^.,;\n]*")
+#   iluminación        "the lighting comes from the top left"
+#   fondo              "a gradient background that transitions from a lighter shade at the top"
+LIGHT_RE = re.compile(r"\b(?:lighting|illuminat\w*|spotlight|sunlight|light source|"
+                      r"light (?:is|comes|coming|from|shines|shining))\b[^.,;\n]*")
+BG_POS_RE = re.compile(r"\b(?:background|backdrop|gradient)\b[^.,;\n]*")
+# Matices: "in the center, slightly to the right". No cambian la celda declarada; solo completan un eje
+# que la frase principal no dio ("in the lower part of the image, slightly to the right" -> right).
+SLIGHT_RE = re.compile(r"\b(?:slightly|a bit|a little|somewhat)\b[^.,;\n]*")
+SENT_SPLIT_RE = re.compile(r"[.;!?\n]+")
 
 
-def parse_position(text: str) -> tuple[str | None, str | None]:
-    """(horizontal, vertical). El formato del dataset es "<vertical>-<horizontal>" (p. ej. mid-left)."""
-    t = NOISE_RE.sub(" ", text.lower())
-    for rx in (PART_RE, ORIENT_RE, SHADOW_RE):
-        t = rx.sub(" ", t)
+def _parse_clause(t: str) -> tuple[str | None, str | None, bool]:
+    """(horizontal, vertical, es_par) de un trozo de texto ya en minúsculas."""
     m = PAIR_RE.search(t)
     if m:
-        return H_MAP[m.group(2)], V_MAP[m.group(1)]
+        return H_MAP[m.group(2)], V_MAP[m.group(1)], True
     v, h = V_RE.search(t), H_RE.search(t)
     v, h = (V_MAP[v.group(1)] if v else None), (H_MAP[h.group(1)] if h else None)
     if C_RE.search(t):
         v, h = v or "mid", h or "center"
+    return h, v, False
+
+
+def parse_position(text: str) -> tuple[str | None, str | None]:
+    """(horizontal, vertical). El formato del dataset es "<vertical>-<horizontal>" (p. ej. mid-left).
+
+    Cuenta la PRIMERA declaración de cada eje, recorriendo las frases en orden (igual que en forma y
+    color cuenta la primera mención): "positioned in the center of the image. [...] top left" se lee
+    como center/mid. Una frase que habla de un solo eje ("Vertical position: centered") solo fija ese
+    eje, salvo que traiga un par explícito ("upper-left"), que fija los dos.
+    """
+    t = NOISE_RE.sub(" ", text.lower())
+    for rx in (PART_RE, ORIENT_RE, SHADOW_RE, LIGHT_RE, BG_POS_RE):
+        t = rx.sub(" ", t)
+    h = v = None
+    for sent in SENT_SPLIT_RE.split(t):
+        only_v = "vertical" in sent and "horizontal" not in sent
+        only_h = "horizontal" in sent and "vertical" not in sent
+        for part in (SLIGHT_RE.sub(" ", sent), sent):       # primero sin matices; después con ellos
+            ph, pv, pair = _parse_clause(part)
+            if h is None and (pair or not only_v):
+                h = ph
+            if v is None and (pair or not only_h):
+                v = pv
+        if h is not None and v is not None:
+            break
     return h, v
 
 
@@ -153,6 +185,10 @@ LIGHT_WORDS = {"light", "lighting", "lights", "spotlight", "glow", "illumination
 WORD_RE = re.compile(r"[a-z]+(?:['\-][a-z]+)*")
 QUOTED_RE = re.compile(r"[\"“”']([^\"“”']{2,40})[\"“”']")
 COLOR_LABEL_RE = re.compile(r"\bcolou?r\b\W{0,4}:")        # "**Color:**", "color:", '"color":'
+# El fondo como sujeto de la frase: el color que sigue es del fondo, salvo que la frase cambie de tema.
+BG_SUBJECT_RE = re.compile(r"\b(?:background|backdrop|wall|floor|ground|surface|sky)\s+"
+                           r"(?:is|was|appears|looks|seems|has|features|consists)\b"
+                           r"(?:(?!\b(?:and|while|with|but)\b)[^.;\n]){0,60}$")
 
 
 def normalize_color_name(name: str | None) -> str | None:
@@ -196,6 +232,8 @@ def _entity(text: str, start: int, end: int) -> str:
     if any(w in LIGHT_WORDS for w in after):
         return "light"
     if any(w in BG_WORDS for w in before):
+        return "background"
+    if BG_SUBJECT_RE.search(text[:start]):          # "the background is a solid, muted purple color"
         return "background"
     return "object"
 
@@ -265,6 +303,11 @@ def extract(raw: str | None, json_mode: bool = False) -> dict:
     out["x"] = H_MAP.get(f.get("horizontal", "").strip().lower())
     out["y"] = V_MAP.get(f.get("vertical", "").strip().lower())
     color = normalize_color_name(f.get("color"))
+    if color and color not in color_vocabulary():
+        # no es un nombre de color: o trae uno dentro ("light green color") o es texto copiado del
+        # prompt ("TABLEAU_COLORS"), que cuenta como omitido
+        inner = color_mentions(color)
+        color = inner[0]["name"] if inner else None
     if color:
         out.update(color=color, n_colors=1)
     return base | out

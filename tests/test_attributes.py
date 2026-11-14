@@ -169,6 +169,54 @@ def test_etiqueta_de_color_tiene_prioridad():
     assert not score(extract(t), truth_from_record(rec(3, 2, 2, "red")))["color"]
 
 
+# Piloto del 14-11-2026 (200 imágenes de val). Salvo donde dice "construido", son respuestas reales.
+def test_cuenta_la_primera_declaracion_de_posicion():
+    # construido: la posición dicha primero manda sobre un par posterior que habla de otra cosa
+    assert parse_position("The figure is positioned in the center of the image. Its texture is rough. "
+                          "A second light is at the top left.") == ("center", "mid")
+    # construido: iluminación y fondo no son la posición del objeto
+    assert parse_position("The lighting comes from the top left corner.") == (None, None)
+    assert parse_position("It is set against a gradient background that goes from light at the top to dark "
+                          "at the bottom.") == (None, None)
+    # InternVL3, p1: los matices no cambian la celda declarada...
+    assert parse_position("It is positioned in the center of the image, slightly to the right side.") == ("center", "mid")
+    assert parse_position("It is positioned in the center of the image, slightly towards the bottom.") == ("center", "mid")
+    # ...pero completan el eje que la frase principal no dio
+    assert parse_position("It is positioned in the lower part of the image, slightly to the right side.") == ("right", "bottom")
+    # una frase sobre un solo eje fija solo ese eje
+    assert parse_position("It is positioned horizontally in the center of the image, slightly above the "
+                          "center.") == ("center", None)
+    # construido, con la estructura de Qwen3.5 en p1: un eje por viñeta
+    assert parse_position("**Position:**\n* **Vertical Position:** It is centered vertically.\n"
+                          "* **Horizontal Position:** It is on the left side of the frame.") == ("left", "mid")
+    assert parse_position("* **Vertical Position:** It is located in the lower right quadrant.\n"
+                          "* **Horizontal Po") == ("right", "bottom")           # par explícito: fija los dos
+    # p2_constrained: los modelos omiten el eje horizontal (o el vertical)
+    assert parse_position("A green object is at the bottom of the image.") == (None, "bottom")
+    assert parse_position("A **head** is at the **right** of the image.") == ("right", None)
+
+
+def test_color_del_fondo_como_sujeto():
+    # InternVL3, p1, val/0265: no dice el color del objeto; "purple" es del fondo
+    e = extract("The object in the image is a spherical object that appears to be a ball. It is positioned in "
+                "the upper right quadrant of the image, slightly towards the center. The background is a solid "
+                "purple color.")
+    assert e["color"] is None and (e["x"], e["y"]) == ("right", "top")
+    assert extract("The background is purple and the object is green.")["color"] == "green"     # construido
+
+
+def test_json_con_campos_omitidos_o_copiados_del_prompt():
+    # Qwen3.5, p3: copia el nombre de la paleta en vez de un color
+    e = extract('```json\n{"shape": "teapot", "color": "TABLEAU_COLORS", "vertical": "top", "horizontal": "left"}\n```',
+                json_mode=True)
+    assert e["json_ok"] and e["shape"] == "teapot" and e["color"] is None and (e["x"], e["y"]) == ("left", "top")
+    # InternVL3, p3: omite la clave horizontal
+    e = extract('```json\n{"shape": "horse", "color": "purple", "vertical": "bottom"}\n```', json_mode=True)
+    assert e["x"] is None and e["y"] == "bottom" and e["color"] == "purple"
+    assert extract('{"shape": "head", "color": "YELLOW", "vertical": "top", "horizontal": "left"}',
+                   json_mode=True)["color"] == "yellow"
+
+
 def test_json_y_fallo_de_formato():
     j = '```json\n{"shape": "cow", "color": "tab:blue", "vertical": "bottom", "horizontal": "left"}\n```'
     assert score(extract(j, json_mode=True), truth_from_record(REC))["attr_mean"] == 1.0
