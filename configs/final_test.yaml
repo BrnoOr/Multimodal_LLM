@@ -1,0 +1,36 @@
+# Plan de la evaluación final en TEST (scripts/final_test.py). Test se usa UNA sola vez.
+#
+# Cada entrada es un (modelo, condición). Todo lo que aparece aquí debe haberse elegido ANTES, en val:
+#   prompt        zero-shot: el mejor de cada modelo en val (scripts/score.py, criterio attr_mean).
+#                 ajustado:  p1_attributes en los 4 modelos (decisión del usuario).
+#   adapter_path  runs/<train_...>/adapter_best del modelo ajustado (mejor checkpoint en val).
+#   decoder_path  solo VL-JEPA: runs/<ydec_...>/decoder_best. Cada condición necesita el decodificador
+#                 entrenado sobre SU Y-Encoder (preentrenado o ajustado, y con la misma cuantización).
+#
+# Mientras quede algún `null`, scripts/final_test.py rechaza el plan completo y no lee test.
+# Al primer lanzamiento el plan se congela (runs/final_test/plan.lock.yaml) y ya no puede cambiar.
+# Comprobar antes con:  uv run --no-sync python scripts/final_test.py --dry-run
+
+limit: null        # null = test completo (10 000 imágenes)
+
+entries:
+  # ── LLaVA-OneVision-0.5B ──────────────────────────────────────────────────────────────────────
+  - {label: llava_ov_zs_nf4,   model: llava_ov,  quant: nf4,  prompt: null}
+  - {label: llava_ov_zs_bf16,  model: llava_ov,  quant: bf16, prompt: null}
+  - {label: llava_ov_ft_nf4,   model: llava_ov,  quant: nf4,  prompt: p1_attributes, needs_adapter: true, adapter_path: null}
+  - {label: llava_ov_ft_bf16,  model: llava_ov,  quant: bf16, prompt: p1_attributes, needs_adapter: true, adapter_path: null}
+  # ── InternVL3-1B ──────────────────────────────────────────────────────────────────────────────
+  - {label: internvl3_zs_nf4,  model: internvl3, quant: nf4,  prompt: null}
+  - {label: internvl3_zs_bf16, model: internvl3, quant: bf16, prompt: null}
+  - {label: internvl3_ft_nf4,  model: internvl3, quant: nf4,  prompt: p1_attributes, needs_adapter: true, adapter_path: null}
+  - {label: internvl3_ft_bf16, model: internvl3, quant: bf16, prompt: p1_attributes, needs_adapter: true, adapter_path: null}
+  # ── Qwen3.5-0.8B-Base ─────────────────────────────────────────────────────────────────────────
+  - {label: qwen35_zs_nf4,     model: qwen35,    quant: nf4,  prompt: null}
+  - {label: qwen35_zs_bf16,    model: qwen35,    quant: bf16, prompt: null}
+  - {label: qwen35_ft_nf4,     model: qwen35,    quant: nf4,  prompt: p1_attributes, needs_adapter: true, adapter_path: null}
+  - {label: qwen35_ft_bf16,    model: qwen35,    quant: bf16, prompt: p1_attributes, needs_adapter: true, adapter_path: null}
+  # ── VL-JEPA (texto vía Y-Decoder) ─────────────────────────────────────────────────────────────
+  - {label: vljepa_zs_nf4,     model: vljepa,    quant: nf4,  prompt: null, needs_decoder: true, decoder_path: null}
+  - {label: vljepa_zs_bf16,    model: vljepa,    quant: bf16, prompt: null, needs_decoder: true, decoder_path: null}
+  - {label: vljepa_ft_nf4,     model: vljepa,    quant: nf4,  prompt: p1_attributes, needs_adapter: true, adapter_path: null, needs_decoder: true, decoder_path: null}
+  - {label: vljepa_ft_bf16,    model: vljepa,    quant: bf16, prompt: p1_attributes, needs_adapter: true, adapter_path: null, needs_decoder: true, decoder_path: null}

@@ -792,6 +792,7 @@ forma explícita y testeada.
 | D6 | Control bf16 también en el ajuste: una corrida de LoRA sobre base bf16 por modelo, idéntica en lo demás. | criterios del proyecto: pregunta del enunciado, [8] §4 |
 | D2 | Y-Decoder: prefijo sobre Llama-3.2-1B preentrenado, en NF4 con LoRA (§2.4). | usuario |
 | D4 | Captions idénticos en el lote de InfoNCE: no se enmascaran con lote físico ≤ 128; se reporta la tasa (§2.3). | usuario |
+| D8 | Grilla de selección de las sondas de §2.5 (capa oculta, weight decay, ancho del núcleo y regularización; ver §4). | usuario |
 | D7 | Referencias para la cota en bits y las métricas agregadas en §7. | usuario |
 | — | Se evalúa la pérdida de información en cada etapa de VL-JEPA (§2.5). | usuario |
 
@@ -799,7 +800,6 @@ forma explícita y testeada.
 
 | # | Decisión | Propuesta de este documento | Bloquea |
 |---|---|---|---|
-| D8 | Grilla de las sondas de §2.5 (implementada en `src/vlmfid/eval/probes.py`, ver §4). | Propuesta implementada; falta la confirmación del usuario. | análisis |
 | §4 | Valores PENDIENTE de la tabla de adaptaciones (r, α, dropout, LR, esquema, lote efectivo, longitudes) y los del Y-Decoder. | Barrido corto en val o model cards, a acordar. | etapa 2 |
 | §7 | Agregar a `docs/papers/` las referencias externas y verificarlas antes de citarlas. | — | informe |
 

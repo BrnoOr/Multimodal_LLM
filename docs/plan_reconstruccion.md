@@ -165,3 +165,18 @@ y ajustado bf16, en test. Tablas y figuras del informe en notebooks nuevos que i
 | P4 | Actualizar CLAUDE.md §3 con las decisiones que lo contradicen (prompt de la etapa 2; controles bf16; Y-Decoder). | Requiere autorización: es el archivo de instrucciones del proyecto. |
 | P5 | Hiperparámetros de M §4 (paso 2.0). | Se acuerda al llegar a la etapa 2. |
 | P6 | Java en el cluster para `pycocoevalcap`. | Se comprueba en el paso 1.0. |
+
+## 6. Estado (actualizado al escribir `scripts/final_test.py`)
+
+Código escrito y **sin ejecutar**; cada punto se valida en el cluster antes de darlo por bueno.
+
+| Paso | Estado |
+|---|---|
+| 0 Limpieza | hecho (`_para_borrar/`), salvo lo que depende de reescribir el entrenamiento |
+| 1.0 Inspección de modelos | escrito: `scripts/inspect_models.py`, cola `stage1_inspect` |
+| 1.1 Evaluación común | escrito: `eval/attributes.py`, `eval/text_metrics.py`, `scripts/score.py` |
+| 1.2 VLMs zero-shot | escrito: colas `stage1_pilot_val`, `stage1_val` |
+| 1.3 VL-JEPA zero-shot | escrito: `models/ydecoder.py`, `train/ydecoder.py`, colas `ydecoder_sweep`, `stage1_vljepa_val` |
+| 1.4 Pérdida de información | escrito: `eval/probes.py`, `scripts/info_loss.py`, cola `stage1_infoloss` |
+| 3 Evaluación final | escrito: `scripts/final_test.py`, plan `configs/final_test.yaml` (pendiente de completar) |
+| 2.0–2.3 Etapa 2 | pendiente: `src/vlmfid/train/` sigue con el protocolo anterior |
