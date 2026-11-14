@@ -182,7 +182,7 @@ class HFGenerativeDescriber(Describer):
 
     def generation_kwargs(self) -> dict:
         g = as_dict(self.cfg.get("generation"))
-        g.setdefault("max_new_tokens", 128)
+        g.setdefault("max_new_tokens", 256)
         g.setdefault("do_sample", False)
         g.setdefault("num_beams", 1)
         return g

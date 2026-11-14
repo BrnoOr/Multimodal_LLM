@@ -636,7 +636,7 @@ Los valores "nuestro" marcados **PENDIENTE** no se fijan: no hay justificación 
 | Resolución (Qwen3.5) | sin fuente en la carpeta | PENDIENTE (model card) | — |
 | Resolución y cuadros (VL-JEPA) | 256² px; 1, 8 o 32 cuadros según fase [5, §3.2] | los del checkpoint (8 cuadros, 256 px [repo, sin verificar]) | Debe coincidir con el entrenamiento del checkpoint. |
 | Longitud máxima de consulta (VL-JEPA) | 512 tokens [5, §3.1] | 512 | Valor del paper. El checkpoint usó 64, donde los prompts con ejemplos no caben; el relleno va enmascarado. Decisión del usuario: mismos prompts en los 4 modelos. |
-| Longitud máxima de generación | 128 a 1 024 tokens objetivo según dataset [8, Tabla 9] | PENDIENTE | Los captions tienen 10–19 palabras [repo, sin verificar]. Debe ser igual para los tres VLM. |
+| Longitud máxima de generación | 128 a 1 024 tokens objetivo según dataset [8, Tabla 9] | 256, igual en los tres VLM y en el Y-Decoder | Decisión del usuario (14-11-2026) a partir del piloto en val (200 imágenes): con 128 se cortaba el 38 % de las respuestas de Qwen3.5 con `p1_attributes` y el 64 % con `p0_minimal`, y ese modelo deja la posición para el final. Los captions de referencia tienen como máximo 31 tokens. La fracción de respuestas cortadas se reporta por run. |
 
 ---
 

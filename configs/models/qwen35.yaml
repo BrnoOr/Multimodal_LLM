@@ -35,7 +35,7 @@ chat_template_kwargs:
   enable_thinking: false    # sin bloque <think>: la respuesta es directamente la descripción
 batch_size: 64
 generation:
-  max_new_tokens: 128
+  max_new_tokens: 256      # 128 cortaba el 38 % de las respuestas de Qwen3.5 en p1 (piloto del 14-11-2026)
   do_sample: false          # greedy por reproducibilidad (Qwen recomienda muestreo para chat)
   num_beams: 1
 # LoRA en TODAS las capas lineales de los bloques del language_model (QLoRA §4): atención (q/k/v/o),

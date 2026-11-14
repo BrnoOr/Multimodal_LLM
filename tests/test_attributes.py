@@ -135,7 +135,7 @@ def test_la_orientacion_no_es_posicion():
     assert parse_position(ESFERA_TOP) == ("center", "mid")           # "its top facing the viewer" no es y=top
     assert parse_position(BALDE) == (None, None)                     # no dice dónde está
     assert parse_position(RANA) == ("right", "top")                  # la posición va antes que la orientación
-    assert parse_position(OSO_IZQUIERDA) == ("left", "mid")
+    assert parse_position(OSO_IZQUIERDA) == ("left", None)           # "slightly behind the center" es un matiz
     assert parse_position("It casts a soft shadow to its lower left.") == (None, None)
     # la orientación no borra una posición dicha después de la coma
     assert parse_position("The cow is facing left, positioned at the bottom right.") == ("right", "bottom")
@@ -181,6 +181,15 @@ def test_cuenta_la_primera_declaracion_de_posicion():
     # InternVL3, p1: los matices no cambian la celda declarada...
     assert parse_position("It is positioned in the center of the image, slightly to the right side.") == ("center", "mid")
     assert parse_position("It is positioned in the center of the image, slightly towards the bottom.") == ("center", "mid")
+    # análogo en las otras celdas (construidos): el matiz hacia el centro no saca al objeto de su celda
+    assert parse_position("It is on the left side of the image, slightly towards the center.") == ("left", None)
+    assert parse_position("It is at the top of the image, slightly lower than the edge.") == (None, "top")
+    assert parse_position("It is in the bottom-right corner, slightly to the left.") == ("right", "bottom")
+    # "off-center" declara el centro (Qwen3.5, p1, val/0230; InternVL3, p0, val/0216)
+    assert parse_position("The object is located in the center of the image. The object is positioned slightly "
+                          "off-center to the left.") == ("center", "mid")
+    assert parse_position("The object is positioned slightly off-center and casts a shadow on the "
+                          "background.") == ("center", "mid")
     # ...pero completan el eje que la frase principal no dio
     assert parse_position("It is positioned in the lower part of the image, slightly to the right side.") == ("right", "bottom")
     # una frase sobre un solo eje fija solo ese eje

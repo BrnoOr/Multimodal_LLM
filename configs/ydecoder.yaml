@@ -23,7 +23,7 @@ decoder:
     alpha: 16
     dropout: 0.1
   generation:
-    max_new_tokens: 128                 # igual que los VLM (configs/models/*.yaml)
+    max_new_tokens: 256                 # igual que los VLM (configs/models/*.yaml)
   train:
     lr: 2.0e-4                          # LoRA y proyección de prefijo
     batch_size: 16

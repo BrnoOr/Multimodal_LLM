@@ -53,4 +53,4 @@ def test_as_dict_accepts_missing_plain_and_omegaconf():
     assert as_dict(OmegaConf.create({"a": 1})) == {"a": 1}
     q = compose(["model=qwen35"])
     assert as_dict(q.model.get("chat_template_kwargs")) == {"enable_thinking": False}
-    assert as_dict(cfg.model.get("generation"))["max_new_tokens"] == 128
+    assert as_dict(cfg.model.get("generation"))["max_new_tokens"] == 256

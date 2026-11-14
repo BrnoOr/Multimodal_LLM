@@ -133,9 +133,12 @@ SHADOW_RE = re.compile(r"\bshadows?\b[^.,;\n]*")
 LIGHT_RE = re.compile(r"\b(?:lighting|illuminat\w*|spotlight|sunlight|light source|"
                       r"light (?:is|comes|coming|from|shines|shining))\b[^.,;\n]*")
 BG_POS_RE = re.compile(r"\b(?:background|backdrop|gradient)\b[^.,;\n]*")
-# Matices: "in the center, slightly to the right". No cambian la celda declarada; solo completan un eje
-# que la frase principal no dio ("in the lower part of the image, slightly to the right" -> right).
+# Matices: "in the center, slightly to the right"; "on the left, slightly towards the center". No cambian
+# la celda declarada (decisión del usuario, 14-11-2026): cuenta center en el primero y left en el segundo.
+# Solo completan, con una dirección explícita, un eje que la frase principal no dio ("in the lower part
+# of the image, slightly to the right" -> right). "off-center" declara el centro y lo que sigue es matiz.
 SLIGHT_RE = re.compile(r"\b(?:slightly|a bit|a little|somewhat)\b[^.,;\n]*")
+OFF_CENTER_RE = re.compile(r"\b(?:(?:slightly|a bit|a little|somewhat)\s+)?off[\s-]cent(?:er|re)(?:ed|d)?\b")
 SENT_SPLIT_RE = re.compile(r"[.;!?\n]+")
 
 
@@ -162,16 +165,22 @@ def parse_position(text: str) -> tuple[str | None, str | None]:
     t = NOISE_RE.sub(" ", text.lower())
     for rx in (PART_RE, ORIENT_RE, SHADOW_RE, LIGHT_RE, BG_POS_RE):
         t = rx.sub(" ", t)
+    t = OFF_CENTER_RE.sub(" center, slightly ", t)
     h = v = None
     for sent in SENT_SPLIT_RE.split(t):
         only_v = "vertical" in sent and "horizontal" not in sent
         only_h = "horizontal" in sent and "vertical" not in sent
-        for part in (SLIGHT_RE.sub(" ", sent), sent):       # primero sin matices; después con ellos
-            ph, pv, pair = _parse_clause(part)
-            if h is None and (pair or not only_v):
-                h = ph
-            if v is None and (pair or not only_h):
-                v = pv
+        ph, pv, pair = _parse_clause(SLIGHT_RE.sub(" ", sent))          # la declaración, sin matices
+        if h is None and (pair or not only_v):
+            h = ph
+        if v is None and (pair or not only_h):
+            v = pv
+        nuance = " ".join(SLIGHT_RE.findall(sent))                      # los matices: solo left/right/top/bottom
+        mh, mv = H_RE.search(nuance), V_RE.search(nuance)
+        if h is None and mh and not only_v:
+            h = H_MAP[mh.group(1)]
+        if v is None and mv and not only_h:
+            v = V_MAP[mv.group(1)]
         if h is not None and v is not None:
             break
     return h, v
