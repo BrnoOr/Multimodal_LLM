@@ -8,6 +8,7 @@ __pycache__/
 .ruff_cache/
 .claude/
 docs/papers/
+_para_borrar/
 
 # datos y pesos (solo se versionan los manifiestos)
 data/raw/*

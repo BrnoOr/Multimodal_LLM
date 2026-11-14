@@ -1,8 +1,7 @@
 # Plan de reconstrucción — estructura y pasos (fase 3)
 
-> Propuesta. Nada de esto está implementado. Se apoya en `docs/metodologia.md` (**M**) y en
-> `docs/auditoria.md` (**A**). Toda ejecución se deja preparada para el cluster; en el laptop solo
-> se escribe código.
+> Se apoya en `docs/metodologia.md` (**M**) y en `docs/auditoria.md` (**A**). Toda ejecución se deja
+> preparada para el cluster; en el laptop solo se escribe código. El avance está en §6.
 
 ## 1. Principios
 
@@ -165,18 +164,45 @@ y ajustado bf16, en test. Tablas y figuras del informe en notebooks nuevos que i
 | P4 | Actualizar CLAUDE.md §3 con las decisiones que lo contradicen (prompt de la etapa 2; controles bf16; Y-Decoder). | Requiere autorización: es el archivo de instrucciones del proyecto. |
 | P5 | Hiperparámetros de M §4 (paso 2.0). | Se acuerda al llegar a la etapa 2. |
 | P6 | Java en el cluster para `pycocoevalcap`. | Se comprueba en el paso 1.0. |
+| P7 | Selección de checkpoint en VL-JEPA (paso 2.2). La exactitud por atributo necesita el Y-Decoder, y el de la etapa 2 solo puede entrenarse después del ajuste, porque el Y-Encoder cambia (M §2.3): durante el entrenamiento no hay texto que puntuar. | **Abierta, bloquea el paso 2.2.** Propuesta: elegir el paso con la exactitud por atributo del caption de val más cercano a `Ŝ_Y`, codificado con el Y-Encoder del momento (protocolo de candidatos de [5] §4.1, usado solo para seleccionar), declarado como diferencia frente a los VLM. Alternativas: pérdida InfoNCE en val, o un decodificador por checkpoint candidato. |
+| P8 | Lote efectivo común (parte de P5). VL-JEPA necesita que su lote físico sea igual al efectivo (M §2.3). | Propuesta: 128 si cabe en 24 GB, por [5] §4.5 y D4; si no, 64. Se mide en la prueba de humo del paso 2.1. |
+| P9 | ¿La cabeza `y_encoder.projector` lleva también LR ×0.05? M §2.3 no lo aclara. | Abierta; releer [5] §3.1 antes de fijarlo. |
+| P10 | Condiciones bf16 de VL-JEPA: `configs/final_test.yaml` pide un Y-Decoder por condición, es decir 4 (zero-shot y ajustado, NF4 y bf16). | A confirmar que el decodificador del control va también en bf16. |
+| P11 | `quant_skip_modules` de los tres VLM excluye `lm_head` de NF4, aunque es un módulo congelado (M §2.1). | Se resuelve con el reporte del paso 1.0: se cuantiza, o se registra como excepción justificada. |
 
-## 6. Estado (actualizado al escribir `scripts/final_test.py`)
+## 6. Estado (revisado el 14-11-2026, commit `b5749df`)
 
-Código escrito y **sin ejecutar**; cada punto se valida en el cluster antes de darlo por bueno.
+Revisión por lectura. **Nada se ha ejecutado**: `runs/` y `logs/` están vacíos, ni siquiera `pytest`.
 
-| Paso | Estado |
+| Paso | Código | Falta |
+|---|---|---|
+| 0 Limpieza | hecho | `data/targets.py` y `tests/test_targets.py` siguen en su lugar porque `train/` los importa; se mueven en la etapa 2. |
+| 1.0 Inspección de modelos | escrito: `scripts/inspect_models.py`, cola `stage1_inspect` | ejecutar |
+| 1.1 Evaluación común | escrito: `eval/attributes.py`, `eval/text_metrics.py`, `scripts/score.py` | ejecutar. No hay test de `text_metrics` (el paso 1.1 lo pedía). |
+| 1.2 VLMs zero-shot | escrito: colas `stage1_pilot_val`, `stage1_val` | ejecutar. El control bf16 no tiene cola: se lanza a mano tras elegir el prompt. |
+| 1.3 VL-JEPA zero-shot | escrito: `models/ydecoder.py`, `train/ydecoder.py`, colas `ydecoder_sweep`, `stage1_vljepa_val` | ejecutar. No hay test del Y-Decoder. Las colas llevan el marcador `<YDEC>`, que se reemplaza tras el barrido. |
+| 1.4 Pérdida de información | escrito: `eval/probes.py`, `scripts/info_loss.py`, cola `stage1_infoloss` | ejecutar |
+| 2.0 Hiperparámetros | — | decisión del usuario (P5, P8) |
+| 2.1–2.3 Etapa 2 | **no escrito**: `src/vlmfid/train/` (salvo `ydecoder.py` y `data.py`), `scripts/train.py` y `configs/train/` siguen con el protocolo anterior | reescribir (lista abajo) y ejecutar |
+| 3 Evaluación final | escrito: `scripts/final_test.py`, `configs/final_test.yaml` | el plan tiene valores `null` que salen de val (prompts, adaptadores, decodificadores) |
+
+**Etapa 1: solo queda ejecutar en el cluster.** Ningún script de la etapa 1 importa el código
+obsoleto de `train/`. Orden: `check_env.py` y `pytest` → `stage1_inspect` → `stage1_pilot_val` y
+revisión manual → `stage1_val` → `ydecoder_sweep` → `stage1_vljepa_val` → controles bf16 →
+`stage1_infoloss`. Los tests de `train/` fallarán hasta la etapa 2; es esperado.
+
+**Etapa 2: falta escribirla.** Lo que hoy impide correr `scripts/train.py`:
+
+| Archivo | Problema |
 |---|---|
-| 0 Limpieza | hecho (`_para_borrar/`), salvo lo que depende de reescribir el entrenamiento |
-| 1.0 Inspección de modelos | escrito: `scripts/inspect_models.py`, cola `stage1_inspect` |
-| 1.1 Evaluación común | escrito: `eval/attributes.py`, `eval/text_metrics.py`, `scripts/score.py` |
-| 1.2 VLMs zero-shot | escrito: colas `stage1_pilot_val`, `stage1_val` |
-| 1.3 VL-JEPA zero-shot | escrito: `models/ydecoder.py`, `train/ydecoder.py`, colas `ydecoder_sweep`, `stage1_vljepa_val` |
-| 1.4 Pérdida de información | escrito: `eval/probes.py`, `scripts/info_loss.py`, cola `stage1_infoloss` |
-| 3 Evaluación final | escrito: `scripts/final_test.py`, plan `configs/final_test.yaml` (pendiente de completar) |
-| 2.0–2.3 Etapa 2 | pendiente: `src/vlmfid/train/` sigue con el protocolo anterior |
+| `train/config.py` | Valida `target.format`, `data.holdout`, `objective.negatives` y el banco; las métricas de selección (`macro`, `shape_pos`, `color_adj`…) ya no existen en `eval/attributes.py`. |
+| `train/loop.py`, `scripts/train.py` | Leen `metrics['macro']` y `metrics['shape_pos']`: fallan con `KeyError` en la primera evaluación. `train.py` evalúa en test al terminar (A H1). |
+| `train/collate.py` | La rama por atributo importa `models/bank.py`, que está en `_para_borrar/`. |
+| `train/jepa.py`, `train/objectives.py` | Modo por defecto de banco; Y-Encoder congelado y cacheado. Debe quedar solo InfoNCE bidireccional del lote, con el Y-Encoder entrenable. |
+| `train/lora.py` | Sin LoRA en el Y-Encoder ni grupo de LR ×0.05 para él; el conector de VL-JEPA es solo `vis_proj`. |
+| `train/evaluate.py` | Grupos de holdout; para VL-JEPA depende de P7. |
+| `configs/train/budget.yaml`, `models/*.yaml` | Objetivo canónico, `shape_pos`, sección `test`, `negatives: bank` e hiperparámetros sin fuente (A H7). |
+| `tests/test_train_units.py`, `test_train_e2e.py` | Prueban el protocolo anterior; uno importa `models/bank.py`. |
+
+Faltan además las colas de la etapa 2 (humo, ajuste NF4, ajuste bf16, Y-Decoder sobre el Y-Encoder
+ajustado, val completo, pérdida de información).
