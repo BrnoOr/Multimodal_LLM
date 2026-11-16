@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))          # scripts/: sc
 from score import read_predictions  # noqa: E402
 
 from vlmfid.eval import ATTRIBUTES  # noqa: E402
-from vlmfid.eval.attributes import extract, score, truth_from_record  # noqa: E402
+from vlmfid.eval.attributes import extract, json_mode_for, score, truth_from_record  # noqa: E402
 from vlmfid.paths import RUNS  # noqa: E402
 
 
@@ -41,7 +41,7 @@ def _short(text: str, width: int) -> str:
 
 def peek(run_dir: Path, n: int, width: int, only_wrong: bool) -> None:
     cfg = OmegaConf.load(run_dir / "config.yaml")
-    json_mode = cfg.prompt.get("response_format") == "json"
+    json_mode = json_mode_for(cfg)
     rows = sorted(read_predictions(run_dir / "predictions.jsonl"), key=lambda r: r["id"])
     exts = [extract(r["prediction"], json_mode) for r in rows]
     truths = [truth_from_record(r) for r in rows]

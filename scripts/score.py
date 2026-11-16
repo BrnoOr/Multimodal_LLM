@@ -27,7 +27,7 @@ from pathlib import Path
 from omegaconf import OmegaConf
 
 from vlmfid.eval import ATTRIBUTES, METRICS, TEXT_METRICS, color_ceiling, majority_baseline, score_texts, text_metrics
-from vlmfid.eval.attributes import extract
+from vlmfid.eval.attributes import extract, json_mode_for
 from vlmfid.paths import RUNS
 
 
@@ -55,7 +55,7 @@ def score_run(run_dir: Path, with_text: bool = True) -> dict:
     rows = read_predictions(pred_path)
     if not rows:
         raise ValueError(f"{run_dir}: predictions.jsonl está vacío")
-    json_mode = cfg.prompt.get("response_format") == "json"
+    json_mode = json_mode_for(cfg)                     # VL-JEPA: el Y-Decoder escribe captions, no JSON
     texts = [r["prediction"] for r in rows]
 
     status = {}

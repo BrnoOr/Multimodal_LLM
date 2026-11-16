@@ -302,6 +302,22 @@ def test_horizontal_como_referencia_no_es_el_eje_de_la_frase():
     assert parse_position("It is at the center of the vertical axis, on the left.") == ("left", "mid")
 
 
+def test_json_mode_solo_si_el_modelo_escribe_el_texto():
+    from omegaconf import OmegaConf
+
+    from vlmfid.eval.attributes import json_mode_for
+
+    def cfg(family, fmt):
+        return OmegaConf.create({"model": {"family": family}, "prompt": {"id": "p", "response_format": fmt}})
+
+    assert json_mode_for(cfg("hf", "json")) and json_mode_for(cfg("qwen_vl", "json"))
+    assert not json_mode_for(cfg("hf", None))
+    # VL-JEPA: el prompt es solo la consulta; el Y-Decoder escribe un caption, nunca JSON
+    assert not json_mode_for(cfg("vljepa", "json"))
+    caption = 'A "tab:blue" cow is at the bottom-left of the image.'
+    assert score(extract(caption, json_mode_for(cfg("vljepa", "json"))), truth_from_record(REC))["attr_mean"] == 1.0
+
+
 def test_json_con_campos_omitidos_o_copiados_del_prompt():
     # Qwen3.5, p3: copia el nombre de la paleta en vez de un color
     e = extract('```json\n{"shape": "teapot", "color": "TABLEAU_COLORS", "vertical": "top", "horizontal": "left"}\n```',

@@ -336,6 +336,18 @@ def _from_text(text: str) -> dict:
     return out
 
 
+def json_mode_for(cfg) -> bool:
+    """Si las respuestas de un run se leen como JSON, según su configuración (`config.yaml` del run).
+
+    Solo cuando el prompt pide JSON (`response_format: json`) **y** el texto lo escribe el propio modelo.
+    En VL-JEPA el prompt es solo la consulta X_Q: el texto lo produce el Y-Decoder, entrenado con
+    captions del dataset, así que nunca es JSON y se extrae como texto libre (docs/metodologia.md §2.4).
+    """
+    if cfg.prompt.get("response_format") != "json":
+        return False
+    return str(cfg.model.get("family", "")) != "vljepa"
+
+
 def extract(raw: str | None, json_mode: bool = False) -> dict:
     """Atributos mencionados en una respuesta.
 
