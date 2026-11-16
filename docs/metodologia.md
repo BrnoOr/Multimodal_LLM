@@ -463,19 +463,34 @@ restringido por esas tres propiedades, y debe declararse así en el informe.
    embedding y pasaría a ser un VLM.
 
 **Protocolo.**
-- **Entrenamiento solo con texto**: pares ⟨`S_Y` = Y-Encoder(caption), caption⟩ de **train**, con
-  entropía cruzada autorregresiva. Así el decodificador aprende a invertir el Y-Encoder y nunca ve
+- **Entrenamiento solo con texto**: pares ⟨`S_Y` = Y-Encoder(caption), caption⟩, con entropía
+  cruzada autorregresiva. Así el decodificador aprende a invertir el Y-Encoder y nunca ve
   predicciones del Predictor; lo que falle al decodificar `Ŝ_Y` es atribuible al Predictor o a la
   brecha entre `Ŝ_Y` y `S_Y`, no a que el decodificador haya memorizado imágenes.
-- **Un decodificador por etapa**: uno sobre el Y-Encoder preentrenado (etapa 1) y otro sobre el
-  ajustado (etapa 2), por la interacción descrita en §2.3.
-- **Zero-shot**: en la etapa 1 el Predictor no ha visto M3DI, pero el Y-Decoder sí se entrena con
-  captions de train de M3DI. Es inevitable (no existe un decodificador preentrenado) y es una
-  asimetría frente a los VLM, cuyo decodificador de texto es zero-shot de verdad. Se reporta como
-  tal; responde en parte a la pregunta del enunciado sobre la evaluación justa de VL-JEPA.
+- **Decodificador genérico en la etapa 1 (decisión del usuario, 16-11-2026).** Como no existe un
+  decodificador preentrenado para este espacio, el de la etapa 1 se entrena con captions **que no
+  son de M3DI**: los de **MSR-VTT** `train_7k` (140 200, protocolo 1K-A, `friedrichor/MSR-VTT`), el
+  corpus del checkpoint `open-vljepa` (Stage B, "MSRVTT 140K" en su README; que sea `train_7k` se
+  deduce de los conteos). El mejor paso se elige por **CIDEr** de la reconstrucción en MSR-VTT
+  `test_1k` (1 000 captions que VL-JEPA no vio; no es el test de M3DI). Así VL-JEPA llega a la
+  etapa 1 sin conocer el formato de M3DI, igual que los VLM, y la etapa 1 expone el desajuste de
+  dominio completo, como pide el enunciado. Reemplaza al diseño anterior, en que el decodificador
+  de la etapa 1 se entrenaba con captions de train de M3DI (asimetría frente a los VLM).
+- **Decodificadores ajustados a M3DI**: parten del genérico (su LoRA y su prefijo) y continúan con
+  captions de train de M3DI, eligiendo el paso por el techo en val de M3DI (`attr_mean`):
+  - **condición intermedia**: sobre el Y-Encoder preentrenado. VL-JEPA sigue en zero-shot; solo el
+    lector aprende el formato. Aísla cuánto del error de VL-JEPA en la etapa 1 es formato del
+    caption y no percepción (pregunta del enunciado sobre conocimiento frente a formato);
+  - **etapa 2**: sobre el Y-Encoder ajustado, por la interacción descrita en §2.3.
+- **Simetría con los VLM**: en la etapa 1 ningún modelo ha visto M3DI; en la etapa 2 todos se
+  ajustan con M3DI. La única asimetría que queda es que el lector de VL-JEPA se entrena (con
+  MSR-VTT) y el de los VLM no; es inevitable y se declara.
 - **Techo del decodificador**: se reporta siempre la decodificación del embedding verdadero,
   `Y-Decoder(S_Y)`, en val y test. Es el máximo alcanzable por VL-JEPA con ese decodificador y
-  separa el error del decodificador del error de predicción (§2.5).
+  separa el error del decodificador del error de predicción (§2.5). Para el genérico se reporta en
+  dos dominios: MSR-VTT `test_1k` (CIDEr; comprueba que el lector funciona en su dominio) y val de
+  M3DI (exactitud por atributo; cuánto de un caption sintético lee un lector que no conoce el
+  formato). El segundo se mide en cada evaluación pero **no** se usa para elegir nada.
 
 **Arquitectura adoptada (D2, decisión del usuario): prefijo sobre Llama-3.2-1B.**
 - Una **proyección entrenable** (precisión completa) convierte el embedding de 1 536-D en *k*
@@ -642,7 +657,8 @@ Los valores "nuestro" marcados **PENDIENTE** no se fijan: no hay justificación 
 | Pérdida de VL-JEPA | InfoNCE bidireccional [5, §2] | igual | Protocolo. |
 | Y-Decoder: arquitectura | no especificado [5]; solo *lightweight* | prefijo sobre Llama-3.2-1B, NF4 + LoRA | Decisión del usuario (§2.4). Sin fuente en el paper. |
 | Y-Decoder: LoRA y optimización | r = 64, α = 16, dropout 0.1, LR 2e-4, lote 16, LR constante, max grad norm 0.3 (LLaMA 7B/13B) [8, Ap. B.2] | los mismos, como punto de partida | Acordado con el usuario: valores de QLoRA como inicio, no justificados para 1B. Revisables tras el barrido. |
-| Y-Decoder: vectores de prefijo y épocas | sin fuente | *k* = 4 (barrido de *k* ∈ {1, 4, 8} con 3 épocas); 10 épocas, eligiendo el mejor paso | *k* elegido en val por el techo `Y-Decoder(S_Y)`. Las épocas pasaron de 3 a 10 porque las tres curvas seguían subiendo al cortar; un decodificador subentrenado limitaría a VL-JEPA por debajo de lo que permite su embedding. Decisión del usuario, 16-11-2026 (`docs/resultados_etapa1.md` §7b). Igual para todos los decodificadores (NF4, bf16, etapa 2). |
+| Y-Decoder genérico: corpus, selección, vectores de prefijo y épocas | sin fuente | MSR-VTT `train_7k`; CIDEr en `test_1k`; barrido de *k* ∈ {1, 4, 8} con 1 época y el ganador hasta 3 épocas, eligiendo el mejor paso | Decisión del usuario, 16-11-2026 (§2.4). Nada del decodificador zero-shot se elige con M3DI. El mismo *k* y las mismas épocas en el control bf16 (P10). |
+| Y-Decoder ajustado a M3DI (intermedia, etapa 2): épocas | sin fuente | PENDIENTE (`train.epochs` = 10 provisional) | Parte del genérico. Antecedente: entrenando desde cero con M3DI, la curva en val no se estabilizó con 3 ni con 10 épocas (`docs/resultados_etapa1.md` §7b). |
 | Y-Decoder: entrada | sin fuente | embedding normalizado a norma 1 | InfoNCE no supervisa la norma de `Ŝ_Y`; sin normalizar, una diferencia de norma con `S_Y` sacaría al decodificador de distribución. Diseño propio. |
 | Cuantización del encoder visual | no aplica: los papers de los VLM no cuantizan; [8] cuantiza el modelo base completo | NF4, igual en los 4 modelos | Enunciado y comparabilidad. Ver §2.1. |
 | Sonda de información | MLP de 1 capa oculta (discretos), kernel ridge (continuos) [1, §5.2]; sin hiperparámetros | igual; grilla elegida en un 20 % retenido: capa oculta ∈ {64, 256, 1024}, weight decay ∈ {1e-4, 1e-2}; núcleo RBF con ancho ∈ {0.25, 1, 4} × heurística de la mediana y α ∈ {1e-3, 1e-1, 10} | Protocolo de [1]. La grilla es propuesta propia (D8), igual en todos los puntos de medición; debe declararse en el informe. |
@@ -814,7 +830,8 @@ forma explícita y testeada.
 | — | Prompts zero-shot elegidos en val por `attr_mean` (§2.2): Qwen3.5 `p1_attributes`, LLaVA-OV `p3_json`, InternVL3 `p1_attributes`. En LLaVA-OV se mantuvo la regla pese a un margen de 0.004 sobre `p1_attributes` y a que la posición de `p3_json` es constante; se reportan ambos (`docs/resultados_etapa1.md` §4). | usuario, 16-11-2026 |
 | P11 | `lm_head` en bf16 en los tres VLM, como excepción uniforme a D5. Está atado a `embed_tokens` en LLaVA-OV y Qwen3.5 (no cuantizable sin desatar los pesos) e independiente en InternVL3 (135.9 M parámetros); se mantiene la regla única y el comportamiento por defecto de `transformers` con `bitsandbytes` (`docs/resultados_etapa1.md` §7.3). Se declara en el informe. | usuario, 16-11-2026 |
 | P10 | Control bf16 de VL-JEPA (etapas 1 y 2): todo el sistema sin cuantizar, incluido el Y-Decoder. Se entrena un decodificador propio con `model.quant=bf16 decoder.quant=bf16`, reutilizando el *k* elegido en el barrido NF4, sin nuevo barrido. Es el equivalente del control de los VLM, donde el LM que produce el texto también va en bf16. Al cargar un decodificador se verifica que coincidan adaptador y cuantización de VL-JEPA (`check_decoder_matches` en `models/vljepa.py`). | usuario, 16-11-2026 |
-| — | Y-Decoder: *k* = 4 y 10 épocas para todos los decodificadores (§4). | usuario, 16-11-2026 |
+| — | ~~Y-Decoder: *k* = 4 y 10 épocas para todos los decodificadores~~. Reemplazada por la fila siguiente. | usuario, 16-11-2026 |
+| C5′ | Y-Decoder de la etapa 1 **genérico**: entrenado solo con captions de MSR-VTT `train_7k`, mejor paso por CIDEr en `test_1k`, *k* barrido en MSR-VTT. Los ajustados a M3DI (condición intermedia y etapa 2) continúan desde él. Se agrega la condición intermedia (VL-JEPA preentrenado + lector ajustado a M3DI) también al plan de test (`configs/final_test.yaml`). | usuario, 16-11-2026 |
 | — | Lectura de las condiciones bf16 frente al enunciado: son controles, no resultados principales (§2.1, *Control sin cuantizar*). | usuario, 16-11-2026 |
 
 ### 6.2 Abiertas

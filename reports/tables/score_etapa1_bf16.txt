@@ -1,0 +1,11 @@
+PTBTokenizer tokenized 186499 tokens at 594081.80 tokens per second.
+PTBTokenizer tokenized 591983 tokens at 1477711.07 tokens per second.
+PTBTokenizer tokenized 186499 tokens at 285910.92 tokens per second.
+PTBTokenizer tokenized 340020 tokens at 700271.22 tokens per second.
+PTBTokenizer tokenized 186499 tokens at 702996.96 tokens per second.
+PTBTokenizer tokenized 1096556 tokens at 1871694.85 tokens per second.
+         model           quant       prompt_id           split               n        complete           shape               x               y           color             pos       attr_mean           bleu1           bleu4         rouge_l           cider
+qwen35_08b_base            bf16   p1_attributes             val           10000            True          0.1768          0.7872          0.6722          0.1336          0.5292          0.4425          0.0901          0.0032          0.1521          0.0000
+  llava_ov_05b            bf16         p3_json             val           10000            True          0.3908          0.3230          0.3450          0.2158          0.1084          0.3186          0.0838          0.0000          0.0778          0.0656
+  internvl3_1b            bf16   p1_attributes             val           10000            True          0.2269          0.2910          0.1352          0.2190          0.0565          0.2180          0.1488          0.0040          0.2260          0.0003
+[score] tabla en /mnt/home2/t7-vLLM/Multimodal_LLM/runs/_tablas/etapa1_bf16.csv

@@ -15,7 +15,7 @@
 | Commit de la inferencia | `3feefb0` (jobs `s1_val_g0` y `s1_val_g1`, 14-11-2026, `logs/*/meta.env`) |
 | Generación | determinista, `max_new_tokens = 256` (verificado en el `config.yaml` de los 18 runs) |
 | Cuantización | NF4 con `bitsandbytes` (versión registrada en el `env.jsonl` de cada run) |
-| Puntaje | `scripts/score.py`, extractor de `3feefb0` (sin cambios en `0698e68`), 37 tests pasan; `pycocoevalcap` con Java 11 |
+| Puntaje | `scripts/score.py` con el extractor corregido el 16-11-2026 (§6), 48 tests pasan; `pycocoevalcap` con Java 11 |
 | Tabla | `runs/_tablas/etapa1_val.csv` (copia en `reports/tables/etapa1_val.csv`); salida con líneas base en `reports/tables/score_etapa1_val.txt` |
 
 ## 2. Líneas base sin modelo (val, estimadas con train)
@@ -32,20 +32,20 @@ Exactitud por atributo, fracción de respuestas en que el extractor no encuentra
 
 | Modelo | Prompt | forma | x | y | color | **attr_mean** | om. forma | om. x | om. y | om. color | palabras | Bleu-1 | Bleu-4 | ROUGE-L | CIDEr |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| LLaVA-OV-0.5B | p0_minimal | 0.258 | 0.224 | 0.208 | 0.198 | 0.222 | 0.715 | 0.344 | 0.334 | 0.025 | 94.1 | 0.088 | 0.016 | 0.149 | 0.000 |
-| LLaVA-OV-0.5B | p1_attributes | 0.271 | 0.445 | 0.298 | 0.210 | 0.306 | 0.710 | 0.027 | 0.069 | 0.004 | 28.2 | 0.267 | 0.008 | 0.329 | 0.024 |
+| LLaVA-OV-0.5B | p0_minimal | 0.258 | 0.224 | 0.208 | 0.199 | 0.222 | 0.715 | 0.344 | 0.334 | 0.021 | 94.1 | 0.088 | 0.016 | 0.149 | 0.000 |
+| LLaVA-OV-0.5B | p1_attributes | 0.271 | 0.445 | 0.298 | 0.210 | 0.306 | 0.710 | 0.027 | 0.068 | 0.004 | 28.2 | 0.267 | 0.008 | 0.329 | 0.024 |
 | LLaVA-OV-0.5B | p2_constrained | 0.235 | 0.000 | 0.012 | 0.000 | 0.062 | 0.004 | 0.999 | 0.936 | 1.000 | 1.6 | 0.000 | 0.000 | 0.060 | 0.045 |
 | LLaVA-OV-0.5B | **p3_json** | 0.373 | 0.338 | 0.330 | 0.197 | **0.309** | 0.017 | 0.000 | 0.000 | 0.019 | 8.3 | 0.082 | 0.000 | 0.076 | 0.060 |
 | LLaVA-OV-0.5B | p4_dataset_format | 0.171 | 0.184 | 0.156 | 0.138 | 0.162 | 0.050 | 0.538 | 0.539 | 0.355 | 8.1 | 0.269 | 0.070 | 0.303 | 0.185 |
 | LLaVA-OV-0.5B | p4m_multiexample | 0.212 | 0.057 | 0.063 | 0.179 | 0.128 | 0.168 | 0.769 | 0.769 | 0.053 | 7.2 | 0.233 | 0.043 | 0.278 | 0.190 |
 | InternVL3-1B | p0_minimal | 0.148 | 0.190 | 0.188 | 0.224 | 0.187 | 0.817 | 0.542 | 0.479 | 0.005 | 56.9 | 0.133 | 0.021 | 0.195 | 0.000 |
-| InternVL3-1B | **p1_attributes** | 0.201 | 0.398 | 0.282 | 0.216 | **0.274** | 0.752 | 0.135 | 0.232 | 0.031 | 55.3 | 0.142 | 0.012 | 0.226 | 0.000 |
+| InternVL3-1B | **p1_attributes** | 0.201 | 0.397 | 0.282 | 0.216 | **0.274** | 0.752 | 0.136 | 0.232 | 0.030 | 55.3 | 0.142 | 0.012 | 0.226 | 0.000 |
 | InternVL3-1B | p2_constrained | 0.232 | 0.016 | 0.334 | 0.219 | 0.200 | 0.681 | 0.963 | 0.007 | 0.001 | 10.3 | 0.499 | 0.093 | 0.469 | 0.181 |
 | InternVL3-1B | p3_json | 0.303 | 0.032 | 0.314 | 0.210 | 0.215 | 0.498 | 0.927 | 0.048 | 0.000 | 7.3 | 0.073 | 0.000 | 0.073 | 0.056 |
 | InternVL3-1B | p4_dataset_format | 0.142 | 0.325 | 0.328 | 0.075 | 0.218 | 0.007 | 0.015 | 0.015 | 0.000 | 9.8 | 0.410 | 0.138 | 0.438 | 0.377 |
 | InternVL3-1B | p4m_multiexample | 0.149 | 0.048 | 0.037 | 0.084 | 0.079 | 0.183 | 0.901 | 0.910 | 0.001 | 3.0 | 0.010 | 0.004 | 0.074 | 0.082 |
-| Qwen3.5-0.8B-Base | p0_minimal | 0.119 | 0.353 | 0.283 | 0.161 | 0.229 | 0.830 | 0.429 | 0.396 | 0.002 | 116.9 | 0.064 | 0.002 | 0.111 | 0.000 |
-| Qwen3.5-0.8B-Base | **p1_attributes** | 0.138 | 0.820 | 0.578 | 0.124 | **0.415** | 0.773 | 0.011 | 0.034 | 0.001 | 84.9 | 0.088 | 0.002 | 0.158 | 0.000 |
+| Qwen3.5-0.8B-Base | p0_minimal | 0.119 | 0.353 | 0.283 | 0.163 | 0.230 | 0.830 | 0.429 | 0.396 | 0.001 | 116.9 | 0.064 | 0.002 | 0.111 | 0.000 |
+| Qwen3.5-0.8B-Base | **p1_attributes** | 0.138 | 0.820 | 0.582 | 0.124 | **0.416** | 0.773 | 0.011 | 0.017 | 0.000 | 84.9 | 0.088 | 0.002 | 0.158 | 0.000 |
 | Qwen3.5-0.8B-Base | p2_constrained | 0.339 | 0.099 | 0.346 | 0.031 | 0.204 | 0.036 | 0.865 | 0.141 | 0.921 | 9.1 | 0.479 | 0.089 | 0.460 | 0.111 |
 | Qwen3.5-0.8B-Base | p3_json | 0.284 | 0.489 | 0.441 | 0.062 | 0.319 | 0.000 | 0.000 | 0.000 | 0.737 | 9.7 | 0.057 | 0.000 | 0.058 | 0.033 |
 | Qwen3.5-0.8B-Base | p4_dataset_format | 0.142 | 0.331 | 0.338 | 0.075 | 0.221 | 0.000 | 0.000 | 0.000 | 0.000 | 11.0 | 0.512 | 0.154 | 0.466 | 0.434 |
@@ -58,7 +58,7 @@ CIDEr se calcula con el idf de las referencias de val; no es comparable con valo
 
 | Modelo | Prompt elegido | attr_mean | Segundo | Margen |
 |---|---|---|---|---|
-| Qwen3.5-0.8B-Base | `p1_attributes` | 0.415 | `p4m_multiexample` (0.355) | 0.060 |
+| Qwen3.5-0.8B-Base | `p1_attributes` | 0.416 | `p4m_multiexample` (0.355) | 0.061 |
 | LLaVA-OV-0.5B | `p3_json` | 0.309 | `p1_attributes` (0.306) | **0.004** |
 | InternVL3-1B | `p1_attributes` | 0.274 | `p4_dataset_format` (0.218) | 0.057 |
 
@@ -78,15 +78,15 @@ Job `s1_bf16` (16-11-2026), mismos prompt, semilla y protocolo; tabla en `runs/_
 
 | Modelo | Prompt | Condición | forma | x | y | color | attr_mean |
 |---|---|---|---|---|---|---|---|
-| Qwen3.5-0.8B-Base | `p1_attributes` | NF4 | 0.138 | 0.820 | 0.578 | 0.124 | 0.415 |
-| | | bf16 | 0.177 | 0.786 | 0.672 | 0.133 | 0.442 |
-| | | **Δ** | −0.039 | +0.034 | −0.094 | −0.009 | **−0.027** |
+| Qwen3.5-0.8B-Base | `p1_attributes` | NF4 | 0.138 | 0.820 | 0.582 | 0.124 | 0.416 |
+| | | bf16 | 0.177 | 0.787 | 0.672 | 0.134 | 0.442 |
+| | | **Δ** | −0.039 | +0.033 | −0.090 | −0.009 | **−0.027** |
 | LLaVA-OV-0.5B | `p3_json` | NF4 | 0.373 | 0.338 | 0.330 | 0.197 | 0.309 |
 | | | bf16 | 0.391 | 0.323 | 0.345 | 0.216 | 0.319 |
-| | | **Δ** | −0.018 | +0.015 | −0.015 | −0.019 | **−0.010** |
-| InternVL3-1B | `p1_attributes` | NF4 | 0.201 | 0.398 | 0.282 | 0.216 | 0.274 |
-| | | bf16 | 0.227 | 0.291 | 0.136 | 0.219 | 0.218 |
-| | | **Δ** | −0.026 | **+0.107** | **+0.146** | −0.003 | **+0.056** |
+| | | **Δ** | −0.018 | +0.015 | −0.015 | −0.019 | **−0.009** |
+| InternVL3-1B | `p1_attributes` | NF4 | 0.201 | 0.397 | 0.282 | 0.216 | 0.274 |
+| | | bf16 | 0.227 | 0.291 | 0.135 | 0.219 | 0.218 |
+| | | **Δ** | −0.026 | **+0.106** | **+0.147** | −0.003 | **+0.056** |
 
 - En Qwen3.5 y LLaVA-OV, NF4 cuesta entre 0.01 y 0.03 de `attr_mean`.
 - **InternVL3 rinde mejor en NF4 que en bf16, y la causa es de formato, no de percepción**
@@ -95,8 +95,8 @@ Job `s1_bf16` (16-11-2026), mismos prompt, semilla y protocolo; tabla en `runs/_
 
   | | omite x | omite y | exactitud x si la declara | exactitud y si la declara |
   |---|---|---|---|---|
-  | NF4 | 0.135 | 0.232 | 0.398 / 0.865 = 0.460 | 0.282 / 0.768 = 0.367 |
-  | bf16 | 0.303 | **0.608** | 0.291 / 0.697 = 0.418 | 0.136 / 0.392 = 0.347 |
+  | NF4 | 0.136 | 0.232 | 0.397 / 0.864 = 0.460 | 0.282 / 0.768 = 0.367 |
+  | bf16 | 0.303 | **0.610** | 0.291 / 0.697 = 0.418 | 0.135 / 0.390 = 0.346 |
 
   Cuando declara la posición, acierta de forma parecida en ambas condiciones (diferencia de 0.02–0.04);
   la caída de `attr_mean` viene de las omisiones, que cuentan como error. Además, en bf16 la x
@@ -129,7 +129,7 @@ Job `s1_bf16` (16-11-2026), mismos prompt, semilla y protocolo; tabla en `runs/_
 4. **Color.** Ningún run supera 0.23, lejos del techo de 0.410. Los modelos usan nombres comunes
    ("teal", "bright green") que no coinciden con el nombre exacto de la paleta.
 5. **Qwen3.5-Base y posición.** Con `p1_attributes` Qwen3.5 escribe una sección `Position:` explícita
-   ("upper left quadrant", "center-right portion") y alcanza x = 0.820 e y = 0.578, muy por encima del
+   ("upper left quadrant", "center-right portion") y alcanza x = 0.820 e y = 0.582, muy por encima del
    resto. Verificado a mano (§6).
 
 ## 6. Revisión manual
@@ -153,8 +153,10 @@ Job `s1_bf16` (16-11-2026), mismos prompt, semilla y protocolo; tabla en `runs/_
 shade. The shadow is cast…") el color quedaba en `None`: las palabras vecinas de "purple" cruzaban el
 punto y "shadow" lo clasificaba como luz. Ahora las vecinas se buscan solo dentro de la misma frase.
 
-Ambas correcciones van con sus tests (`tests/test_attributes.py`). **Las tablas de §3, §4 y §4b son
-anteriores a ellas y deben reemplazarse tras volver a puntuar los 21 runs** (no hay que regenerar).
+Ambas correcciones van con sus tests (`tests/test_attributes.py`, 48 pasan en el cluster). Los 21 runs
+se volvieron a puntuar el 16-11-2026 y las tablas de §3, §4 y §4b ya tienen los valores corregidos. El
+efecto es pequeño: el mayor cambio es +0.004 en la y de Qwen3.5 `p1_attributes` (omisión de y de 0.034 a
+0.017); ningún `attr_mean` cambia más de 0.001 y **la selección de prompts no cambia**.
 
 **LLaVA-OV `p3_json` e InternVL3 `p1_attributes`** (8 muestras cada uno): extracción correcta en las
 muestras revisadas ("upper right quadrant" → right/top; "positioned vertically in the center" →
@@ -219,7 +221,14 @@ salida en precisión completa; fuente: documentación de la biblioteca, no un pa
   `models/vljepa.py`. Se contrasta con el control bf16 de VL-JEPA en val; si la brecha se mantiene,
   revisar la cuantización antes de atribuirla a NF4.
 
-## 7b. Barrido del Y-Decoder (paso 1.3)
+## 7b. Barrido del Y-Decoder con captions de M3DI (paso 1.3) — diseño SUPERADO
+
+> **Superado el 16-11-2026** (decisión del usuario, `docs/metodologia.md` §2.4): el decodificador de la
+> etapa 1 ya no se entrena con M3DI, sino con captions de MSR-VTT, para no darle a VL-JEPA el formato del
+> dataset en zero-shot. Lo que sigue queda como antecedente: muestra que un lector entrenado desde cero
+> con M3DI no se estabiliza en 10 épocas (techo en val 0.739 con 3 épocas, *k* = 4; 0.906 con 10, mejor
+> paso 6 800 de 6 840, curva todavía subiendo). Los decodificadores `ydec_vljepa_open_msrvtt_nf4_zs_nf4_k{1,4,8}_r64`
+> y `…_k4_r64_e10` no se usan en ninguna condición.
 
 Techo `Y-Decoder(S_Y)`: el decodificador reconstruye el caption desde el embedding del **caption
 verdadero** (no desde la predicción de VL-JEPA). 500 captions de val (subconjunto determinista),
@@ -248,12 +257,14 @@ Job `ydec`, commit `0698e68`.
 | Paso | Estado |
 |---|---|
 | Control bf16 de los VLM (prompt elegido, val completo) | hecho (§4b) |
-| Barrido del Y-Decoder (`ydecoder_sweep`, *k* ∈ {8, 4, 1}) | hecho (§7b): *k* = 4 |
-| Y-Decoder NF4 definitivo (*k* = 4, 10 épocas) | en curso (`ydec_k4_e10`) |
-| Y-Decoder bf16 (P10) | después del NF4 definitivo |
+| Barrido del Y-Decoder con M3DI (`ydecoder_sweep`) | hecho, superado (§7b) |
+| Y-Decoder genérico: barrido de *k* en MSR-VTT (`ydecoder_msrvtt`) | por lanzar (prueba de humo primero) |
+| Y-Decoder genérico: ganador hasta 3 épocas, NF4 y bf16 (P10) | después del barrido |
+| Y-Decoder intermedio (genérico ajustado con M3DI) | épocas pendientes de decisión |
+| VL-JEPA zero-shot y condición intermedia en val | después de los decodificadores |
 | VL-JEPA zero-shot en val (piloto de 200 y completo) | espera el Y-Decoder |
-| Control bf16 de VL-JEPA | espera el *k* elegido: entrenar el Y-Decoder bf16 y luego inferir |
+| Control bf16 de VL-JEPA | espera el decodificador genérico bf16 |
 | Pérdida de información (`stage1_infoloss`) | espera el Y-Decoder |
 | P11 (`lm_head`) | resuelto: bf16 en los tres VLM (§7.3) |
 | P10 (Y-Decoder del control bf16 de VL-JEPA) | resuelto: decodificador propio, todo en bf16 |
-| Correcciones del extractor (§6) | implementadas; falta volver a puntuar los 21 runs y actualizar §3, §4 y §4b |
+| Correcciones del extractor (§6) | hecho: 21 runs puntuados de nuevo, tablas actualizadas |
