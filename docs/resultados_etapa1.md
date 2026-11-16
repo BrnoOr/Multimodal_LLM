@@ -71,6 +71,42 @@ depende de la imagen: `y = top` en las 10 000 respuestas y `x = right` en el 90 
 y igualan a la clase mayoritaria. Toda su ventaja viene de forma (0.373) y color (0.197). Con
 `p1_attributes`, en cambio, LLaVA-OV sí discrimina x (0.445). El informe debe reportar ambos.
 
+## 4b. Control sin cuantizar (bf16, prompt elegido, val completo)
+
+Job `s1_bf16` (16-11-2026), mismos prompt, semilla y protocolo; tabla en `runs/_tablas/etapa1_bf16.csv`.
+Δ = NF4 − bf16 (negativo: la cuantización empeora).
+
+| Modelo | Prompt | Condición | forma | x | y | color | attr_mean |
+|---|---|---|---|---|---|---|---|
+| Qwen3.5-0.8B-Base | `p1_attributes` | NF4 | 0.138 | 0.820 | 0.578 | 0.124 | 0.415 |
+| | | bf16 | 0.177 | 0.786 | 0.672 | 0.133 | 0.442 |
+| | | **Δ** | −0.039 | +0.034 | −0.094 | −0.009 | **−0.027** |
+| LLaVA-OV-0.5B | `p3_json` | NF4 | 0.373 | 0.338 | 0.330 | 0.197 | 0.309 |
+| | | bf16 | 0.391 | 0.323 | 0.345 | 0.216 | 0.319 |
+| | | **Δ** | −0.018 | +0.015 | −0.015 | −0.019 | **−0.010** |
+| InternVL3-1B | `p1_attributes` | NF4 | 0.201 | 0.398 | 0.282 | 0.216 | 0.274 |
+| | | bf16 | 0.227 | 0.291 | 0.136 | 0.219 | 0.218 |
+| | | **Δ** | −0.026 | **+0.107** | **+0.146** | −0.003 | **+0.056** |
+
+- En Qwen3.5 y LLaVA-OV, NF4 cuesta entre 0.01 y 0.03 de `attr_mean`.
+- **InternVL3 rinde mejor en NF4 que en bf16, y la causa es de formato, no de percepción**
+  (`peek.py`, `logs/peek_internvl_nf4_vs_bf16.txt` en el cluster). En bf16 el modelo deja de declarar
+  la posición mucho más a menudo:
+
+  | | omite x | omite y | exactitud x si la declara | exactitud y si la declara |
+  |---|---|---|---|---|
+  | NF4 | 0.135 | 0.232 | 0.398 / 0.865 = 0.460 | 0.282 / 0.768 = 0.367 |
+  | bf16 | 0.303 | **0.608** | 0.291 / 0.697 = 0.418 | 0.136 / 0.392 = 0.347 |
+
+  Cuando declara la posición, acierta de forma parecida en ambas condiciones (diferencia de 0.02–0.04);
+  la caída de `attr_mean` viene de las omisiones, que cuentan como error. Además, en bf16 la x
+  declarada se concentra en `left` (5 056 de 6 970). La cuantización perturba el estilo de respuesta
+  de InternVL3 en este prompt; no se interpreta como que NF4 "mejore" la percepción. Es un ejemplo de
+  la sensibilidad al formato que el enunciado pregunta.
+- Diferencias sobre las mismas 10 000 imágenes; error estándar por atributo ≈ 0.005, de modo que
+  diferencias de 0.02 o más no son ruido de muestreo. El efecto en el prompt elegido no se
+  generaliza a los demás prompts, que no se evaluaron en bf16.
+
 ## 5. Observaciones para el informe
 
 1. **Métricas de texto y fidelidad divergen.** Los prompts que imitan el formato del caption
@@ -109,7 +145,16 @@ y igualan a la clase mayoritaria. Toda su ventaja viene de forma (0.373) y color
   - `base/val/0013`: "center of the image, slightly above the horizontal midline. It is positioned in
     the lower half…" → `bottom`. Por la regla de la primera declaración se esperaría `mid`. El texto
     es contradictorio y la referencia es `top`: es error con cualquiera de las dos lecturas.
-    **Pendiente revisar en el extractor** por qué no se aplicó la primera declaración.
+    **Causa y corrección (16-11-2026):** "horizontal midline" hacía que la frase se tratara como
+    referida solo al eje horizontal, y el `center` no fijaba la y. Ahora "horizontal/vertical" seguido
+    de *midline, axis, line, plane, edge* o *direction* no marca la frase como de un solo eje.
+
+**Corrección del color (16-11-2026).** En InternVL3 bf16, `base/val/0004` ("colored in a solid purple
+shade. The shadow is cast…") el color quedaba en `None`: las palabras vecinas de "purple" cruzaban el
+punto y "shadow" lo clasificaba como luz. Ahora las vecinas se buscan solo dentro de la misma frase.
+
+Ambas correcciones van con sus tests (`tests/test_attributes.py`). **Las tablas de §3, §4 y §4b son
+anteriores a ellas y deben reemplazarse tras volver a puntuar los 21 runs** (no hay que regenerar).
 
 **LLaVA-OV `p3_json` e InternVL3 `p1_attributes`** (8 muestras cada uno): extracción correcta en las
 muestras revisadas ("upper right quadrant" → right/top; "positioned vertically in the center" →
@@ -174,15 +219,41 @@ salida en precisión completa; fuente: documentación de la biblioteca, no un pa
   `models/vljepa.py`. Se contrasta con el control bf16 de VL-JEPA en val; si la brecha se mantiene,
   revisar la cuantización antes de atribuirla a NF4.
 
+## 7b. Barrido del Y-Decoder (paso 1.3)
+
+Techo `Y-Decoder(S_Y)`: el decodificador reconstruye el caption desde el embedding del **caption
+verdadero** (no desde la predicción de VL-JEPA). 500 captions de val (subconjunto determinista),
+VL-JEPA y Llama-3.2-1B en NF4, 3 épocas (2052 pasos, 10 936 captions distintos de train, lote 16).
+Job `ydec`, commit `0698e68`.
+
+| *k* | Mejor paso | forma | x | y | color | attr_mean | Caption exacto | Entrenables | Tiempo |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 2052 (último) | 0.998 | 0.736 | 0.434 | 0.422 | 0.648 | 0.168 | 48.2 M | 10 min |
+| **4** | 2052 (último) | 0.994 | **0.840** | **0.550** | **0.572** | **0.739** | **0.292** | 57.7 M | 12 min |
+| 8 | 2000 | 1.000 | 0.834 | 0.508 | 0.498 | 0.710 | 0.206 | 70.3 M | 14 min |
+
+- **Elegido: *k* = 4** (regla: mayor `attr_mean` del techo). La ventaja sobre *k* = 8 (0.029) es del
+  orden de la oscilación entre evaluaciones consecutivas (±0.03 con n = 500).
+- **Ninguna curva se había estabilizado** (*k* = 4: 0.661 → 0.707 → 0.716 → 0.718 → 0.739 en los pasos
+  1400–2052). Por eso **no** se puede atribuir todavía al Y-Encoder la pérdida de posición del techo
+  (y ≈ 0.5): puede ser subentrenamiento del decodificador. Decisión: reentrenar *k* = 4 con 10 épocas
+  (`ydec_vljepa_open_msrvtt_nf4_zs_nf4_k4_r64_e10`).
+- El color del techo (0.572) no se compara con el techo de 0.410 de los VLM: aquí se lee el embedding
+  del texto, que contiene el nombre de la paleta; aquel es el máximo predecible desde la imagen.
+- En las reconstrucciones revisadas los errores son de posición (p. ej. top-left → bottom-left) o de
+  tono cercano (`bright blue` → `rich blue`); forma y plantilla salen bien casi siempre.
+
 ## 8. Pendiente para cerrar la etapa 1
 
 | Paso | Estado |
 |---|---|
-| Control bf16 de los VLM (prompt elegido, val completo) | en curso (`s1_bf16`) |
-| Barrido del Y-Decoder (`ydecoder_sweep`, *k* ∈ {8, 4, 1}) | en curso (`ydec`) |
+| Control bf16 de los VLM (prompt elegido, val completo) | hecho (§4b) |
+| Barrido del Y-Decoder (`ydecoder_sweep`, *k* ∈ {8, 4, 1}) | hecho (§7b): *k* = 4 |
+| Y-Decoder NF4 definitivo (*k* = 4, 10 épocas) | en curso (`ydec_k4_e10`) |
+| Y-Decoder bf16 (P10) | después del NF4 definitivo |
 | VL-JEPA zero-shot en val (piloto de 200 y completo) | espera el Y-Decoder |
 | Control bf16 de VL-JEPA | espera el *k* elegido: entrenar el Y-Decoder bf16 y luego inferir |
 | Pérdida de información (`stage1_infoloss`) | espera el Y-Decoder |
 | P11 (`lm_head`) | resuelto: bf16 en los tres VLM (§7.3) |
 | P10 (Y-Decoder del control bf16 de VL-JEPA) | resuelto: decodificador propio, todo en bf16 |
-| Caso `base/val/0013` del extractor (§6) | revisar |
+| Correcciones del extractor (§6) | implementadas; falta volver a puntuar los 21 runs y actualizar §3, §4 y §4b |
