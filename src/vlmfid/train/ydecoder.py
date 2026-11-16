@@ -43,8 +43,10 @@ from ..tracking import RunTracker
 def default_exp_id(cfg: DictConfig) -> str:
     d = cfg.decoder
     stage = "ft" if cfg.model.get("adapter_path") else "zs"
+    # Las épocas van en el nombre: el barrido de k usó 3 y el decodificador elegido 10; sin el sufijo,
+    # un run con otras épocas se confundiría con uno ya completo y no se entrenaría.
     return (f"ydec_{cfg.model.name}_{cfg.model.quant}_{stage}_{d.quant}_k{d.prefix_len}_r{d.lora.r}"
-            + (f"_s{cfg.seed}" if int(cfg.seed) != 0 else ""))
+            f"_e{int(d.train.epochs)}" + (f"_s{cfg.seed}" if int(cfg.seed) != 0 else ""))
 
 
 def _append(path: Path, row: dict) -> None:
