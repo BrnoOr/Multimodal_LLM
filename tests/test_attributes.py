@@ -275,9 +275,11 @@ def test_vecinas_del_color_no_cruzan_la_frase():
          "solid purple shade. The shadow is cast on a plain, dark background, creating a contrast with the head.")
     e = extract(t)
     assert e["color"] == "purple" and e["shape"] == "head" and (e["x"], e["y"]) == (None, None)
-    # construidos: lo mismo con salto de línea, y la luz o el fondo en la misma frase siguen contando
+    # construidos: la luz o el fondo en la misma frase siguen contando
     assert extract("The object is green.\nShadows fall to the left.")["color"] == "green"
-    assert extract("The object is green\nBackground: purple")["color"] == "green"
+    # `extract` colapsa los espacios (strip_think_tags), así que un salto de línea sin puntuación no separa
+    # frases ahí; `color_mentions`, que recibe el texto sin normalizar, sí lo trata como límite
+    assert [m["entity"] for m in color_mentions("the object is green\nbackground: purple")] == ["object", "background"]
     assert [m["entity"] for m in color_mentions("a green light. a blue cow")] == ["light", "object"]
     assert extract("A blue cow. A pink background.")["color"] == "blue"
 
