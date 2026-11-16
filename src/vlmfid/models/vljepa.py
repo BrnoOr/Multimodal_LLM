@@ -43,6 +43,34 @@ from PIL import Image
 
 from ..paths import resolve
 from .base import Description, Describer
+
+
+def check_decoder_matches(meta: dict, quant: str, adapter_path, path) -> None:
+    """Verifica que un Y-Decoder se entrenó sobre el mismo Y-Encoder que el VL-JEPA cargado.
+
+    El decodificador aprende a invertir los S_Y de un Y-Encoder concreto: cambia con el adaptador
+    (etapa 1 frente a etapa 2) y con la cuantización (NF4 frente a bf16). Un decodificador ajeno no
+    falla, produce texto incoherente, por eso se exige coincidencia exacta de ambos
+    (docs/metodologia.md §2.3 y §2.4; P10). La cuantización del LM del propio decodificador
+    (`decoder.quant`) no se compara aquí: es parte del decodificador, no del Y-Encoder.
+    """
+    trained_on = meta.get("vljepa_adapter_path")
+    if (trained_on or None) != (adapter_path or None):
+        raise RuntimeError(
+            f"El Y-Decoder de {path} se entrenó con adapter_path={trained_on!r} y el modelo actual usa "
+            f"{adapter_path!r}. Cada etapa necesita su propio decodificador."
+        )
+    trained_quant = meta.get("vljepa_quant")
+    if trained_quant is None:
+        raise RuntimeError(
+            f"El Y-Decoder de {path} no registra la cuantización de VL-JEPA con que se entrenó "
+            "(meta.vljepa_quant); no se puede verificar que corresponda a este Y-Encoder."
+        )
+    if str(trained_quant) != str(quant):
+        raise RuntimeError(
+            f"El Y-Decoder de {path} se entrenó sobre VL-JEPA en {trained_quant} y el modelo actual está en "
+            f"{quant}. Cada cuantización necesita su propio decodificador (P10)."
+        )
 from .quant import quantization_report, swap_linear_to_nf4
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
@@ -170,13 +198,8 @@ class VLJEPADescriber(Describer):
         from .ydecoder import YDecoder
 
         dec = YDecoder.from_dir(path)
-        trained_on = dec.meta.get("vljepa_adapter_path")
-        current = self.cfg.get("adapter_path")
-        if (trained_on or None) != (current or None):
-            raise RuntimeError(
-                f"El Y-Decoder de {path} se entrenó con adapter_path={trained_on!r} y el modelo actual usa "
-                f"{current!r}. Cada etapa necesita su propio decodificador."
-            )
+        check_decoder_matches(dec.meta, quant=str(self.cfg.quant),
+                              adapter_path=self.cfg.get("adapter_path"), path=path)
         self.attach_decoder(dec)
 
     def _inner(self):

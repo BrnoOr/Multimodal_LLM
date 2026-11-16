@@ -7,3 +7,6 @@
 model=vljepa decoder.prefix_len=8
 model=vljepa decoder.prefix_len=4
 model=vljepa decoder.prefix_len=1
+# Control bf16 (P10, docs/metodologia.md §6.1): DESPUES del barrido, con el k elegido y sin barrer de nuevo.
+# Reemplaza <K> y descomenta (o lanzala como linea suelta):
+# model=vljepa model.quant=bf16 decoder.quant=bf16 decoder.prefix_len=<K>

@@ -6,6 +6,9 @@
 #   adapter_path  runs/<train_...>/adapter_best del modelo ajustado (mejor checkpoint en val).
 #   decoder_path  solo VL-JEPA: runs/<ydec_...>/decoder_best. Cada condición necesita el decodificador
 #                 entrenado sobre SU Y-Encoder (preentrenado o ajustado, y con la misma cuantización).
+#                 Condiciones nf4: ydec_..._nf4_<zs|ft>_nf4_...; condiciones bf16: ydec_..._bf16_<zs|ft>_bf16_...
+#                 (P10: en el control todo va en bf16, también el LM del decodificador). La carga lo
+#                 verifica (vlmfid.models.vljepa.check_decoder_matches).
 #
 # Mientras quede algún `null`, scripts/final_test.py rechaza el plan completo y no lee test.
 # Al primer lanzamiento el plan se congela (runs/final_test/plan.lock.yaml) y ya no puede cambiar.

@@ -9,3 +9,6 @@ model=vljepa prompt=p2_constrained     data.limit=200 infer.save_embeddings=true
 model=vljepa prompt=p3_json            data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC>/decoder_best
 model=vljepa prompt=p4_dataset_format  data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC>/decoder_best
 model=vljepa prompt=p4m_multiexample   data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC>/decoder_best
+# Control bf16 (P10): solo con el prompt elegido para VL-JEPA en val, y con el decodificador bf16
+# (runs/ydec_vljepa_open_msrvtt_bf16_zs_bf16_k<K>_r64). La carga falla si el decodificador es el NF4.
+# model=vljepa prompt=<PROMPT> model.quant=bf16 infer.save_embeddings=true model.decoder_path=runs/<YDEC_BF16>/decoder_best
