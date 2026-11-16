@@ -156,6 +156,11 @@ BG_POS_RE = re.compile(r"\b(?:background|backdrop|gradient)\b[^.,;\n]*")
 SLIGHT_RE = re.compile(r"\b(?:slightly|a bit|a little|somewhat)\b[^.,;\n]*")
 OFF_CENTER_RE = re.compile(r"\b(?:(?:slightly|a bit|a little|somewhat)\s+)?off[\s-]cent(?:er|re)(?:ed|d)?\b")
 SENT_SPLIT_RE = re.compile(r"[.;!?\n]+")
+# "horizontal"/"vertical" como referencia geométrica, no como el eje del que habla la frase:
+# "slightly above the horizontal midline" describe la altura (Qwen3.5, p1, val/0013). Se ignoran al
+# decidir si una frase habla de un solo eje; "Horizontal Position:", "centered horizontally" siguen contando.
+AXIS_REF_RE = re.compile(r"\b(?:horizontal|vertical)\s+(?:mid-?lines?|axis|axes|lines?|planes?|edges?|"
+                         r"directions?)\b")
 
 
 def _parse_clause(t: str) -> tuple[str | None, str | None, bool]:
@@ -198,8 +203,9 @@ def parse_position(text: str) -> tuple[str | None, str | None]:
 def _scan_position(t: str) -> tuple[str | None, str | None]:
     h = v = None
     for sent in SENT_SPLIT_RE.split(t):
-        only_v = "vertical" in sent and "horizontal" not in sent
-        only_h = "horizontal" in sent and "vertical" not in sent
+        axes = AXIS_REF_RE.sub(" ", sent)
+        only_v = "vertical" in axes and "horizontal" not in axes
+        only_h = "horizontal" in axes and "vertical" not in axes
         ph, pv, pair = _parse_clause(SLIGHT_RE.sub(" ", sent))          # la declaración, sin matices
         if h is None and (pair or not only_v):
             h = ph
@@ -266,9 +272,16 @@ def _color_regex() -> re.Pattern:
 
 
 def _entity(text: str, start: int, end: int) -> str:
-    """A qué se refiere una mención de color: objeto, fondo o luz, según las palabras vecinas."""
-    after = WORD_RE.findall(text[end:])[:3]
-    before = WORD_RE.findall(text[:start])[-3:]
+    """A qué se refiere una mención de color: objeto, fondo o luz, según las palabras vecinas.
+
+    Las vecinas se buscan solo dentro de la misma frase: en "colored in a solid purple shade. The shadow
+    is cast…" (InternVL3, bf16, p1, val/0004), "shadow" ya es otra frase y no hace de "purple" una luz.
+    """
+    s0 = max(text.rfind(c, 0, start) for c in ".;!?\n") + 1
+    ends = [i for i in (text.find(c, end) for c in ".;!?\n") if i != -1]
+    s1 = min(ends) if ends else len(text)
+    after = WORD_RE.findall(text[end:s1])[:3]
+    before = WORD_RE.findall(text[s0:start])[-3:]
     if any(w in BG_WORDS for w in after):
         return "background"
     if any(w in LIGHT_WORDS for w in after):

@@ -268,6 +268,38 @@ def test_color_del_fondo_como_sujeto():
     assert extract("The background is purple and the object is green.")["color"] == "green"     # construido
 
 
+def test_vecinas_del_color_no_cruzan_la_frase():
+    # InternVL3, bf16, p1, val/0004 (16-11-2026): "shadow" está en la frase siguiente; el color es del objeto
+    t = ("The object in the image is a head. It appears to be a simplified, three-dimensional shape with a curved "
+         "top. The head is positioned on a surface, casting a shadow on the background. The head is colored in a "
+         "solid purple shade. The shadow is cast on a plain, dark background, creating a contrast with the head.")
+    e = extract(t)
+    assert e["color"] == "purple" and e["shape"] == "head" and (e["x"], e["y"]) == (None, None)
+    # construidos: lo mismo con salto de línea, y la luz o el fondo en la misma frase siguen contando
+    assert extract("The object is green.\nShadows fall to the left.")["color"] == "green"
+    assert extract("The object is green\nBackground: purple")["color"] == "green"
+    assert [m["entity"] for m in color_mentions("a green light. a blue cow")] == ["light", "object"]
+    assert extract("A blue cow. A pink background.")["color"] == "blue"
+
+
+def test_horizontal_como_referencia_no_es_el_eje_de_la_frase():
+    # Qwen3.5, NF4, p1, val/0013 (16-11-2026). Primera declaración: center del primer enunciado; "slightly
+    # above the horizontal midline" es un matiz de altura, no una frase solo sobre el eje horizontal.
+    t = ("**Shape:** The object is a 3D model of a horse, specifically a blue, stylized figure with a red nose and a "
+         "red tail. **Color:** The main body of the horse is blue, while the nose and tail are red. **Position:** "
+         "The object is located in the center of the image, slightly above the horizontal midline. It is "
+         "positioned in the lower half of the image, appearing to be in mid-air or just about to land on the "
+         "ground.")
+    assert parse_position(t) == ("center", "mid")
+    # InternVL3, NF4, p1, val/0001: "vertical axis" y "horizontal axis" describen la orientación
+    t = ("It is positioned in the upper right quadrant of the image, with its vertical axis pointing downward. "
+         "The horizontal axis is horizontal, extending from the bottom of the image to the top.")
+    assert parse_position(t) == ("right", "top")
+    # construido: sin la referencia, "horizontally" sigue fijando solo el eje horizontal
+    assert parse_position("It is centered horizontally. It sits at the bottom.") == ("center", "bottom")
+    assert parse_position("It is at the center of the vertical axis, on the left.") == ("left", "mid")
+
+
 def test_json_con_campos_omitidos_o_copiados_del_prompt():
     # Qwen3.5, p3: copia el nombre de la paleta en vez de un color
     e = extract('```json\n{"shape": "teapot", "color": "TABLEAU_COLORS", "vertical": "top", "horizontal": "left"}\n```',
