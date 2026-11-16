@@ -297,12 +297,28 @@ lineales de los bloques del LLM. Los valores numéricos dependen de la escala (�
   comparables los 4 modelos [CLAUDE.md, comparabilidad]. Dejar la visión en bf16 haría además que el
   control sin cuantizar midiera solo la cuantización del LLM. A verificar por modelo: la
   cuantización de 4 bits se aplica a capas lineales, así que capas de otro tipo (p. ej. la
-  convolución de parches) pueden quedar sin cuantizar; se registra qué fracción de parámetros queda
+  convolución de parches) pueden quedar sin cuantizar (medido: `docs/resultados_etapa1.md` §7.1); se registra qué fracción de parámetros queda
   efectivamente en NF4 en cada modelo.
 - **Control sin cuantizar** [decisión del usuario, C14]: cada modelo se evalúa además en **bf16**
   (el tipo de cómputo de [8], sin cuantizar los pesos), con el mismo prompt, semilla y protocolo.
   La diferencia NF4 − bf16 responde la pregunta del enunciado sobre la cuantización. Alcance en
   §2.2 (inferencia) y §2.3 (ajuste).
+
+  **Relación con el enunciado.** El enunciado pide que *"todos los modelos se usan preentrenados y
+  cuantizados (4-8-bit NF4 o AWQ), con adaptación mediante LoRA"* y, a la vez, pregunta *"¿cómo
+  afecta la cuantización a la calidad de las descripciones y al comportamiento durante el ajuste?"*.
+  La segunda pregunta no se puede responder con datos propios sin una referencia no cuantizada; [8]
+  §4 solo aporta evidencia en modelos de 7B o más (C14). Por eso las condiciones bf16 se tratan
+  como **controles** y no como resultados principales:
+  - la comparación entre modelos y toda selección (prompt, checkpoint, Y-Decoder) se hacen en NF4;
+  - las corridas bf16 solo se usan para calcular la diferencia NF4 − bf16 de cada modelo;
+  - el control de ajuste también usa LoRA (D6), de modo que la adaptación es la misma;
+  - en el informe, las tablas principales son NF4 y bf16 va en una tabla o columna aparte, rotulada
+    como control de cuantización, citando esta pregunta del enunciado como justificación.
+
+  Usar bf16 como tipo de cómputo dentro de NF4, y mantener en precisión completa los módulos que se
+  entrenan (conector, proyecciones, adaptadores), es parte del esquema de [8] y no constituye una
+  excepción. La única excepción en módulos congelados es `lm_head` (P11, §6.1).
 - **Decodificación de los VLM**: determinista, con la misma configuración para los tres. La longitud
   máxima es dependiente de escala y se registra en §4.
 
@@ -795,6 +811,10 @@ forma explícita y testeada.
 | D8 | Grilla de selección de las sondas de §2.5 (capa oculta, weight decay, ancho del núcleo y regularización; ver §4). | usuario |
 | D7 | Referencias para la cota en bits y las métricas agregadas en §7. | usuario |
 | — | Se evalúa la pérdida de información en cada etapa de VL-JEPA (§2.5). | usuario |
+| — | Prompts zero-shot elegidos en val por `attr_mean` (§2.2): Qwen3.5 `p1_attributes`, LLaVA-OV `p3_json`, InternVL3 `p1_attributes`. En LLaVA-OV se mantuvo la regla pese a un margen de 0.004 sobre `p1_attributes` y a que la posición de `p3_json` es constante; se reportan ambos (`docs/resultados_etapa1.md` §4). | usuario, 16-11-2026 |
+| P11 | `lm_head` en bf16 en los tres VLM, como excepción uniforme a D5. Está atado a `embed_tokens` en LLaVA-OV y Qwen3.5 (no cuantizable sin desatar los pesos) e independiente en InternVL3 (135.9 M parámetros); se mantiene la regla única y el comportamiento por defecto de `transformers` con `bitsandbytes` (`docs/resultados_etapa1.md` §7.3). Se declara en el informe. | usuario, 16-11-2026 |
+| P10 | Control bf16 de VL-JEPA (etapas 1 y 2): todo el sistema sin cuantizar, incluido el Y-Decoder. Se entrena un decodificador propio con `model.quant=bf16 decoder.quant=bf16`, reutilizando el *k* elegido en el barrido NF4, sin nuevo barrido. Es el equivalente del control de los VLM, donde el LM que produce el texto también va en bf16. Al cargar un decodificador se verifica que coincidan adaptador y cuantización de VL-JEPA (`check_decoder_matches` en `models/vljepa.py`). | usuario, 16-11-2026 |
+| — | Lectura de las condiciones bf16 frente al enunciado: son controles, no resultados principales (§2.1, *Control sin cuantizar*). | usuario, 16-11-2026 |
 
 ### 6.2 Abiertas
 
