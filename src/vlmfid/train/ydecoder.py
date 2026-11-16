@@ -153,6 +153,7 @@ def _run(cfg, d, t, run_dir: Path, summary_path: Path, tracker: RunTracker) -> i
             if not torch.isfinite(loss):
                 raise RuntimeError(f"Pérdida no finita en el paso {step}")
             loss.backward()
+            loss = loss.detach()                          # solo se usa para registrar
             torch.nn.utils.clip_grad_norm_(dec.trainable_parameters(), float(t.max_grad_norm))
             opt.step()
             opt.zero_grad(set_to_none=True)
