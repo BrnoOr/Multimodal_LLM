@@ -1,0 +1,28 @@
+# Paso 1.3 — Y-Decoder GENÉRICO de la etapa 1 (decisión del usuario, 16-11-2026; docs/metodologia.md §2.4).
+# Solo captions de MSR-VTT (train_7k, 140 200); el mejor paso se elige por CIDEr en MSR-VTT test_1k. No ve M3DI:
+# el techo en val de M3DI se mide en cada evaluación solo para reportarlo (m3di_* en val_log.jsonl).
+#
+# 0) Prueba de humo (pocos minutos; descarga los JSON de anotaciones a la caché de HF):
+#   uv run --no-sync python scripts/train_ydecoder.py model=vljepa smoke_steps=40 decoder.msrvtt.eval_every=20 \
+#       decoder.msrvtt.val_limit=32 decoder.msrvtt.m3di_report_limit=32 exp_id=ydec_humo_msrvtt
+#   En el log: "fuente=msrvtt  selección=cider" y "140200" o menos captions distintos de train.
+#
+# 1) Barrido de k con 1 época cada uno (8 763 pasos, ~45-60 min). Se puede repartir en las dos GPU:
+#   grep '^model' configs/queues/ydecoder_msrvtt.txt | head -2 > /tmp/ydec_msrvtt_g0.txt
+#   grep '^model' configs/queues/ydecoder_msrvtt.txt | tail -1 > /tmp/ydec_msrvtt_g1.txt
+#   SCRIPT=scripts/train_ydecoder.py GPU=0 scripts/launch.sh ydec_msrvtt_g0 scripts/run_queue.sh /tmp/ydec_msrvtt_g0.txt
+#   SCRIPT=scripts/train_ydecoder.py GPU=1 scripts/launch.sh ydec_msrvtt_g1 scripts/run_queue.sh /tmp/ydec_msrvtt_g1.txt
+#   Comparar best.cider en runs/ydec_*_msrvtt_k*_r64_e1/summary.json y revisar val_ceiling.jsonl a mano.
+model=vljepa decoder.prefix_len=1 decoder.msrvtt.epochs=1
+model=vljepa decoder.prefix_len=4 decoder.msrvtt.epochs=1
+model=vljepa decoder.prefix_len=8 decoder.msrvtt.epochs=1
+#
+# 2) El k ganador hasta 3 épocas (decoder.msrvtt.epochs por defecto), eligiendo el mejor paso. Reemplaza <K>:
+# model=vljepa decoder.prefix_len=<K>
+#    -> runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k<K>_r64_e3   (decodificador ZERO-SHOT de VL-JEPA)
+# Control bf16 (P10), mismo k y épocas:
+# model=vljepa model.quant=bf16 decoder.quant=bf16 decoder.prefix_len=<K>
+#
+# 3) Condición INTERMEDIA: el genérico ajustado con captions de M3DI sobre el Y-Encoder preentrenado.
+#    Épocas PENDIENTES de decidir (decoder.train.epochs).
+# model=vljepa decoder.text_source=m3di decoder.prefix_len=<K> decoder.init_from=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k<K>_r64_e3/decoder_best

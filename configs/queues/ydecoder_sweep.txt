@@ -1,3 +1,7 @@
+# SUPERADO (16-11-2026): barrido con captions de M3DI, del diseno anterior. El decodificador zero-shot
+# ahora es el GENERICO de MSR-VTT (configs/queues/ydecoder_msrvtt.txt). Se conserva como registro;
+# NO relanzar (con la configuracion actual las lineas usarian text_source=msrvtt).
+#
 # Paso 1.3 — Y-Decoder de la etapa 1 (sobre el Y-Encoder preentrenado): barrido del largo del prefijo.
 # Solo texto de train; elige el mejor paso por el techo Y-Decoder(S_Y) en 500 captions de val.
 #   SCRIPT=scripts/train_ydecoder.py GPU=0 scripts/launch.sh ydec scripts/run_queue.sh configs/queues/ydecoder_sweep.txt

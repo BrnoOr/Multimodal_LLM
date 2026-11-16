@@ -6,10 +6,16 @@
 #   lora.*, train.lr, train.batch_size, train.schedule, train.max_grad_norm, train.betas
 #       QLoRA (Dettmers et al., 2023), Ap. B.2 y Tabla 9, medidos en LLaMA 7B/13B. Se usan como PUNTO DE
 #       PARTIDA acordado con el usuario, no como valores justificados para un LM de 1B.
-#   prefix_len, train.epochs
-#       sin fuente. prefix_len se barrió en val (configs/queues/ydecoder_sweep.txt, 3 épocas) y se eligió
-#       k = 4 por el techo del decodificador: exactitud por atributo de Y-Decoder(S_Y) en val. Las épocas
-#       pasaron de 3 a 10 porque las curvas no se habían estabilizado; decisión del usuario.
+#   text_source, msrvtt.*
+#       decisión del usuario (16-11-2026, docs/metodologia.md §2.4): el decodificador de la etapa 1 es
+#       GENÉRICO, entrenado con captions de MSR-VTT (train_7k, el corpus del checkpoint), y se elige por
+#       CIDEr en MSR-VTT test_1k; no ve M3DI. Los decodificadores ajustados a M3DI (condición intermedia y
+#       etapa 2) continúan desde él con text_source=m3di e init_from=<decoder genérico>.
+#   prefix_len, epochs
+#       sin fuente. Decodificador genérico: barrido de k ∈ {1, 4, 8} con 1 época en MSR-VTT
+#       (configs/queues/ydecoder_msrvtt.txt) y el ganador hasta 3 épocas, eligiendo el mejor paso.
+#       k = 4 es provisional (venía del barrido con M3DI, ya no se usa para elegir); se fija tras el
+#       barrido en MSR-VTT. train.epochs = 10 es el de los decodificadores ajustados a M3DI.
 #   train.noise_std = 0
 #       sin ruido: el protocolo entrena con S_Y limpio (docs/metodologia.md §2.4).
 decoder:
@@ -17,8 +23,18 @@ decoder:
   llama_name: unsloth/Llama-3.2-1B     # mismo LM de origen que el Predictor; réplica sin restricción de acceso
   quant: nf4                            # nf4 | bf16 (control sin cuantizar)
   embed_dim: 1536                       # espacio compartido de VL-JEPA
-  prefix_len: 4                         # k vectores de prefijo: elegido en el barrido {1, 4, 8} (16-11-2026)
+  prefix_len: 4                         # k vectores de prefijo: PROVISIONAL hasta el barrido en MSR-VTT
   normalize_input: true                 # el embedding entra con norma 1 (ver vlmfid.models.ydecoder)
+  text_source: msrvtt                   # msrvtt (genérico, etapa 1) | m3di (ajustado: intermedia y etapa 2)
+  init_from: null                       # runs/<ydec_...>/decoder_best para continuar desde ese decodificador
+  msrvtt:                               # solo con text_source=msrvtt (vlmfid.data.msrvtt)
+    repo: friedrichor/MSR-VTT
+    train_file: msrvtt_train_7k.json    # 140 200 captions: entrenamiento
+    val_file: msrvtt_test_1k.json       # 1 000 captions que VL-JEPA no vio: eligen el paso (CIDEr)
+    val_limit: null                     # null = los 1 000
+    epochs: 3                           # el barrido de k usa 1 (override en la cola)
+    eval_every: 1000                    # ~9 evaluaciones por época (8 763 pasos por época con lote 16)
+    m3di_report_limit: 500              # techo en val de M3DI medido en cada evaluación, SOLO para reportar
   lora:
     r: 64
     alpha: 16
@@ -28,14 +44,15 @@ decoder:
   train:
     lr: 2.0e-4                          # LoRA y proyección de prefijo
     batch_size: 16
-    epochs: 10                          # sobre los captions distintos de train; se elige el mejor paso en val.
-                                        # Era 3: en el barrido las tres curvas seguían subiendo al cortar
-                                        # (decisión del usuario, 16-11-2026; docs/resultados_etapa1.md §7b)
+    epochs: 10                          # text_source=m3di: sobre los captions distintos de train de M3DI; se
+                                        # elige el mejor paso en val. Era 3; en el barrido con M3DI las curvas
+                                        # seguían subiendo (docs/resultados_etapa1.md §7b). PENDIENTE de revisar
+                                        # para los decodificadores que continúan desde el genérico.
     schedule: constant
     betas: [0.9, 0.999]
     weight_decay: 0.0
     max_grad_norm: 0.3
     noise_std: 0.0
-    eval_every: 200                     # pasos entre evaluaciones en val
-    val_limit: 500                      # imágenes de val para elegir el paso (subconjunto determinista)
+    eval_every: 200                     # text_source=m3di: pasos entre evaluaciones en val
+    val_limit: 500                      # text_source=m3di: imágenes de val para elegir el paso (subconjunto determinista)
     log_every: 20

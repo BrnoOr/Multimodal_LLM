@@ -58,11 +58,19 @@ class YDecoder:
         self.tok = None
 
     # ---------------------------------------------------------------- carga
-    def load(self, trainable: bool = False, adapter_dir: Path | None = None) -> "YDecoder":
-        """Construye el decodificador. `trainable=True` adjunta un LoRA nuevo; `adapter_dir` carga uno ya
-        entrenado. Exactamente una de las dos opciones."""
+    def load(self, trainable: bool = False, adapter_dir: Path | None = None,
+             init_dir: Path | None = None) -> "YDecoder":
+        """Construye el decodificador.
+
+        * `trainable=True`: LoRA nuevo y prefijo aleatorio (decodificador desde Llama base).
+        * `trainable=True, init_dir=...`: continúa entrenando un decodificador ya entrenado (su LoRA y su
+          prefijo), p. ej. el genérico de MSR-VTT ajustado después con M3DI (docs/metodologia.md §2.4).
+        * `adapter_dir=...`: decodificador entrenado, solo para inferir.
+        """
         if trainable == (adapter_dir is not None):
             raise ValueError("load(): usa trainable=True (entrenar) o adapter_dir (inferir), no ambos ni ninguno")
+        if init_dir is not None and not trainable:
+            raise ValueError("load(): init_dir solo tiene sentido con trainable=True")
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         c = self.cfg
@@ -86,11 +94,15 @@ class YDecoder:
         self.prefix = nn.Linear(int(c.embed_dim), int(c.prefix_len) * self.hidden)      # fp32
 
         if trainable:
-            from peft import LoraConfig, get_peft_model
+            from peft import LoraConfig, PeftModel, get_peft_model
 
-            lm = get_peft_model(lm, LoraConfig(
-                r=int(c.lora.r), lora_alpha=int(c.lora.alpha), lora_dropout=float(c.lora.dropout),
-                bias="none", target_modules=LORA_REGEX, task_type="CAUSAL_LM"))
+            if init_dir is None:
+                lm = get_peft_model(lm, LoraConfig(
+                    r=int(c.lora.r), lora_alpha=int(c.lora.alpha), lora_dropout=float(c.lora.dropout),
+                    bias="none", target_modules=LORA_REGEX, task_type="CAUSAL_LM"))
+            else:
+                lm = PeftModel.from_pretrained(lm, str(Path(init_dir) / ADAPTER_DIR), is_trainable=True)
+                self.prefix.load_state_dict(torch.load(Path(init_dir) / PREFIX_FILE, map_location="cpu"))
             for p in lm.parameters():                 # pesos maestros en fp32; el forward corre en autocast bf16
                 if p.requires_grad and p.dtype != torch.float32:
                     p.data = p.data.float()

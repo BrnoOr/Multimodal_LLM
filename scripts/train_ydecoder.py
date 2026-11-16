@@ -1,20 +1,23 @@
 """Entrena el Y-Decoder de VL-JEPA (docs/metodologia.md §2.4; vlmfid.train.ydecoder).
 
-    # etapa 1: decodificador sobre el Y-Encoder preentrenado
-    uv run --no-sync python scripts/train_ydecoder.py model=vljepa
-    # barrido del largo del prefijo
+    # etapa 1, zero-shot: decodificador GENÉRICO, solo captions de MSR-VTT (por defecto)
     uv run --no-sync python scripts/train_ydecoder.py model=vljepa decoder.prefix_len=4
-    # etapa 2: decodificador sobre el Y-Encoder ajustado
-    uv run --no-sync python scripts/train_ydecoder.py model=vljepa model.adapter_path=runs/<train_vljepa...>/adapter_best
+    # condición intermedia: el genérico ajustado con captions de M3DI (Y-Encoder preentrenado)
+    uv run --no-sync python scripts/train_ydecoder.py model=vljepa decoder.text_source=m3di \
+        decoder.init_from=runs/<ydec_..._msrvtt_...>/decoder_best
+    # etapa 2: el genérico ajustado con M3DI sobre el Y-Encoder ajustado
+    uv run --no-sync python scripts/train_ydecoder.py model=vljepa model.adapter_path=runs/<train_vljepa...>/adapter_best \
+        decoder.text_source=m3di decoder.init_from=runs/<ydec_..._msrvtt_...>/decoder_best
     # prueba de humo (pocos pasos, val chico)
-    uv run --no-sync python scripts/train_ydecoder.py model=vljepa decoder.train.epochs=1 decoder.train.eval_every=20 \
-        decoder.train.val_limit=32 smoke_steps=40 exp_id=ydec_humo
+    uv run --no-sync python scripts/train_ydecoder.py model=vljepa smoke_steps=40 decoder.msrvtt.eval_every=20 \
+        decoder.msrvtt.val_limit=32 decoder.msrvtt.m3di_report_limit=32 exp_id=ydec_humo_msrvtt
 
 En el cluster:
-    SCRIPT=scripts/train_ydecoder.py GPU=0 scripts/launch.sh ydec scripts/run_queue.sh configs/queues/ydecoder_sweep.txt
+    SCRIPT=scripts/train_ydecoder.py GPU=0 scripts/launch.sh ydec_msrvtt scripts/run_queue.sh configs/queues/ydecoder_msrvtt.txt
 
 Configuración = defaults.yaml ⊕ configs/models/<model>.yaml ⊕ configs/ydecoder.yaml (clave `decoder`)
-⊕ overrides. Entrena solo con texto de train y elige el mejor paso en val; test no se usa.
+⊕ overrides. Entrena solo con texto (MSR-VTT train_7k o M3DI train) y elige el mejor paso en MSR-VTT test_1k
+(CIDEr) o en val de M3DI (attr_mean); el test de M3DI no se usa.
 Para usar el decodificador en inferencia: `model.decoder_path=runs/<exp_id>/decoder_best`.
 """
 

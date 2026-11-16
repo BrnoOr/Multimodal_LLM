@@ -6,9 +6,11 @@
 #   adapter_path  runs/<train_...>/adapter_best del modelo ajustado (mejor checkpoint en val).
 #   decoder_path  solo VL-JEPA: runs/<ydec_...>/decoder_best. Cada condición necesita el decodificador
 #                 entrenado sobre SU Y-Encoder (preentrenado o ajustado, y con la misma cuantización).
-#                 Condiciones nf4: ydec_..._nf4_<zs|ft>_nf4_...; condiciones bf16: ydec_..._bf16_<zs|ft>_bf16_...
-#                 (P10: en el control todo va en bf16, también el LM del decodificador). La carga lo
-#                 verifica (vlmfid.models.vljepa.check_decoder_matches).
+#                 Zero-shot: el decodificador GENÉRICO de MSR-VTT (ydec_..._zs_<q>_msrvtt_...); intermedia:
+#                 el genérico ajustado con M3DI (ydec_..._zs_..._cont); ajustado: el genérico ajustado con
+#                 M3DI sobre el Y-Encoder ajustado (ydec_..._ft_..._cont). Decisión del 16-11-2026, M §2.4.
+#                 bf16: todo en bf16, también el LM del decodificador (P10). La carga verifica adaptador y
+#                 cuantización (vlmfid.models.vljepa.check_decoder_matches).
 #
 # Mientras quede algún `null`, scripts/final_test.py rechaza el plan completo y no lee test.
 # Al primer lanzamiento el plan se congela (runs/final_test/plan.lock.yaml) y ya no puede cambiar.
@@ -35,5 +37,8 @@ entries:
   # ── VL-JEPA (texto vía Y-Decoder) ─────────────────────────────────────────────────────────────
   - {label: vljepa_zs_nf4,     model: vljepa,    quant: nf4,  prompt: null, needs_decoder: true, decoder_path: null}
   - {label: vljepa_zs_bf16,    model: vljepa,    quant: bf16, prompt: null, needs_decoder: true, decoder_path: null}
+  # Condición intermedia: VL-JEPA preentrenado + decodificador genérico ajustado con M3DI (aísla el formato).
+  # Mismo prompt que vljepa_zs_nf4.
+  - {label: vljepa_zs_nf4_decm3di, model: vljepa, quant: nf4, prompt: null, needs_decoder: true, decoder_path: null}
   - {label: vljepa_ft_nf4,     model: vljepa,    quant: nf4,  prompt: p1_attributes, needs_adapter: true, adapter_path: null, needs_decoder: true, decoder_path: null}
   - {label: vljepa_ft_bf16,    model: vljepa,    quant: bf16, prompt: p1_attributes, needs_adapter: true, adapter_path: null, needs_decoder: true, decoder_path: null}
