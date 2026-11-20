@@ -13,9 +13,9 @@ está escrita completa** (código, colas, grilla y notebook), sin ejecutar.
   3 épocas, CIDEr 1.827, techo M3DI ≈ 0.12) y el diagnóstico de cuantización. Se agrega solo inferencia: VL-JEPA
   zero-shot NF4 con los 6 prompts. **Cancelados:** Y-Decoder bf16 y control bf16 de VL-JEPA (A3, A5), condición
   intermedia (A6) y pérdida de información de la etapa 1 (A7). `final_test.yaml` queda con 15 condiciones.
-- **En el cluster (20-11):** corre `s1_vljepa_piloto` en la GPU 1 (`stage1_vljepa_val.txt`: 6 prompts × 200
-  imágenes). Después: puntuar, revisar a mano y decidir si el val completo va con los 6 prompts o con los 2 mejores
-  (según el tiempo medido). La GPU 0 sigue ocupada por un proceso ajeno.
+- **VL-JEPA zero-shot en val (A4, hecho 20-11):** 6 prompts × 10 000, ≈ 580 s cada uno. Gana `p4m_multiexample`
+  (attr_mean 0.0039; todos entre 0.0026 y 0.0039, es decir, ruido); anotado en `final_test.yaml` junto con los
+  prompts zero-shot de los VLM. **Etapa 1 cerrada.** La GPU 0 sigue ocupada por un proceso ajeno.
 - **Diagnóstico de cuantización (A2, hecho):** toda la brecha NF4 − bf16 de VL-JEPA viene del **Y-Encoder** (S_Y
   contra bf16: coseno 0.876; X-Encoder y Predictor ≥ 0.99). Además, el checkpoint **no discrimina entre imágenes de
   M3DI** ni siquiera en bf16 (R@1 ≈ azar). Detalle en `resultados_etapa1.md` §7.4. Falta la verificación "propio
@@ -27,7 +27,7 @@ está escrita completa** (código, colas, grilla y notebook), sin ejecutar.
 - **Sin commitear** (cierre CE1): notebooks 02 y 03, docs (`estado_sesion`, `metodologia`, `pasos_cluster`,
   `resultados_etapa1`), `configs/final_test.yaml`, colas `ydecoder_msrvtt`, `stage1_vljepa_val`, `stage1_infoloss`
   y `tests/test_final_test.py`. **No hacer `git pull`
-  mientras corra `s1_vljepa_piloto`.**
+  mientras corra una cola.**
 
 ## 2. Lo cerrado en la etapa 1
 
@@ -98,9 +98,9 @@ intermedia** y las **sondas** de §2.5.
 
 | # | Paso | Dónde | Depende de |
 |---|---|---|---|
-| 1 | VL-JEPA zero-shot, piloto 6 prompts × 200 (A4), **en curso** → `score.py` + `peek.py` → mandar a Claude | cluster | — |
-| 2 | VL-JEPA en val completo: 6 prompts o los 2 mejores del piloto (según el tiempo) → prompt por `attr_mean` → anotar en `final_test.yaml` (`vljepa_zs_nf4`) | cluster + usuario | 1 |
-| 3 | Commit + push de todo lo pendiente; `git pull` en el cluster **cuando no corra ninguna cola** | usuario | 1 (o 2) |
+| 1 | ~~VL-JEPA zero-shot (A4)~~ hecho: `p4m_multiexample` | — | — |
+| 2 | ~~Prompts zero-shot en `final_test.yaml`~~ hecho (los 4 modelos) | — | — |
+| 3 | Commit + push; `git pull` en el cluster **cuando no corra ninguna cola** | usuario | — |
 | 4 | Verificación "propio frente a otros" (notebook 02 §11c-bis o el comando del 20-11, sin GPU) | cluster | — |
 | 5 | Correr el notebook 02 completo y actualizar `resultados_etapa1.md` con VL-JEPA (A8) | cluster + laptop | 2, 3 |
 | 6 | Tests de entrenamiento y humo de la etapa 2 (B1–B2) | cluster | 3 |

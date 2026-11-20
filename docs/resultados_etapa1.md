@@ -4,8 +4,9 @@
 > sobre **val**; test no se ha tocado. Las cifras corresponden a modelos de 0.5–1B y solo son
 > comparables entre nuestros modelos bajo el mismo protocolo [CLAUDE.md §2].
 >
-> Estado (16-11-2026): VLM autorregresivos en NF4 completos; control bf16 de los VLM en curso; VL-JEPA
-> pendiente del barrido del Y-Decoder; pérdida de información pendiente.
+> Estado (20-11-2026): **etapa 1 cerrada (CE1, §8)**. VLM en NF4 y control bf16 completos; VL-JEPA zero-shot
+> NF4 en val con los 6 prompts (§7d); Y-Decoder genérico NF4 (§7c); diagnóstico de cuantización (§7.4). Sin control
+> bf16 de VL-JEPA, sin condición intermedia y sin pérdida de información (cancelados en el cierre).
 
 ## 1. Procedencia
 
@@ -293,6 +294,31 @@ Job `ydec`, commit `0698e68`.
 - En las reconstrucciones revisadas los errores son de posición (p. ej. top-left → bottom-left) o de
   tono cercano (`bright blue` → `rich blue`); forma y plantilla salen bien casi siempre.
 
+### 7.4b Verificación YQ: ¿error nuestro o sensibilidad del modelo? (humo, 64 captions, 20-11-2026)
+
+`scripts/diag_yencoder_quant.py`. Son los mismos pesos (el Y-Encoder del checkpoint) y los mismos captions, comparados contra bf16:
+
+| Condición | cos S_Y (media / p10) | Estructura (Spearman) | Auto-recuperación R@1 | Lineales en 4 bits |
+|---|---|---|---|---|
+| fp32 | 0.9999 / 0.9999 | 0.9998 | 1.000 | 0 |
+| NF4 manual (proyecto) | 0.877 / 0.825 | 0.947 | 0.625 | 168 |
+| NF4 estándar de `transformers` | 0.878 / 0.825 | 0.947 | 0.625 | 168 |
+| NF4 estándar, sin doble cuantización | 0.877 / 0.824 | 0.946 | 0.625 | 168 |
+
+Coseno por posición contra bf16 (NF4, igual en las tres variantes): ≥ 0.988 desde los embeddings hasta la salida
+del bloque 23, y **0.862 en la última posición** (salida del bloque 24 tras la norma final). El máximo |h| en bf16
+crece con la profundidad hasta ≈ 9 × 10⁴ a la entrada del último bloque (después de la norma final, ≈ 90).
+
+- **No es un error de la cuantización manual:** la carga estándar de `transformers` da el mismo resultado,
+  hasta la tercera cifra. La doble cuantización no influye.
+- **Es una sensibilidad real de este modelo a NF4, localizada en el último bloque.** Hipótesis, no verificada:
+  activaciones atípicas de gran magnitud ("massive activations"), que hacen que pequeños errores relativos de
+  los pesos en 4 bits desplacen la salida. Se pone a prueba con la condición `nf4_skip_last` (NF4 salvo el
+  último bloque) en la corrida completa.
+- NF4 conserva buena parte de la estructura relativa entre captions (Spearman 0.95), pero no toda: con 64
+  captions, solo el 62.5 % de los S_Y en NF4 recupera su propio caption en bf16. Son cifras del humo (n = 64);
+  la corrida completa (1 024) las reemplaza.
+
 ## 7c. Y-Decoder genérico (MSR-VTT)
 
 Diseño C5′ (`docs/metodologia.md` §2.4): decodificador entrenado solo con captions de MSR-VTT `train_7k`; el paso
@@ -349,6 +375,30 @@ NF4, decodificador genérico (§7c), 6 prompts, 200 imágenes de val (`runs/_tab
 - Detalle menor: `peek` informa `tokens: mediana=0` porque el conteo de tokens generados no se registra para
   VL-JEPA. No afecta la puntuación.
 
+### Val completo (10 000 imágenes, job `s1_vljepa_val`, 20-11-2026)
+
+≈ 580 s por prompt. `runs/_tablas/vljepa_val.csv`.
+
+| Prompt | forma | x | y | color | attr_mean | Bleu-1 | Bleu-4 | ROUGE-L | CIDEr |
+|---|---|---|---|---|---|---|---|---|---|
+| **p4m_multiexample** | 0.0033 | 0.0001 | 0.0000 | 0.0120 | **0.0039** | 0.172 | 0.000 | 0.162 | 0.008 |
+| p3_json | 0.0036 | 0.0001 | 0.0000 | 0.0106 | 0.0036 | 0.175 | 0.000 | 0.164 | 0.008 |
+| p2_constrained | 0.0032 | 0.0001 | 0.0000 | 0.0108 | 0.0035 | 0.173 | 0.000 | 0.163 | 0.008 |
+| p4_dataset_format | 0.0023 | 0.0002 | 0.0000 | 0.0106 | 0.0033 | 0.173 | 0.000 | 0.163 | 0.008 |
+| p1_attributes | 0.0024 | 0.0003 | 0.0000 | 0.0103 | 0.0032 | 0.172 | 0.000 | 0.163 | 0.008 |
+| p0_minimal | 0.0023 | 0.0001 | 0.0002 | 0.0078 | 0.0026 | 0.168 | 0.000 | 0.161 | 0.007 |
+| *clase mayoritaria* | 0.1414 | 0.3311 | 0.3299 | 0.0846 | 0.2218 | | | | |
+
+- **Prompt elegido por la regla (`attr_mean` máx.): `p4m_multiexample`**, anotado en `configs/final_test.yaml`
+  (`vljepa_zs_nf4`). El margen sobre el segundo (`p3_json`) es de 0.0003, unos 12 aciertos de atributo en
+  40 000. **La elección no es distinguible del ruido**, y así se reporta (el bootstrap pareado del notebook 02
+  §3 lo cuantifica). El rango entre prompts (0.0013) es mínimo: VL-JEPA es casi insensible al prompt, porque el
+  prompt solo entra como consulta al Predictor y el texto lo escribe siempre el mismo lector genérico.
+- VL-JEPA queda dos órdenes de magnitud por debajo de la clase mayoritaria (0.222) y del techo de su lector
+  (≈ 0.12). Lectura: omisión casi total (§7d, piloto), sin discriminación entre imágenes (§7.4) y un lector
+  sin el vocabulario de M3DI (§7c). Es un resultado de la **cadena VL-JEPA + lector genérico en zero-shot**, no
+  solo del Predictor.
+
 ## 8. Cierre de la etapa 1 (CE1, decisión del usuario, 20-11-2026)
 
 La etapa 1 se cierra **sin más entrenamientos** (`docs/metodologia.md` §6.1, CE1). Lo único que se agrega es
@@ -363,7 +413,7 @@ La etapa 1 se cierra **sin más entrenamientos** (`docs/metodologia.md` §6.1, C
 | Barrido del Y-Decoder con M3DI (`ydecoder_sweep`) | hecho, superado (§7b) |
 | Y-Decoder genérico: barrido de *k* en MSR-VTT y k = 8 hasta 3 épocas, NF4 | hecho (§7c) |
 | Diagnóstico de cuantización de VL-JEPA (A2) | hecho (§7.4); falta la verificación "propio frente a otros" (sin GPU) |
-| **VL-JEPA zero-shot en val, 6 prompts** (A4: piloto de 200 → val completo → prompt) | **en curso** (job `s1_vljepa_piloto`, 20-11) |
+| VL-JEPA zero-shot en val, 6 prompts (A4: piloto de 200 → val completo → prompt) | hecho (§7d): `p4m_multiexample`, attr_mean 0.0039 |
 | Y-Decoder genérico bf16 (A3) y control bf16 de VL-JEPA (A5) | **cancelado** (CE1) |
 | Condición intermedia (A6) | **cancelado** (CE1) |
 | Pérdida de información de la etapa 1 (A7) | **cancelado** (CE1); el comando queda en `stage1_infoloss.txt` (solo inferencia) |

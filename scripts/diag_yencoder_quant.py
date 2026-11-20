@@ -16,6 +16,7 @@ Condiciones (todas contra la referencia bf16):
     nf4_manual     swap_linear_to_nf4 (lo que usa el proyecto); debe reproducir el ≈ 0.876 del diagnóstico
     nf4_hf         from_pretrained(..., quantization_config=BitsAndBytesConfig NF4 + doble cuantización)
     nf4_hf_nodq    ídem sin doble cuantización (¿influye la doble cuantización?)
+    nf4_skip_last  NF4 manual salvo el último bloque del transformer (en bf16): ¿el error está ahí?
 
 Métricas por condición:
     cos_s_y        coseno por caption entre S_Y de la condición y S_Y bf16 (media, p10, mínimo)
@@ -187,6 +188,17 @@ def run(cfg) -> int:
         print(f"[diagyq] NF4 manual: {n_swapped} lineales reemplazadas", flush=True)
         add("nf4_manual", encode(base_man, projector, batches, torch.bfloat16), base_man)
         del base_man
+
+        # NF4 manual salvo el ÚLTIMO bloque (queda en bf16). El humo del 20-11 mostró que el error aparece
+        # casi entero en la última posición (coseno por capa ≥ 0.988 hasta la capa 23 y 0.862 al final),
+        # donde además están las activaciones más grandes. ¿Basta con dejar ese bloque sin cuantizar?
+        base_skip = copy.deepcopy(base_bf16)
+        blocks = base_skip.layers
+        n_skip = sum(swap_linear_to_nf4(b, dev) for b in list(blocks)[:-1])
+        print(f"[diagyq] NF4 salvo el último bloque: {n_skip} lineales reemplazadas "
+              f"({len(blocks) - 1} de {len(blocks)} bloques)", flush=True)
+        add("nf4_skip_last", encode(base_skip, projector, batches, torch.bfloat16), base_skip)
+        del base_skip
 
         # NF4 por la vía estándar de transformers, con y sin doble cuantización
         from transformers import AutoModel, BitsAndBytesConfig

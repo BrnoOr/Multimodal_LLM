@@ -32,7 +32,7 @@
 ## Parte A — Cerrar la etapa 1
 
 > **Cierre CE1 (decisión del usuario, 20-11-2026; `docs/metodologia.md` §6.1):** la etapa 1 se cierra sin más
-> entrenamientos. Hechos: A1 y A2. En curso: A4 (solo inferencia). **Cancelados: A3, A5, A6 y A7.** Quedan aquí
+> entrenamientos. Hechos: A1, A2 y A4. **Etapa 1 cerrada (20-11).** **Cancelados: A3, A5, A6 y A7.** Quedan aquí
 > como referencia, sin ejecutar.
 
 ### A1. Esperar el Y-Decoder genérico NF4 (k = 8, 3 épocas)
@@ -115,8 +115,8 @@ El `cat` debe mostrar `model=vljepa model.quant=bf16 decoder.quant=bf16 decoder.
 
 ### A4. VL-JEPA zero-shot en val (piloto → val completo → prompt)
 
-**EN CURSO (20-11):** piloto lanzado como `s1_vljepa_piloto` en la GPU 1. Según el tiempo del piloto, el val completo
-va con los 6 prompts (como los VLM) o con los 2 mejores (diferencia que se declararía).
+**HECHO (20-11):** 6 prompts en val completo; gana `p4m_multiexample` (attr_mean 0.0039, margen de ruido;
+`docs/resultados_etapa1.md` §7d).
 
 Puede ir en paralelo con A3 si hay dos GPU libres. Piloto: 200 imágenes × 6 prompts.
 
@@ -247,7 +247,9 @@ CUDA_VISIBLE_DEVICES=1 uv run --no-sync python scripts/diag_yencoder_quant.py mo
 ```
 
 **Bien si** el humo imprime `coincide con encode_texts`, `NF4 manual: 168 lineales reemplazadas`, y en `nf4_hf` y
-`nf4_hf_nodq` `lineales 4 bits 168`. Entonces la corrida completa:
+`nf4_hf_nodq` `lineales 4 bits 168`, y en `nf4_skip_last` `161 lineales reemplazadas (23 de 24 bloques)`.
+**Humo hecho el 20-11** (`docs/resultados_etapa1.md` §7.4b); la condición `nf4_skip_last` se agregó después: repetir el
+humo con otro tag (`diag.tag=humo2`) antes de la corrida completa. Entonces la corrida completa:
 
 ```bash
 GPU=1 scripts/launch.sh diag_yq uv run --no-sync python scripts/diag_yencoder_quant.py model=vljepa
@@ -259,7 +261,8 @@ grep -E "^\[diagyq\]|^  " logs/diag_yq/job.log | tail -15
 | Si… | Entonces |
 |---|---|
 | `nf4_manual` ≈ 0.88 y `nf4_hf` ≈ 0.99 | Error de la cuantización manual: se corrige el código; YQ se resuelve sin excepción |
-| `nf4_manual` ≈ `nf4_hf` ≈ 0.88 | Sensibilidad real del modelo a NF4: YQ es una decisión de protocolo (NF4 declarado o excepción bf16) |
+| `nf4_manual` ≈ `nf4_hf` ≈ 0.88 | Sensibilidad real del modelo a NF4: YQ es una decisión de protocolo (NF4 declarado o excepción bf16) — **resultado del humo** |
+| `nf4_skip_last` ≈ 0.99 | Basta con dejar el último bloque del Y-Encoder en bf16: una excepción acotada, como `lm_head` (P11) |
 | `nf4_hf_nodq` mucho mejor que `nf4_hf` | Lo causa la doble cuantización |
 | `estructura` alta (≥ 0.95) aunque el coseno baje | NF4 desplaza los vectores pero conserva las distancias relativas entre captions: pesa a favor de mantener NF4 |
 | El coseno por capa cae de golpe en una capa con `max|h|` muy grande | Activaciones atípicas: el origen típico de la sensibilidad a 4 bits |
