@@ -1,0 +1,14 @@
+# LLaVA-OneVision-0.5B — etapa 2. Solo claves permitidas (ver configs/train/budget.yaml).
+#
+# Prompt: el mejor zero-shot de LLaVA-OV fue p3_json (Índice macro 0,468), pero pide JSON y el
+# objetivo del ajuste es el caption en prosa. Se usa p1_attributes, su segundo mejor (0,461, a
+# -0,7 puntos), coherente con el objetivo (decisión del equipo, 14-10-2026).
+prompt: p1_attributes
+
+train:
+  # ≈1 500 tokens visuales por imagen (AnyRes): es el modelo con secuencias más largas. Con
+  # gradient checkpointing, 8 por micro-lote deja margen en 24 GB; si hay OOM el loop lo parte solo.
+  micro_batch_size: 8
+
+lora:
+  connector_modules: [multi_modal_projector]   # MLP de 2 capas SigLIP -> Qwen2 (model.multi_modal_projector)

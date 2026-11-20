@@ -1,0 +1,10 @@
+# InternVL3-1B — etapa 2. Solo claves permitidas (ver configs/train/budget.yaml).
+#
+# Prompt: mejor zero-shot de la etapa 1, p1_attributes (Índice macro 0,433).
+prompt: p1_attributes
+
+train:
+  micro_batch_size: 16      # 256 tokens visuales por imagen (una tesela de 448 px)
+
+lora:
+  connector_modules: [multi_modal_projector]   # LayerNorm + MLP InternViT -> Qwen2.5 (model.multi_modal_projector)
