@@ -9,7 +9,7 @@
 
 train:
   # InfoNCE toma los negativos del lote: el micro-lote DEBE ser el lote efectivo (compose_train lo exige).
-  micro_batch_size: 128
+  micro_batch_size: 64     # = lote efectivo (P8)
   # P7 (decisión del usuario, 16-11-2026): durante el ajuste no hay Y-Decoder válido (el Y-Encoder cambia),
   # así que el paso se elige por la InfoNCE en val (mínima). Diferencia declarada frente a los VLM.
   selection_metric: val_loss

@@ -15,7 +15,7 @@
 #       sin fuente. Decodificador genérico: barrido de k ∈ {1, 4, 8} con 1 época en MSR-VTT
 #       (configs/queues/ydecoder_msrvtt.txt) y el ganador hasta 3 épocas, eligiendo el mejor paso.
 #       k = 8: mejor CIDEr en MSR-VTT test_1k con 1 época (k=1 1.321, k=4 1.384, k=8 1.439; adelante en
-#       las 7 evaluaciones). train.epochs = 10 es el de los decodificadores ajustados a M3DI.
+#       las 7 evaluaciones). train.epochs = 20 es el de los decodificadores ajustados a M3DI (decisión 20-11).
 #   train.noise_std = 0
 #       sin ruido: el protocolo entrena con S_Y limpio (docs/metodologia.md §2.4).
 decoder:
@@ -44,10 +44,11 @@ decoder:
   train:
     lr: 2.0e-4                          # LoRA y proyección de prefijo
     batch_size: 16
-    epochs: 10                          # text_source=m3di: sobre los captions distintos de train de M3DI; se
-                                        # elige el mejor paso en val. Era 3; en el barrido con M3DI las curvas
-                                        # seguían subiendo (docs/resultados_etapa1.md §7b). PENDIENTE de revisar
-                                        # para los decodificadores que continúan desde el genérico.
+    epochs: 20                          # text_source=m3di: sobre los captions distintos de train de M3DI; se
+                                        # elige el mejor paso en val. Decisión del usuario (20-11-2026): el run
+                                        # de 10 épocas desde cero seguía subiendo ≈ +0.015 por época al final
+                                        # (0.718 a 3 ép., 0.906 a 10; resultados §7b); 20 es un tope holgado,
+                                        # con selección del mejor paso. ≈ 1 h 40 min con k = 8.
     schedule: constant
     betas: [0.9, 0.999]
     weight_decay: 0.0

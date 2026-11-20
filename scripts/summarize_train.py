@@ -11,7 +11,7 @@ Columnas:
     model, quant, lr, lora_r,          identificación y ejes de la grilla (configs/train/grid.yaml)
     connector_lr_mult, steps
     loss_first, loss_last              pérdida de entrenamiento en el primer y el último registro
-    peak_mem_gb                        pico de memoria (máximo de train_log): decide P8 (lote 128 en 24 GB)
+    peak_mem_gb                        pico de memoria (máximo de train_log): decidió P8 (lote 64; 128 no cabía en VL-JEPA)
     sel_metric, sel_mode               attr_mean (máx., VLM) o val_loss (mín., VL-JEPA; P7)
     val_step0                          métrica de selección en el paso 0 (adaptador en cero = zero-shot)
     val_last                           la del ÚLTIMO paso evaluado: regla de la grilla

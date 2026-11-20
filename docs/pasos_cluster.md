@@ -283,7 +283,10 @@ CUDA_VISIBLE_DEVICES=1 uv run --no-sync pytest tests/test_train_units.py tests/t
 
 **Mandar a Claude:** la salida completa si algo falla (no seguir a B2 con fallos).
 
-### B2. Prueba de humo (6 pasos × lote 128, los 4 modelos, NF4 y bf16)
+### B2. Prueba de humo (6 pasos × lote efectivo, los 4 modelos, NF4 y bf16)
+
+**Hecho el 20-11 con lote 128:** los 3 VLM pasaron (NF4 y bf16) y VL-JEPA dio OOM en las dos precisiones → P8 = 64.
+Falta repetir solo las 2 líneas de VL-JEPA con lote 64 (ver B3).
 
 Repartida en las dos GPU si están libres (NF4 en una, bf16 en otra); si no, toda la cola en una:
 
@@ -312,17 +315,25 @@ grep -hE "\[train\] modelo listo|\[train\] grupos de LR|query_tokens" logs/s2_sm
 | `lora_layers_llm` | 168 (LLaVA-OV, InternVL3), 186 (Qwen3.5) |
 | VL-JEPA `lora_layers_predictor` / `lora_layers_y_encoder` | 56 / 168 |
 | Grupos de LR de VL-JEPA | `lora_y_encoder` = 0.05 × `lora` |
-| `peak_mem_gb` de VL-JEPA (NF4 y bf16) | < 24 GB con micro-lote 128 → P8 = 128 |
+| `peak_mem_gb` de VL-JEPA (NF4 y bf16) | < 22 GB con micro-lote 64 (P8 = 64, decidido) |
 | `loss_last` < `loss_first` | en los 8 runs |
 | `val_step0` (adaptador en cero) | coherente con el zero-shot de `p1_attributes` (aproximado: el humo de los VLM evalúa solo 32 imágenes de val, no las 500 de la grilla) |
 
 **Mandar a Claude:** la tabla de `summarize_train` y el `grep`. **DECISIÓN P8** con el pico de memoria de VL-JEPA.
 
-### B3. Ajustar el lote si P8 = 64
+### B3. Humo de VL-JEPA con lote 64 (P8)
 
-Solo si VL-JEPA no cabe con 128: Claude cambia `train.effective_batch_size` a 64 en `configs/train/budget.yaml`
-(para los cuatro, por comparabilidad) y regenera la grilla (`scripts/make_grid.py`). Push → `git pull` → repetir solo la línea de humo de
-VL-JEPA para confirmar.
+P8 = 64 ya está en `configs/train/budget.yaml` y `configs/train/models/vljepa.yaml`. La grilla no se regenera: sus
+líneas no llevan el lote. Tras `git pull`, repetir solo VL-JEPA:
+
+```bash
+grep '^model=vljepa' configs/queues/stage2_smoke.txt > /tmp/s2_smoke_vljepa.txt
+wc -l /tmp/s2_smoke_vljepa.txt
+SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2_smoke_vj scripts/run_queue.sh /tmp/s2_smoke_vljepa.txt
+```
+
+`wc -l` debe dar 2. Los runs de VL-JEPA del primer humo fallaron antes de escribir nada reanudable; si existe
+`runs/train_vljepa_open_msrvtt_*_m6/`, moverla a `_para_borrar/` antes de relanzar.
 
 ### B4. Grilla de hiperparámetros (LR × r × conector, 150 pasos × lote, en val)
 
@@ -370,7 +381,7 @@ wc -l /tmp/grid_vljepa.txt
 SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2_grid_vljepa scripts/run_queue.sh /tmp/grid_vljepa.txt
 ```
 
-`wc -l` debe dar **12**. Duración: con los `img/s` del humo (B2), cada corrida procesa 150 × 128 = 19 200 imágenes
+`wc -l` debe dar **12**. Duración: con los `img/s` del humo (B2), cada corrida procesa 150 × 64 = 9 600 imágenes
 más 4 evaluaciones en val.
 
 Seguimiento y resultado:
@@ -390,7 +401,7 @@ Push → `git pull` en el cluster.
 
 ### B5. Ajuste completo (1 época, NF4 y control bf16)
 
-977 pasos con lote 128 por run; la duración por modelo se estima con los `img/s` del humo (columna
+1 954 pasos con lote 64 por run; la duración por modelo se estima con los `img/s` del humo (columna
 `samples_per_s` de `train_log.jsonl`). NF4 en la GPU 0 y bf16 en la GPU 1:
 
 ```bash

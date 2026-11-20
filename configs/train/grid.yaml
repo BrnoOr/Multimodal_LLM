@@ -14,7 +14,7 @@
 # evaluaciones intermedias solo se registran. Se descartó successive halving (presupuestos distintos por combinación).
 # El ganador de cada modelo va a configs/train/models/<modelo>.yaml (train.lr, lora.r, train.connector_lr_mult).
 #
-# Costo: 3 × 2 × 2 = 12 combinaciones por modelo, 48 corridas, 48 × 150 × 128 ≈ 922 000 imágenes (≈ 7 épocas de
+# Costo: 3 × 2 × 2 = 12 combinaciones por modelo, 48 corridas, 48 × 150 × 64 ≈ 461 000 imágenes (≈ 3.7 épocas de
 # train). La corrida final es 1 época.
 
 steps: 150                  # pasos por combinación (barrido de LR, 16-11-2026)

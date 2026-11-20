@@ -1,4 +1,4 @@
-# Pasos 2.1 y 2.2 — AJUSTE COMPLETO: 1 época de train (977 pasos con lote 128), checkpoint elegido en val.
+# Pasos 2.1 y 2.2 — AJUSTE COMPLETO: 1 época de train (1 954 pasos con lote 64, P8), checkpoint elegido en val.
 # Requisitos ANTES de lanzar:
 #   1. Prueba de humo revisada (stage2_smoke.txt) y P8 decidido (lote efectivo común).
 #   2. Grilla hecha (stage2_grid.txt, configs/train/grid.yaml) y la combinación ganadora de cada modelo (train.lr,

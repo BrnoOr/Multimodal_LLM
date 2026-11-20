@@ -109,9 +109,10 @@ intermedia** y las **sondas** de §2.5.
 | 9 | `stage2_train.txt` → Y-Decoder de la etapa 2 (`ydecoder_msrvtt.txt` §4) → `stage2_val.txt` → `stage2_infoloss.txt` (B5–B8; notebook 03) | cluster | 7, 8 |
 | 10 | Llenar `configs/final_test.yaml` y correr `scripts/final_test.py` una sola vez (Parte C) | cluster | 9 |
 
-**Decisiones del usuario pendientes:** P8 (lote 128 o 64, tras el humo); épocas del Y-Decoder ajustado a M3DI (para B6); de dónde parte el Y-Decoder del control bf16 de la
+**Decisiones del usuario pendientes:** revisión de `max_grad_norm` con las normas del humo; de dónde parte el Y-Decoder del control bf16 de la
 etapa 2, ya que no hay genérico bf16 (P10, por CE1); P4 (actualizar CLAUDE.md §3: prompt de la etapa 2, controles bf16,
-Y-Decoder, P7, P9 y el cierre CE1). **Tomadas el 20-11:** P5 (P5′), grilla en dos tandas (G3), Y-Encoder en NF4 (YQ).
+Y-Decoder, P7, P9 y el cierre CE1). **Tomadas el 20-11:** P5 (P5′), grilla en dos tandas (G3), Y-Encoder en NF4 (YQ), lote 64 (P8, por OOM de
+VL-JEPA con 128), Y-Decoder M3DI con 20 épocas (YD).
 
 ## 5. Comandos para retomar
 

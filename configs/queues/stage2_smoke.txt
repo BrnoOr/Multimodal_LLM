@@ -1,11 +1,10 @@
 # Paso 2.0 — PRUEBA DE HUMO de la etapa 2 (docs/plan_reconstruccion.md §4; CLAUDE.md §5: validar antes de la corrida completa).
-# 6 pasos con el lote efectivo real (128), val chico. Verifica en el log de cada línea:
+# 6 pasos con el lote efectivo real (64 desde P8; el primer humo, con 128, dio OOM en VL-JEPA), val chico. Verifica en el log de cada línea:
 #   * "[train] modelo listo": trainable_lora_* / trainable_connector / lora_layers_* por componente
 #       VLM: lora_layers_llm = 168 (LLaVA-OV, InternVL3) o 186 (Qwen3.5)   (docs/resultados_etapa1.md §7.2)
 #       VL-JEPA: lora_layers_predictor = 56, lora_layers_y_encoder = 168 (24 capas de EmbeddingGemma × 7)
 #   * "[train] grupos de LR": VL-JEPA con lora_y_encoder = 0.05 × lora
-#   * "pico X GB" en las líneas [train]: P8 se decide con esto (VL-JEPA necesita lote físico = 128 en 24 GB;
-#     si no cabe, bajar train.effective_batch_size a 64 en budget.yaml PARA LOS CUATRO)
+#   * "pico X GB" en las líneas [train]: P8 (decidido 20-11: 64 para los cuatro; VL-JEPA usa lote físico 64)
 #   * la pérdida baja entre el paso 1 y el 6; el paso 0 de val reproduce el zero-shot (adaptador en cero)
 #   * VL-JEPA: "query_tokens" en model_info (la consulta p1 sin relleno) y que no falle por padding_side
 # Corridas cortas: permitidas aunque train.hparams_confirmed sea false.
@@ -15,7 +14,7 @@ model=vljepa     train.max_steps=6 data.val_limit=128 train.eval_every=3 train.s
 model=qwen35     train.max_steps=6 data.val_limit=32  train.eval_every=3 train.save_every=3 train.log_every=1
 model=internvl3  train.max_steps=6 data.val_limit=32  train.eval_every=3 train.save_every=3 train.log_every=1
 model=llava_ov   train.max_steps=6 data.val_limit=32  train.eval_every=3 train.save_every=3 train.log_every=1
-# Control bf16 (D6): misma prueba sin cuantizar, sobre todo para medir la memoria de VL-JEPA con lote 128.
+# Control bf16 (D6): misma prueba sin cuantizar, sobre todo para medir la memoria de VL-JEPA con lote 64.
 model=vljepa     model.quant=bf16 train.max_steps=6 data.val_limit=128 train.eval_every=3 train.save_every=3 train.log_every=1
 model=qwen35     model.quant=bf16 train.max_steps=6 data.val_limit=32  train.eval_every=3 train.save_every=3 train.log_every=1
 model=internvl3  model.quant=bf16 train.max_steps=6 data.val_limit=32  train.eval_every=3 train.save_every=3 train.log_every=1

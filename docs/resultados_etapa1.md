@@ -323,6 +323,23 @@ crece con la profundidad hasta ≈ 9 × 10⁴ a la entrada del último bloque (d
   captions, solo el 62.5 % de los S_Y en NF4 recupera su propio caption en bf16. Son cifras del humo (n = 64);
   la corrida completa (1 024) las reemplaza.
 
+**Corrida completa (1 024 captions, job `diag_yq`, 20-11-2026):**
+
+| Condición | cos S_Y (media / p10) | Estructura | Auto-recuperación R@1 |
+|---|---|---|---|
+| fp32 | 0.9999 / 0.9999 | 0.9998 | 1.000 |
+| NF4 manual | 0.876 / 0.810 | 0.941 | 0.157 |
+| NF4 salvo el último bloque | 0.890 / 0.829 | 0.935 | 0.165 |
+| NF4 estándar de `transformers` | 0.876 / 0.809 | 0.941 | 0.158 |
+| NF4 estándar, sin doble cuantización | 0.876 / 0.809 | 0.941 | 0.160 |
+
+Confirma el humo: el resultado manual es igual al estándar, la doble cuantización no influye y dejar el último
+bloque en bf16 no recupera la precisión. **Con 1 024 captions, la auto-recuperación cae a 0.16**: el S_Y en NF4
+de un caption tiene como vecino más cercano entre los S_Y bf16 a *otro* caption en el 84 % de los casos. Los
+captions de M3DI son plantillas casi iguales y el desplazamiento de NF4 (coseno 0.88) es grande frente a las
+distancias entre ellos. La estructura relativa *dentro* de cada espacio se conserva en buena medida
+(Spearman 0.94).
+
 **Decisión (YQ, usuario, 20-11-2026):** el Y-Encoder sigue en NF4 en la etapa 2, y así se declara
 (`docs/metodologia.md` §6.1). El costo de NF4 lo mide el control bf16 de la etapa 2.
 

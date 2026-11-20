@@ -39,11 +39,12 @@ data:
 train:
   hparams_confirmed: false      # true tras P8 y con el ganador de la grilla anotado en configs/train/models/ (P5 ya confirmado)
   epochs: 1                     # CLAUDE.md §3
-  # P8. A CONFIRMAR. 128 es el lote efectivo de la comparación controlada de [5] §4.5 (VL-JEPA 1.6B vs VLM).
-  # VL-JEPA necesita lote FÍSICO = efectivo (InfoNCE toma los negativos del lote, M §2.3). Si no cabe en
-  # 24 GB (se mide en la prueba de humo), bajar a 64, que es el lote con que se entrenó el checkpoint de
-  # open-vljepa (configs/stage_b_retrain.yaml del submódulo). 125 000 = 976·128 + 72 -> 977 pasos.
-  effective_batch_size: 128
+  # P8 (20-11-2026): 64 para los cuatro, por la regla acordada. La propuesta era 128 (comparación controlada de
+  # [5] §4.5), pero VL-JEPA necesita lote FÍSICO = efectivo (InfoNCE toma los negativos del lote, M §2.3) y con
+  # 128 dio OOM en el humo, en NF4 y en bf16 (pide 2.05 / 4.10 GiB con ≈ 22 GB ocupados). 64 es el lote con que
+  # se entrenó el checkpoint de open-vljepa (configs/stage_b_retrain.yaml del submódulo).
+  # 125 000 = 1 953·64 + 8 -> 1 954 pasos por época.
+  effective_batch_size: 64
   micro_batch_size: null        # lo fija configs/train/models/<modelo>.yaml (solo memoria)
   drop_last: false              # se usan las 125 000 imágenes; el último paso lleva el resto
   optimizer: adamw              # CONFIRMADO (P5′, 20-11-2026). [8] usa paged AdamW, crítico solo en 33B/65B (§4); con 0.5-1B el
@@ -63,14 +64,15 @@ train:
   eps: 1.0e-8
   schedule: cosine              # CONFIRMADO (P5′). coseno con calentamiento 3 % [2, Ap.]; VL-JEPA SFT también usa
                                 #   coseno [5] §3.2. Alternativa: constant [8, Ap. B.2]
-  warmup_ratio: 0.03            # [2, Ap.]; ≈ 29 de 977 pasos
+  warmup_ratio: 0.03            # [2, Ap.]; ≈ 59 de 1 954 pasos
   min_lr_ratio: 0.0
   max_grad_norm: 0.3            # CONFIRMADO (P5′). [8, Ap. B.2]. Revisar grad_norm del humo antes de la grilla
   max_target_tokens: 64         # cota de seguridad: el caption más largo tiene 31 tokens; si alguno excede, falla
   gradient_checkpointing: true
   x_encoder_chunk: 32           # VL-JEPA: el X-Encoder (congelado, sin gradiente) se pasa en trozos de este tamaño;
                                 #   no cambia la pérdida, solo la memoria pico
-  eval_every: 100               # pasos entre evaluaciones en val (+ paso 0 y el último) -> ~10 por época
+  eval_every: 200               # pasos entre evaluaciones en val (+ paso 0 y el último) -> ~10 por época
+                                #   (era 100 con lote 128; se duplica con P8 = 64 para conservar ~10 evaluaciones)
   eval_at_start: true           # paso 0 = modelo base con el adaptador en cero (control de paridad con la etapa 1)
   save_every: 100               # pasos entre checkpoints de reanudación
   log_every: 10
