@@ -23,10 +23,11 @@
 #   SCRIPT=scripts/train_ydecoder.py GPU=1 scripts/launch.sh ydec_k8_bf16 scripts/run_queue.sh /tmp/ydec_k8_bf16.txt
 model=vljepa decoder.prefix_len=8
 #    -> runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3   (decodificador ZERO-SHOT de VL-JEPA)
-model=vljepa model.quant=bf16 decoder.quant=bf16 decoder.prefix_len=8
+#    bf16 CANCELADO: cierre de la etapa 1 sin más entrenamientos (decisión del usuario, 20-11-2026; M §6.1, CE1).
+# model=vljepa model.quant=bf16 decoder.quant=bf16 decoder.prefix_len=8
 #
-# 3) Condición INTERMEDIA: el genérico ajustado con captions de M3DI sobre el Y-Encoder preentrenado.
-#    Épocas PENDIENTES de decidir (decoder.train.epochs).
+# 3) Condición INTERMEDIA: CANCELADA (CE1). Era el genérico ajustado con captions de M3DI sobre el Y-Encoder
+#    preentrenado. Las épocas del ajuste a M3DI siguen pendientes para la sección 4 (etapa 2).
 # model=vljepa decoder.text_source=m3di decoder.prefix_len=8 decoder.init_from=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best
 #
 # 4) Etapa 2: el genérico ajustado con captions de M3DI sobre el Y-Encoder AJUSTADO (después de stage2_train.txt).
@@ -34,4 +35,5 @@ model=vljepa model.quant=bf16 decoder.quant=bf16 decoder.prefix_len=8
 #    La carga verifica que adaptador y cuantización coincidan (check_decoder_matches).
 # model=vljepa model.adapter_path=runs/<TRAIN_VLJEPA>/adapter_best decoder.text_source=m3di decoder.prefix_len=8 decoder.init_from=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best
 # Control bf16 (P10): adaptador bf16, VL-JEPA y decodificador en bf16, partiendo del genérico bf16.
+# OJO (CE1): el genérico bf16 no se entrenó. Si se mantiene este control, hay que decidir de dónde parte (P10).
 # model=vljepa model.quant=bf16 decoder.quant=bf16 model.adapter_path=runs/<TRAIN_VLJEPA_BF16>/adapter_best decoder.text_source=m3di decoder.prefix_len=8 decoder.init_from=runs/ydec_vljepa_open_msrvtt_bf16_zs_bf16_msrvtt_k8_r64_e3/decoder_best

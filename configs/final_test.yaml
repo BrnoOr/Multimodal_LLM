@@ -35,10 +35,10 @@ entries:
   - {label: qwen35_ft_nf4,     model: qwen35,    quant: nf4,  prompt: p1_attributes, needs_adapter: true, adapter_path: null}
   - {label: qwen35_ft_bf16,    model: qwen35,    quant: bf16, prompt: p1_attributes, needs_adapter: true, adapter_path: null}
   # ── VL-JEPA (texto vía Y-Decoder) ─────────────────────────────────────────────────────────────
-  - {label: vljepa_zs_nf4,     model: vljepa,    quant: nf4,  prompt: null, needs_decoder: true, decoder_path: null}
-  - {label: vljepa_zs_bf16,    model: vljepa,    quant: bf16, prompt: null, needs_decoder: true, decoder_path: null}
-  # Condición intermedia: VL-JEPA preentrenado + decodificador genérico ajustado con M3DI (aísla el formato).
-  # Mismo prompt que vljepa_zs_nf4.
-  - {label: vljepa_zs_nf4_decm3di, model: vljepa, quant: nf4, prompt: null, needs_decoder: true, decoder_path: null}
+  - {label: vljepa_zs_nf4,     model: vljepa,    quant: nf4,  prompt: null, needs_decoder: true, decoder_path: runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best}
+  # RETIRADAS por el cierre de la etapa 1 sin más entrenamientos (decisión del usuario, 20-11-2026; M §6.1, CE1):
+  # sus decodificadores (genérico bf16, A3; intermedio, A6) no se entrenaron. Se declara en el informe.
+  # - {label: vljepa_zs_bf16,    model: vljepa,    quant: bf16, prompt: null, needs_decoder: true, decoder_path: null}
+  # - {label: vljepa_zs_nf4_decm3di, model: vljepa, quant: nf4, prompt: null, needs_decoder: true, decoder_path: null}
   - {label: vljepa_ft_nf4,     model: vljepa,    quant: nf4,  prompt: p1_attributes, needs_adapter: true, adapter_path: null, needs_decoder: true, decoder_path: null}
   - {label: vljepa_ft_bf16,    model: vljepa,    quant: bf16, prompt: p1_attributes, needs_adapter: true, adapter_path: null, needs_decoder: true, decoder_path: null}

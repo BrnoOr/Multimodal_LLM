@@ -1,3 +1,6 @@
+# CANCELADO en la etapa 1 (cierre sin este paso, decisión del usuario 20-11-2026; M §6.1, CE1). Se conserva
+# como referencia: si la etapa 2 quiere comparar contra la etapa 1, este es el comando (no entrena nada).
+#
 # Paso 1.4 — perdida de informacion por etapa de VL-JEPA, etapa 1 (docs/metodologia.md §2.5).
 # 10 000 imagenes de TRAIN para ajustar las sondas, 2 000 de VAL para medir. Test no se usa.
 # Decodificador: el GENERICO de MSR-VTT, k = 8 y 3 épocas (configs/queues/ydecoder_msrvtt.txt); debe existir antes.

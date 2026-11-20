@@ -10,6 +10,9 @@ model=vljepa prompt=p3_json            data.limit=200 infer.save_embeddings=true
 model=vljepa prompt=p4_dataset_format  data.limit=200 infer.save_embeddings=true model.decoder_path=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best
 model=vljepa prompt=p4m_multiexample   data.limit=200 infer.save_embeddings=true model.decoder_path=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best
 #
+# CIERRE DE LA ETAPA 1 (CE1, 20-11-2026): de esta cola solo corren los 6 prompts (piloto y val completo). El
+# control bf16 y la condición intermedia de abajo quedan CANCELADOS (sus decodificadores no se entrenaron).
+#
 # Control bf16 (P10): solo con el prompt elegido para VL-JEPA en val, con el decodificador genérico en bf16
 # (ydec_vljepa_open_msrvtt_bf16_zs_bf16_msrvtt_k8_r64_e3). La carga falla si el decodificador es el NF4.
 # model=vljepa prompt=<PROMPT> model.quant=bf16 infer.save_embeddings=true model.decoder_path=runs/ydec_vljepa_open_msrvtt_bf16_zs_bf16_msrvtt_k8_r64_e3/decoder_best

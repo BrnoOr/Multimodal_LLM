@@ -28,7 +28,7 @@ def test_el_plan_del_repo_esta_pendiente_o_completo():
     if pending:
         with pytest.raises(ValueError, match="no está listo"):
             final_test.load_plan(final_test.PLAN_PATH)
-    assert len({e["label"] for e in raw["entries"]}) == len(raw["entries"]) == 17      # 4 modelos x 4 condiciones + intermedia de VL-JEPA
+    assert len({e["label"] for e in raw["entries"]}) == len(raw["entries"]) == 15      # 4 modelos x 4 condiciones, sin vljepa_zs_bf16 (cierre de la etapa 1, CE1)
 
 
 def test_plan_incompleto_se_rechaza(tmp_path):
