@@ -86,7 +86,8 @@ def test_qwen35_entrena_selecciona_y_recarga(data, tmp_path):
     assert [r["step"] for r in val] == [0, 2, 4, 6, 8]
     assert all(r["selection_metric"] == "attr_mean" and "val_loss" in r for r in val)
     best = json.loads((rd / "best.json").read_text())
-    assert best["value"] == pytest.approx(max(r["attr_mean"] for r in val))
+    # val_log.jsonl redondea a 5 decimales; best.json guarda el valor exacto
+    assert best["value"] == pytest.approx(max(r["attr_mean"] for r in val), abs=1e-5)
     preds0 = _lines(rd / "val_predictions" / "step_00000.jsonl")
     assert {p["reference"] for p in preds0} == {r["caption"] for r in data["val"]}        # caption original
     train = _lines(rd / "train_log.jsonl")
@@ -235,7 +236,9 @@ def test_vljepa_opcion_a(data, tmp_path):
     assert [r["step"] for r in val] == [0, 2, 4, 6, 8]
     assert all(r["selection_metric"] == "val_loss" and r["n"] == 8 for r in val)
     best = json.loads((rd / "best.json").read_text())
-    assert best["value"] == pytest.approx(min(r["val_loss"] for r in val))      # P7: mínima InfoNCE
+    # val_log.jsonl redondea a 5 decimales; best.json guarda el valor exacto
+    assert best["value"] == pytest.approx(min(r["val_loss"] for r in val), abs=1e-5)      # P7: mínima InfoNCE
+    assert best["step"] == min(val, key=lambda r: r["val_loss"])["step"]
     assert min(r["val_loss"] for r in val[1:]) < val[0]["val_loss"]
     assert not (rd / "val_predictions").exists()                                 # sin Y-Decoder no hay texto
     train = _lines(rd / "train_log.jsonl")
