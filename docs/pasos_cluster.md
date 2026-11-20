@@ -224,7 +224,8 @@ las tablas de §3, §7 y §12 del notebook y `runs/_tablas/etapa1_val.csv`. Clau
 | # | Qué | Dónde | Cuándo |
 |---|---|---|---|
 | P8 | Lote efectivo común: 128 (propuesta, [5] §4.5) o 64 si VL-JEPA no cabe | `configs/train/budget.yaml` | tras B2 (memoria medida) |
-| P5 | Confirmar la propuesta: optimizador, esquema, warmup, `max_grad_norm`, LoRA α/dropout, weight decay (filas "Propuesta" de `docs/metodologia.md` §4) | `configs/train/budget.yaml` → `train.hparams_confirmed: true` | **antes de B4**: la grilla toma estos valores de `budget.yaml`; cambiarlos después la invalida. `hparams_confirmed: true` se pone tras B4, con el ganador anotado |
+| P5 | ~~Confirmar la propuesta~~ **CONFIRMADA (20-11-2026, P5′)**: AdamW, coseno + 3 %, weight decay 0, `max_grad_norm` 0.3, α 16, dropout 0.1, τ 0.07. Solo queda revisar `max_grad_norm` con la norma del humo (B2) antes de B4 | `configs/train/budget.yaml` | hecho |
+| YQ | Cuantización del Y-Encoder de VL-JEPA: NF4 o excepción bf16 (`docs/resultados_etapa1.md` §7.4) | `docs/metodologia.md` §6.2 | antes de la grilla de VL-JEPA (B4b) |
 | Grilla | Combinación ganadora por modelo (LR, r, conector; B4) | `configs/train/models/<modelo>.yaml` (`train.lr`, `lora.r`, `train.connector_lr_mult`) | tras B4 |
 | Épocas | Épocas del Y-Decoder ajustado a M3DI (mismo valor que A6) | `configs/ydecoder.yaml` | antes de A6 |
 | P4 | Autorizar la actualización de CLAUDE.md §3 (prompt de la etapa 2, controles bf16, Y-Decoder, P7) | `CLAUDE.md` | cuando quieras |
@@ -294,22 +295,47 @@ la grilla (falla si alguien editó una de las dos):
 uv run --no-sync python scripts/make_grid.py --check
 ```
 
-Repartida por modelo entre las dos GPU (`stage2_grid_g0.txt`: VL-JEPA e InternVL3; `stage2_grid_g1.txt`: Qwen3.5 y
-LLaVA-OV; 24 corridas cada una):
+**Dos tandas (G3, 20-11-2026):** primero los 3 VLM (36 corridas); VL-JEPA (12) cuando se decida YQ.
+
+**Antes de lanzar, revisar `max_grad_norm` (P5′)** con la norma del gradiente del humo (antes del recorte):
+
+```bash
+for f in runs/train_*_m6/train_log.jsonl; do echo "== $f"; python3 -c "import json,statistics as s; g=[json.loads(l)['grad_norm'] for l in open('$f')]; print('mediana', round(s.median(g),3), 'max', round(max(g),3), 'n', len(g))"; done
+```
+
+**Mandar a Claude** la salida. Si en algún modelo la mediana es varias veces 0.3, se conversa antes de B4a.
+
+#### B4a. Grilla de los VLM (36 corridas)
+
+Una GPU (la 1):
 
 ```bash
 scripts/jobs.sh gpu
-SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_grid_g0 scripts/run_queue.sh configs/queues/stage2_grid_g0.txt
-SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2_grid_g1 scripts/run_queue.sh configs/queues/stage2_grid_g1.txt
+grep '^model' configs/queues/stage2_grid.txt | grep -v '^model=vljepa ' > /tmp/grid_vlm.txt
+wc -l /tmp/grid_vlm.txt
+SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2_grid_vlm scripts/run_queue.sh /tmp/grid_vlm.txt
 ```
 
-(Una sola GPU: `SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2_grid scripts/run_queue.sh configs/queues/stage2_grid.txt`.)
-Duración: con los `img/s` del humo (B2), cada corrida procesa 150 × 128 = 19 200 imágenes más 4 evaluaciones en val.
+`wc -l` debe dar **36**. Si se liberan las dos GPU, repartir por modelo (p. ej. Qwen3.5 en una, InternVL3 y LLaVA-OV
+en otra) con `grep 'model=qwen35'` etc.
+
+#### B4b. Grilla de VL-JEPA (12 corridas), tras decidir YQ
+
+Si YQ cambia la cuantización del Y-Encoder, Claude ajusta el código y la cola antes de esto.
+
+```bash
+grep '^model=vljepa ' configs/queues/stage2_grid.txt > /tmp/grid_vljepa.txt
+wc -l /tmp/grid_vljepa.txt
+SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2_grid_vljepa scripts/run_queue.sh /tmp/grid_vljepa.txt
+```
+
+`wc -l` debe dar **12**. Duración: con los `img/s` del humo (B2), cada corrida procesa 150 × 128 = 19 200 imágenes
+más 4 evaluaciones en val.
 
 Seguimiento y resultado:
 
 ```bash
-cat logs/s2_grid_g0/queue_status.tsv logs/s2_grid_g1/queue_status.tsv | awk '{print $2}' | sort | uniq -c
+cat logs/s2_grid_vlm/queue_status.tsv logs/s2_grid_vljepa/queue_status.tsv 2>/dev/null | awk '{print $2}' | sort | uniq -c
 uv run --no-sync python scripts/summarize_train.py runs/train_*_m150 --table s2_grid --winners
 ```
 
@@ -317,7 +343,8 @@ La primera línea cuenta los códigos de salida (todos deben ser `0`). **Regla**
 modelo, gana la combinación con mejor métrica en el **último** paso (mayor `attr_mean` en los VLM, menor InfoNCE en
 VL-JEPA), no el mejor paso; un run que no llegó al paso 150 no compite. **Mandar a Claude:** la salida y
 `runs/_tablas/s2_grid.csv`. Claude escribe `train.lr`, `lora.r` y `train.connector_lr_mult` de cada modelo en
-`configs/train/models/<modelo>.yaml`, y con tu **confirmación de P5** pone `train.hparams_confirmed: true`.
+`configs/train/models/<modelo>.yaml`. `train.hparams_confirmed: true` se pone con P8 decidido y los 4 ganadores
+anotados (P5 ya está confirmado). Los VLM pueden pasar a B5 antes que VL-JEPA si se decide así.
 Push → `git pull` en el cluster.
 
 ### B5. Ajuste completo (1 época, NF4 y control bf16)
