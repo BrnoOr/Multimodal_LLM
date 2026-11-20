@@ -7,22 +7,31 @@
 #       decoder.msrvtt.val_limit=32 decoder.msrvtt.m3di_report_limit=32 exp_id=ydec_humo_msrvtt
 #   En el log: "fuente=msrvtt  selección=cider" y "140200" o menos captions distintos de train.
 #
-# 1) Barrido de k con 1 época cada uno (8 763 pasos, ~45-60 min). Se puede repartir en las dos GPU:
-#   grep '^model' configs/queues/ydecoder_msrvtt.txt | head -2 > /tmp/ydec_msrvtt_g0.txt
-#   grep '^model' configs/queues/ydecoder_msrvtt.txt | tail -1 > /tmp/ydec_msrvtt_g1.txt
-#   SCRIPT=scripts/train_ydecoder.py GPU=0 scripts/launch.sh ydec_msrvtt_g0 scripts/run_queue.sh /tmp/ydec_msrvtt_g0.txt
-#   SCRIPT=scripts/train_ydecoder.py GPU=1 scripts/launch.sh ydec_msrvtt_g1 scripts/run_queue.sh /tmp/ydec_msrvtt_g1.txt
-#   Comparar best.cider en runs/ydec_*_msrvtt_k*_r64_e1/summary.json y revisar val_ceiling.jsonl a mano.
-model=vljepa decoder.prefix_len=1 decoder.msrvtt.epochs=1
-model=vljepa decoder.prefix_len=4 decoder.msrvtt.epochs=1
-model=vljepa decoder.prefix_len=8 decoder.msrvtt.epochs=1
+# 1) HECHO (job ydec_msrvtt, 16-11-2026). Barrido de k con 1 época cada uno: 7 381 pasos (118 094 captions
+#    distintos / lote 16), ~33 min por k. Mejor CIDEr en MSR-VTT test_1k (paso 7 000 en los tres):
+#      k=1 1.3214 · k=4 1.3839 · k=8 1.4388. k=8 va primero en las 7 evaluaciones (pasos 1 000-7 000), con el
+#      mismo orden de datos (semilla 0), así que la comparación es pareada. Ganador: k = 8.
+# model=vljepa decoder.prefix_len=1 decoder.msrvtt.epochs=1
+# model=vljepa decoder.prefix_len=4 decoder.msrvtt.epochs=1
+# model=vljepa decoder.prefix_len=8 decoder.msrvtt.epochs=1
 #
-# 2) El k ganador hasta 3 épocas (decoder.msrvtt.epochs por defecto), eligiendo el mejor paso. Reemplaza <K>:
-# model=vljepa decoder.prefix_len=<K>
-#    -> runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k<K>_r64_e3   (decodificador ZERO-SHOT de VL-JEPA)
-# Control bf16 (P10), mismo k y épocas:
-# model=vljepa model.quant=bf16 decoder.quant=bf16 decoder.prefix_len=<K>
+# 2) k = 8 hasta 3 épocas (decoder.msrvtt.epochs por defecto), eligiendo el mejor paso. ~1 h 45 min cada uno.
+#    NF4 y control bf16 (P10) en paralelo, uno por GPU:
+#   grep '^model' configs/queues/ydecoder_msrvtt.txt | head -1 > /tmp/ydec_k8_nf4.txt
+#   grep '^model' configs/queues/ydecoder_msrvtt.txt | tail -1 > /tmp/ydec_k8_bf16.txt
+#   SCRIPT=scripts/train_ydecoder.py GPU=0 scripts/launch.sh ydec_k8_nf4 scripts/run_queue.sh /tmp/ydec_k8_nf4.txt
+#   SCRIPT=scripts/train_ydecoder.py GPU=1 scripts/launch.sh ydec_k8_bf16 scripts/run_queue.sh /tmp/ydec_k8_bf16.txt
+model=vljepa decoder.prefix_len=8
+#    -> runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3   (decodificador ZERO-SHOT de VL-JEPA)
+model=vljepa model.quant=bf16 decoder.quant=bf16 decoder.prefix_len=8
 #
 # 3) Condición INTERMEDIA: el genérico ajustado con captions de M3DI sobre el Y-Encoder preentrenado.
 #    Épocas PENDIENTES de decidir (decoder.train.epochs).
-# model=vljepa decoder.text_source=m3di decoder.prefix_len=<K> decoder.init_from=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k<K>_r64_e3/decoder_best
+# model=vljepa decoder.text_source=m3di decoder.prefix_len=8 decoder.init_from=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best
+#
+# 4) Etapa 2: el genérico ajustado con captions de M3DI sobre el Y-Encoder AJUSTADO (después de stage2_train.txt).
+#    Mismas épocas que la condición intermedia (PENDIENTE). Reemplaza <TRAIN_VLJEPA> por el exp_id del ajuste de VL-JEPA.
+#    La carga verifica que adaptador y cuantización coincidan (check_decoder_matches).
+# model=vljepa model.adapter_path=runs/<TRAIN_VLJEPA>/adapter_best decoder.text_source=m3di decoder.prefix_len=8 decoder.init_from=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best
+# Control bf16 (P10): adaptador bf16, VL-JEPA y decodificador en bf16, partiendo del genérico bf16.
+# model=vljepa model.quant=bf16 decoder.quant=bf16 model.adapter_path=runs/<TRAIN_VLJEPA_BF16>/adapter_best decoder.text_source=m3di decoder.prefix_len=8 decoder.init_from=runs/ydec_vljepa_open_msrvtt_bf16_zs_bf16_msrvtt_k8_r64_e3/decoder_best

@@ -1,18 +1,18 @@
 # Paso 1.3 — VL-JEPA zero-shot en VAL con su Y-Decoder GENÉRICO (docs/metodologia.md §2.2 y §2.4).
 # El decodificador zero-shot se entrena solo con captions de MSR-VTT (configs/queues/ydecoder_msrvtt.txt).
-# Reemplaza <YDEC_ZS> por su exp_id, p. ej. ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k4_r64_e3.
+# Genérico: k = 8 (barrido del 16-11-2026), 3 épocas. Debe existir runs/<…>/decoder_best antes de lanzar.
 # Piloto (200 imagenes) primero; despues quitar data.limit para val completo.
 #   GPU=0 scripts/launch.sh s1_vljepa scripts/run_queue.sh configs/queues/stage1_vljepa_val.txt
-model=vljepa prompt=p0_minimal         data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC_ZS>/decoder_best
-model=vljepa prompt=p1_attributes      data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC_ZS>/decoder_best
-model=vljepa prompt=p2_constrained     data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC_ZS>/decoder_best
-model=vljepa prompt=p3_json            data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC_ZS>/decoder_best
-model=vljepa prompt=p4_dataset_format  data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC_ZS>/decoder_best
-model=vljepa prompt=p4m_multiexample   data.limit=200 infer.save_embeddings=true model.decoder_path=runs/<YDEC_ZS>/decoder_best
+model=vljepa prompt=p0_minimal         data.limit=200 infer.save_embeddings=true model.decoder_path=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best
+model=vljepa prompt=p1_attributes      data.limit=200 infer.save_embeddings=true model.decoder_path=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best
+model=vljepa prompt=p2_constrained     data.limit=200 infer.save_embeddings=true model.decoder_path=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best
+model=vljepa prompt=p3_json            data.limit=200 infer.save_embeddings=true model.decoder_path=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best
+model=vljepa prompt=p4_dataset_format  data.limit=200 infer.save_embeddings=true model.decoder_path=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best
+model=vljepa prompt=p4m_multiexample   data.limit=200 infer.save_embeddings=true model.decoder_path=runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best
 #
 # Control bf16 (P10): solo con el prompt elegido para VL-JEPA en val, con el decodificador genérico en bf16
-# (ydec_vljepa_open_msrvtt_bf16_zs_bf16_msrvtt_k<K>_r64_e3). La carga falla si el decodificador es el NF4.
-# model=vljepa prompt=<PROMPT> model.quant=bf16 infer.save_embeddings=true model.decoder_path=runs/<YDEC_ZS_BF16>/decoder_best
+# (ydec_vljepa_open_msrvtt_bf16_zs_bf16_msrvtt_k8_r64_e3). La carga falla si el decodificador es el NF4.
+# model=vljepa prompt=<PROMPT> model.quant=bf16 infer.save_embeddings=true model.decoder_path=runs/ydec_vljepa_open_msrvtt_bf16_zs_bf16_msrvtt_k8_r64_e3/decoder_best
 #
 # Condición intermedia: mismo VL-JEPA preentrenado, decodificador genérico ajustado con M3DI. Mismo prompt
 # elegido en zero-shot; aísla el efecto del formato del caption (docs/metodologia.md §2.4).
