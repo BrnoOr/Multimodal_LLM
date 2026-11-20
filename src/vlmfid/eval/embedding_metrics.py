@@ -66,6 +66,35 @@ def retrieval_recall(pred, target, captions: list[str], ks=(1, 5)) -> dict[str, 
     return out
 
 
+def structure_spearman(a, b, captions: list[str] | None = None) -> float:
+    """Correlación de Spearman entre las matrices de similitud coseno de dos conjuntos de embeddings.
+
+    Mide si dos versiones de un mismo encoder (p. ej. bf16 y NF4) ordenan igual las distancias
+    entre pares de textos, aunque los vectores estén desplazados: 1 = misma estructura relativa.
+    Se usa la mitad superior sin la diagonal. Con `captions`, se toma un solo representante por texto
+    distinto (los duplicados darían pares de similitud 1 en ambas matrices e inflarían la correlación).
+    """
+    A, B = _norm(a), _norm(b)
+    if A.shape != B.shape:
+        raise ValueError(f"Formas distintas: {tuple(A.shape)} vs {tuple(B.shape)}")
+    if captions is not None:
+        if len(captions) != A.shape[0]:
+            raise ValueError("captions debe tener una entrada por fila")
+        _, first = np.unique(caption_codes(captions), return_index=True)
+        keep = torch.as_tensor(np.sort(first))
+        A, B = A[keep], B[keep]
+    n = A.shape[0]
+    if n < 3:
+        raise ValueError("Hacen falta al menos 3 textos distintos")
+    iu = torch.triu_indices(n, n, offset=1)
+    sa = (A @ A.T)[iu[0], iu[1]].double().numpy()
+    sb = (B @ B.T)[iu[0], iu[1]].double().numpy()
+    ra, rb = sa.argsort().argsort().astype(np.float64), sb.argsort().argsort().astype(np.float64)
+    ra -= ra.mean()
+    rb -= rb.mean()
+    return float((ra * rb).sum() / np.sqrt((ra * ra).sum() * (rb * rb).sum()))
+
+
 def infonce_fixed_batches(pred, target, captions: list[str], batch_size: int,
                           temperature: float) -> dict[str, float]:
     """InfoNCE bidireccional en lotes consecutivos de tamaño fijo (se descarta el resto).

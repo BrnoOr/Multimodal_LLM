@@ -851,7 +851,7 @@ forma explícita y testeada.
 | # | Decisión | Propuesta de este documento | Bloquea |
 |---|---|---|---|
 | §4 | P8 (lote efectivo, tras el humo); LR, r y conector por la grilla (G1, G3). Épocas del Y-Decoder ajustado a M3DI (etapa 2). La propuesta común se confirmó (P5′). | §4 y `configs/train/budget.yaml` | corrida completa de la etapa 2 |
-| YQ | Cuantización del Y-Encoder de VL-JEPA en la etapa 2: NF4 (regla D5) o excepción bf16 (como `lm_head`, P11). Evidencia: S_Y en NF4 con coseno 0.876 contra bf16 (`resultados_etapa1.md` §7.4). Opcional antes de decidir: verificar con la carga estándar de `transformers` + `BitsAndBytesConfig` si es sensibilidad del modelo o un error de la cuantización manual. | decisión del usuario | grilla de VL-JEPA (G3) y su ajuste completo |
+| YQ | Cuantización del Y-Encoder de VL-JEPA en la etapa 2: NF4 (regla D5) o excepción bf16 (como `lm_head`, P11). Evidencia: S_Y en NF4 con coseno 0.876 contra bf16 (`resultados_etapa1.md` §7.4). Verificación escrita (20-11-2026, sin ejecutar): `scripts/diag_yencoder_quant.py` compara la cuantización manual con la carga estándar de `transformers` + `BitsAndBytesConfig` (con y sin doble cuantización) y fp32, sobre los mismos pesos y captions; mide coseno de S_Y, coseno por capa, conservación de la estructura de similitudes (Spearman) y auto-recuperación (`docs/pasos_cluster.md` B0b). | decisión del usuario | grilla de VL-JEPA (G3) y su ajuste completo |
 | §7 | Agregar a `docs/papers/` las referencias externas y verificarlas antes de citarlas. | — | informe |
 
 ---

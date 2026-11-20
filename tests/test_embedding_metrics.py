@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from vlmfid.eval.embedding_metrics import (caption_codes, infonce_fixed_batches, paired_cosine,
-                                           retrieval_recall)
+                                           retrieval_recall, structure_spearman)
 
 
 def _eye(n):
@@ -72,3 +72,26 @@ def test_infonce_azar_cerca_de_log_b():
 def test_infonce_sin_lote_completo_falla():
     with pytest.raises(ValueError):
         infonce_fixed_batches(_eye(3), _eye(3), ["a", "b", "c"], batch_size=4, temperature=0.07)
+
+
+def test_estructura_identica_y_rotada_es_1():
+    rng = np.random.default_rng(0)
+    a = rng.normal(size=(20, 6))
+    q, _ = np.linalg.qr(rng.normal(size=(6, 6)))          # rotación: conserva todos los cosenos
+    caps = [str(i) for i in range(20)]
+    assert structure_spearman(a, a, caps) == pytest.approx(1.0)
+    assert structure_spearman(a, a @ q, caps) == pytest.approx(1.0)
+
+
+def test_estructura_independiente_cerca_de_0():
+    rng = np.random.default_rng(1)
+    a, b = rng.normal(size=(60, 16)), rng.normal(size=(60, 16))
+    assert abs(structure_spearman(a, b)) < 0.15
+
+
+def test_estructura_descarta_duplicados():
+    a = np.array([[1, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1.0]])
+    with pytest.raises(ValueError):                         # 2 textos distintos: no alcanza
+        structure_spearman(a[:3], a[:3], ["x", "x", "y"])
+    assert structure_spearman(a, a, ["x", "x", "y", "z"]) == pytest.approx(1.0)
+

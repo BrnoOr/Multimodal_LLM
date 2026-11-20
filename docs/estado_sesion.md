@@ -105,7 +105,7 @@ intermedia** y las **sondas** de §2.5.
 | 5 | Correr el notebook 02 completo y actualizar `resultados_etapa1.md` con VL-JEPA (A8) | cluster + laptop | 2, 3 |
 | 6 | Tests de entrenamiento y humo de la etapa 2 (B1–B2) | cluster | 3 |
 | 7 | ~~P5~~ confirmado (P5′); revisar `max_grad_norm` con el humo; P8 tras el humo; grilla de los **VLM** (B4a, 36 corridas) → ganadores | usuario + Claude → cluster | 6 |
-| 8 | **YQ:** cuantización del Y-Encoder (NF4 o excepción bf16), con o sin la verificación de `transformers` → grilla de **VL-JEPA** (B4b, 12 corridas) | usuario → cluster | antes de B4b |
+| 8 | **YQ:** verificación `scripts/diag_yencoder_quant.py` (B0b: tests, humo, completa; minutos de GPU) → decisión NF4 o excepción bf16 → grilla de **VL-JEPA** (B4b, 12 corridas) | cluster → usuario → cluster | GPU libre |
 | 9 | `stage2_train.txt` → Y-Decoder de la etapa 2 (`ydecoder_msrvtt.txt` §4) → `stage2_val.txt` → `stage2_infoloss.txt` (B5–B8; notebook 03) | cluster | 7, 8 |
 | 10 | Llenar `configs/final_test.yaml` y correr `scripts/final_test.py` una sola vez (Parte C) | cluster | 9 |
 

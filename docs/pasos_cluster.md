@@ -233,6 +233,40 @@ las tablas de §3, §7 y §12 del notebook y `runs/_tablas/etapa1_val.csv`. Clau
 Mientras `train.hparams_confirmed` sea `false`, `scripts/train.py` solo acepta corridas cortas (`train.max_steps`):
 el humo (B2) y la grilla (B4) se pueden correr ya; el ajuste completo (B5), no.
 
+### B0b. Verificación YQ: cuantización del Y-Encoder (`scripts/diag_yencoder_quant.py`)
+
+Pregunta: la caída de S_Y en NF4 (coseno 0.876 contra bf16, `docs/resultados_etapa1.md` §7.4), ¿es un error de
+nuestra cuantización manual o una sensibilidad real de EmbeddingGemma a NF4? Mismos pesos (el Y-Encoder del
+checkpoint), mismos 1 024 captions de val; condiciones `fp32`, `nf4_manual` (la del proyecto), `nf4_hf` (carga
+estándar de `transformers` con la `BitsAndBytesConfig` común) y `nf4_hf_nodq` (sin doble cuantización). No
+entrena; unos minutos de GPU. Con una GPU libre (no mientras corra otra cola en ella):
+
+```bash
+uv run --no-sync pytest tests/test_embedding_metrics.py tests/test_diag_yencoder.py -q
+CUDA_VISIBLE_DEVICES=1 uv run --no-sync python scripts/diag_yencoder_quant.py model=vljepa diag.n=64 diag.tag=humo
+```
+
+**Bien si** el humo imprime `coincide con encode_texts`, `NF4 manual: 168 lineales reemplazadas`, y en `nf4_hf` y
+`nf4_hf_nodq` `lineales 4 bits 168`. Entonces la corrida completa:
+
+```bash
+GPU=1 scripts/launch.sh diag_yq uv run --no-sync python scripts/diag_yencoder_quant.py model=vljepa
+grep -E "^\[diagyq\]|^  " logs/diag_yq/job.log | tail -15
+```
+
+**Cómo se lee** (todo contra bf16):
+
+| Si… | Entonces |
+|---|---|
+| `nf4_manual` ≈ 0.88 y `nf4_hf` ≈ 0.99 | Error de la cuantización manual: se corrige el código; YQ se resuelve sin excepción |
+| `nf4_manual` ≈ `nf4_hf` ≈ 0.88 | Sensibilidad real del modelo a NF4: YQ es una decisión de protocolo (NF4 declarado o excepción bf16) |
+| `nf4_hf_nodq` mucho mejor que `nf4_hf` | Lo causa la doble cuantización |
+| `estructura` alta (≥ 0.95) aunque el coseno baje | NF4 desplaza los vectores pero conserva las distancias relativas entre captions: pesa a favor de mantener NF4 |
+| El coseno por capa cae de golpe en una capa con `max|h|` muy grande | Activaciones atípicas: el origen típico de la sensibilidad a 4 bits |
+
+`fp32` calibra cuánto aleja ya la precisión bf16 (debería ser ≈ 1). **Mandar a Claude** las líneas `[diagyq]` y las
+tablas por capa del final del log.
+
 ### B1. Tests del entrenamiento
 
 Usan modelos diminutos (`tests/_tiny_vlm.py`); con GPU libre tardan pocos minutos.
