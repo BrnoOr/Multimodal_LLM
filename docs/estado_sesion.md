@@ -57,16 +57,18 @@ intermedia** y las **sondas** de §2.5.
 - **P5:** código + propuesta citada; LR por barrido corto en val ({1e-4, 2e-4, 5e-4}, 150 pasos × 128).
 - Pendiente del usuario: confirmar la propuesta (filas "Propuesta" de `metodologia.md` §4), P8 tras el humo,
   épocas del Y-Decoder ajustado a M3DI (intermedio y etapa 2), y autorizar la actualización de CLAUDE.md (P4).
-- **A verificar en el cluster:** lado de relleno del tokenizador de consultas de VL-JEPA (Llama-3.2). transformers
-  5.17 declara `padding_side = "left"` en la clase de Llama; si `AutoTokenizer` la usa, la inferencia rellena la
-  consulta hasta 512 por la izquierda y corre las posiciones RoPE. El ajuste exige `right` y falla si no. Comando en §5.
+- **Verificado en el cluster (19-11-2026): el tokenizador de Llama-3.2 se carga con `padding_side = "left"`**
+  (EmbeddingGemma, `right`). La inferencia rellenaba la consulta hasta 512 por la izquierda y corría las
+  posiciones RoPE. Corregido: `models/vljepa.py` fija `right` en ambos al cargar. Única medición afectada: la
+  similitud coseno de la inspección (`resultados_etapa1.md` §7.4, marcada inválida) → repetir
+  `inspect_vljepa_{nf4,bf16}`. El Y-Decoder y su techo no pasan por el Predictor: no se repiten.
 
 ## 4. Pasos que siguen
 
 | # | Paso | Dónde | Depende de |
 |---|---|---|---|
 | 1 | Commit + push; `git pull` en el cluster | usuario | — |
-| 2 | Verificar el lado de relleno de los tokenizadores de VL-JEPA (§5) | cluster | 1 |
+| 2 | ~~Verificar el lado de relleno~~ hecho (19-11): era `left`, corregido. Repetir la inspección de VL-JEPA (NF4 y bf16) | cluster | 1 |
 | 3 | Genérico k = 8 hasta 3 épocas, NF4 y bf16 (`ydecoder_msrvtt.txt` §2) | cluster | 1 |
 | 4 | `pytest tests/test_train_units.py tests/test_train_e2e.py` y luego `stage2_smoke.txt` (puede ir en paralelo con 3 si hay GPU) | cluster | 1 |
 | 5 | VL-JEPA en val con el genérico (piloto 200 × 6 prompts → val completo → prompt) | cluster | 2, 3 |

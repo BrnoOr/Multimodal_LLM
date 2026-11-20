@@ -221,6 +221,13 @@ salida en precisión completa; fuente: documentación de la biblioteca, no un pa
   `models/vljepa.py`. Se contrasta con el control bf16 de VL-JEPA en val; si la brecha se mantiene,
   revisar la cuantización antes de atribuirla a NF4.
 
+  **⚠️ Medición inválida (19-11-2026).** Estas similitudes se midieron con la consulta rellenada **a la
+  izquierda** hasta 512 tokens: en el cluster, el tokenizador de Llama-3.2 se carga con
+  `padding_side = "left"` y el Predictor numera las posiciones RoPE de corrido sobre [visuales; consulta],
+  así que la consulta real quedó desplazada respecto de las visuales. `models/vljepa.py` fija ahora el
+  relleno a la derecha. Hay que repetir la inspección de VL-JEPA antes de usar esta tabla. Las demás
+  mediciones de la etapa 1 no pasan por el Predictor (VLM, Y-Decoder y su techo) y no se ven afectadas.
+
 ## 7b. Barrido del Y-Decoder con captions de M3DI (paso 1.3) — diseño SUPERADO
 
 > **Superado el 16-11-2026** (decisión del usuario, `docs/metodologia.md` §2.4): el decodificador de la

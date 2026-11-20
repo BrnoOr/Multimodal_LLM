@@ -181,6 +181,13 @@ class VLJEPADescriber(Describer):
 
         self.query_tok = _ensure_pad_token(AutoTokenizer.from_pretrained(self.arch["predictor"]["llama_name"]))
         self.target_tok = _ensure_pad_token(AutoTokenizer.from_pretrained(self.arch["y_encoder"]["model_name"]))
+        # Relleno a la DERECHA en los dos tokenizadores, explícito. El Predictor de open-vljepa numera las
+        # posiciones RoPE de corrido sobre [visuales; consulta] (`predictor.py`, position_ids = arange), así
+        # que un relleno a la izquierda hasta max_query_len desplaza la consulta real cientos de posiciones
+        # respecto de las visuales. En el cluster (transformers 5.x) el tokenizador de Llama-3.2 se carga con
+        # padding_side = "left" (verificado el 19-11-2026); el de EmbeddingGemma, con "right".
+        self.query_tok.padding_side = "right"
+        self.target_tok.padding_side = "right"
         self.transform = T.Compose([
             T.Resize(size, antialias=True), T.CenterCrop(size), T.ToTensor(),
             T.Normalize(IMAGENET_MEAN, IMAGENET_STD),
