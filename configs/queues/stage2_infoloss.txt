@@ -1,0 +1,8 @@
+# Paso 2.3 — pérdida de información por etapa de VL-JEPA, etapa 2 (docs/metodologia.md §2.5): mismas sondas,
+# imágenes y semillas que la etapa 1 (stage1_infoloss.txt), sobre el modelo AJUSTADO y con su Y-Decoder de la etapa 2.
+# Reemplaza <TRAIN_VLJEPA> por el exp_id del ajuste (runs/train_vljepa_open_msrvtt_nf4_p1_attributes_r64_lr<LR>_e1)
+# y <YDEC_FT> por el del decodificador ajustado (ydec_vljepa_open_msrvtt_nf4_ft_nf4_k8_r64_e<E>_cont).
+#   SCRIPT=scripts/info_loss.py GPU=0 scripts/launch.sh infoloss_ft scripts/run_queue.sh configs/queues/stage2_infoloss.txt
+model=vljepa prompt=p1_attributes info.tag=ft model.adapter_path=runs/<TRAIN_VLJEPA>/adapter_best model.decoder_path=runs/<YDEC_FT>/decoder_best
+# Control bf16 (P10), con su adaptador y su decodificador bf16:
+# model=vljepa prompt=p1_attributes info.tag=ft model.quant=bf16 model.adapter_path=runs/<TRAIN_VLJEPA_BF16>/adapter_best model.decoder_path=runs/<YDEC_FT_BF16>/decoder_best

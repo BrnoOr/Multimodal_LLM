@@ -1,9 +1,9 @@
 """Etapa 2 de punta a punta en CPU: Qwen3.5 y VL-JEPA diminutos (arquitectura real, pesos aleatorios).
 
-Cubre lo que no se puede ver sin GPU en el cluster: que LoRA + conector se adjunten donde corresponde,
-que la pérdida baje, que la selección en val guarde `adapter_best`, que reanudar tras SIGTERM dé
-exactamente el mismo resultado que no interrumpir, y que el adaptador guardado se cargue por el
-camino de `model.adapter_path` (el que usa scripts/infer.py en test).
+Cubre lo que no se puede ver sin GPU en el cluster: que LoRA + conector se adjunten donde corresponde
+(y solo ahí), que la pérdida baje, que la selección en val guarde `adapter_best` con el criterio de cada
+familia, que reanudar tras SIGTERM dé el mismo resultado que no interrumpir, y que el adaptador guardado
+se cargue por el camino de `model.adapter_path` (el de scripts/infer.py y scripts/final_test.py).
 """
 
 import json
@@ -14,18 +14,18 @@ import torch
 from PIL import Image
 
 pytest.importorskip("peft")
-pytest.importorskip("matplotlib")
 
 from _tiny_vlm import tiny_describer, tiny_vljepa_describer, train_cfg, write_m3di
 
 from vlmfid.data.manifest import to_records
+from vlmfid.prompts import render
 from vlmfid.train import loop
 
 
 @pytest.fixture(autouse=True)
 def solo_cpu(monkeypatch):
-    """Los modelos diminutos viven en CPU. Trainer y VLJEPADescriber eligen el dispositivo con
-    torch.cuda.is_available(), así que en el cluster (con GPU) mandarían los tensores a cuda:0."""
+    """Los modelos diminutos viven en CPU. Trainer elige el dispositivo con torch.cuda.is_available(),
+    así que en el cluster (con GPU) mandaría los tensores a cuda:0."""
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
 
 
@@ -39,11 +39,10 @@ def data(tmp_path, monkeypatch):
 
     monkeypatch.setattr(loop, "load_manifest", fake_load)
     monkeypatch.setattr(loop, "data_root", lambda *a, **k: root)
-    monkeypatch.setattr(loop, "CACHE", tmp_path / "cache")
     return recs
 
 
-def _run(cfg, describer, runs, stop_after=None, monkeypatch=None):
+def _run(cfg, describer, runs, stop_after=None):
     tr = loop.Trainer(cfg, describer=describer, run_root=runs)
     if stop_after is not None:
         orig, calls = tr._step, {"n": 0}
@@ -66,6 +65,7 @@ def _lines(p):
     return [json.loads(x) for x in p.read_text().splitlines()]
 
 
+# ───────────────────────────────────────────────────────────────────────────── VLM (Qwen3.5)
 def test_qwen35_entrena_selecciona_y_recarga(data, tmp_path):
     cfg = train_cfg()
     d = tiny_describer()
@@ -74,21 +74,24 @@ def test_qwen35_entrena_selecciona_y_recarga(data, tmp_path):
     rd = tmp_path / "runs" / cfg.exp_id
     summary = json.loads((rd / "summary.json").read_text())
     assert summary["steps"] == 8 and summary["samples_seen"] == 64            # 64 / 8: todo train
-    assert summary["trainable_connector"] > 0 and summary["lora_layers"] > 0
+    assert summary["trainable_connector"] > 0 and summary["lora_layers_llm"] > 0
     names = [n for n, p in d.model.named_parameters() if p.requires_grad]
-    assert all("language_model" in n or "merger.modules_to_save" in n for n in names)
+    assert all("language_model" in n or "visual.merger.modules_to_save" in n for n in names)
     assert not any("visual.blocks" in n for n in names)                        # encoder visual congelado
+    assert {g["name"] for g in tr.optimizer.param_groups} == {"lora", "connector"}
+    lrs = {g["name"]: g["initial_lr"] for g in tr.optimizer.param_groups}
+    assert lrs["connector"] == pytest.approx(0.1 * lrs["lora"])               # connector_lr_mult
 
     val = _lines(rd / "val_log.jsonl")
     assert [r["step"] for r in val] == [0, 2, 4, 6, 8]
+    assert all(r["selection_metric"] == "attr_mean" and "val_loss" in r for r in val)
     best = json.loads((rd / "best.json").read_text())
-    assert best["value"] == max(r[cfg.train.selection_metric] for r in val)
+    assert best["value"] == pytest.approx(max(r["attr_mean"] for r in val))
     preds0 = _lines(rd / "val_predictions" / "step_00000.jsonl")
-    assert all(p["target"].endswith("of the image.") and '"' not in p["target"] for p in preds0)   # canónico
+    assert {p["reference"] for p in preds0} == {r["caption"] for r in data["val"]}        # caption original
     train = _lines(rd / "train_log.jsonl")
     assert train[-1]["loss"] < train[0]["loss"]
     assert (rd / "adapter_best" / "adapter_config.json").exists()
-    assert (rd / "val_predictions" / "step_00000.jsonl").exists()
 
     # recarga como en inferencia (HFGenerativeDescriber con model.adapter_path)
     from peft import PeftModel
@@ -97,6 +100,7 @@ def test_qwen35_entrena_selecciona_y_recarga(data, tmp_path):
     fresh.model = PeftModel.from_pretrained(fresh.model, str(rd / "adapter_last")).eval()
     pairs = [(r, Image.open(tmp_path / "m3di" / r["image_path"]).convert("RGB")) for r in data["val"][:2]]
     batch = tr.featurizer.pad(tr.featurizer(pairs))
+    d.model.eval()
     with torch.no_grad(), torch.autocast("cpu", dtype=torch.bfloat16):
         a = d.model(**batch["inputs"]).logits.float()
         b = fresh.model(**batch["inputs"]).logits.float()
@@ -132,11 +136,26 @@ def test_usa_todo_train_con_ultimo_lote_incompleto(data, tmp_path):
     assert summary["steps"] == 3 and summary["samples_seen"] == 64 == summary["n_train"]
 
 
+def test_corrida_corta_completa_su_schedule(data, tmp_path):
+    """train.max_steps corta el run y el coseno se completa dentro de la corrida (barrido de LR)."""
+    cfg = train_cfg(**{"train.max_steps": 4, "train.hparams_confirmed": "false"})
+    assert cfg.exp_id.endswith("_m4")
+    rc, _tr = _run(cfg, tiny_describer(), tmp_path / "runs")
+    assert rc == 0
+    rd = tmp_path / "runs" / cfg.exp_id
+    summary = json.loads((rd / "summary.json").read_text())
+    assert summary["steps"] == 4 == summary["steps_schedule"] and summary["short_run"]
+    train = _lines(rd / "train_log.jsonl")
+    assert train[-1]["lr_lora"] < 1e-9 < train[0]["lr_lora"]                  # coseno terminado
+    assert [r["step"] for r in _lines(rd / "val_log.jsonl")] == [0, 2, 4]
+
+
 def test_reanudar_con_otra_config_falla(data, tmp_path):
     cfg = train_cfg()
     _run(cfg, tiny_describer(), tmp_path / "r", stop_after=2)
     with pytest.raises(RuntimeError, match="difiere"):
-        loop.Trainer(train_cfg(**{"train.lr": 1e-3}), describer=tiny_describer(), run_root=tmp_path / "r").run()
+        loop.Trainer(train_cfg(**{"train.max_grad_norm": 0.5}), describer=tiny_describer(),
+                     run_root=tmp_path / "r").run()
     # cambiar solo el micro-lote es seguro (no altera la matemática)
     assert _run(train_cfg(**{"train.micro_batch_size": 2}), tiny_describer(), tmp_path / "r")[0] == 0
 
@@ -170,127 +189,112 @@ def test_micro_lote_no_cambia_el_gradiente(data, tmp_path):
             assert torch.allclose(g0[n], g[n], atol=1e-6, rtol=1e-4), n
 
 
-def test_split_composicional_reporta_no_vistas(data, tmp_path):
-    cfg = train_cfg(**{"data.holdout": "compositional", "train.eval_every": 4})
-    rc, tr = _run(cfg, tiny_describer(), tmp_path / "runs")
-    assert rc == 0
-    from vlmfid.data.targets import is_held_out
-
-    rd = tmp_path / "runs" / cfg.exp_id
-    assert cfg.exp_id.endswith("_hc")
-    summary = json.loads((rd / "summary.json").read_text())
-    assert summary["n_train"] == sum(not is_held_out(r) for r in data["train"])
-    val = _lines(rd / "val_log.jsonl")
-    assert all("seen_shape_pos" in r and "unseen_shape_pos" in r for r in val)
+# ───────────────────────────────────────────────────────────────────────────── VL-JEPA (opción A)
+def _jepa_cfg(**kw):
+    return train_cfg(**{"model": "vljepa", "train.micro_batch_size": 8, "model.batch_size": 4,
+                        "train.x_encoder_chunk": 3, **kw})
 
 
-@pytest.mark.parametrize("negatives", ["bank", "batch"])
-def test_vljepa_entrena_con_lora_en_el_predictor(data, tmp_path, negatives):
-    cfg = train_cfg(**{"model": "vljepa", "train.micro_batch_size": 8, "model.batch_size": 4,
-                       "objective.negatives": negatives})
-    d = tiny_vljepa_describer(tmp_path, data, target_format=cfg.target.format)
-    bank_before = d.bank_emb.clone()
-    rc, _tr = _run(cfg, d, tmp_path / "runs")
-    assert rc == 0
-    rd = tmp_path / "runs" / cfg.exp_id
-    names = [n for n, p in d.model.named_parameters() if p.requires_grad]
-    assert any("predictor.layers" in n and "lora_" in n for n in names)
-    assert any("vis_proj.modules_to_save" in n for n in names)
-    assert not any("y_encoder" in n or "x_encoder" in n or "out_proj" in n for n in names)
-    assert torch.equal(bank_before, d.bank_emb)                 # Y-Encoder congelado: el banco sigue válido
-    val = _lines(rd / "val_log.jsonl")
-    assert [r["step"] for r in val] == [0, 2, 4, 6, 8]
-    train = _lines(rd / "train_log.jsonl")
-    assert train[-1]["loss"] < train[0]["loss"]
-    preds = _lines(rd / "val_predictions" / "step_00008.jsonl")
-    assert all(p["prediction"] in set(d.bank_texts) for p in preds)       # texto por recuperación
-
-    # recarga por el camino de VLJEPADescriber.load (bandera is_loaded_in_4bit incluida si fuera NF4)
-    from peft import PeftModel
-
-    (tmp_path / "f").mkdir()
-    fresh = tiny_vljepa_describer(tmp_path / "f", data, target_format=cfg.target.format)
-    fresh.model = PeftModel.from_pretrained(fresh.model, str(rd / "adapter_last")).eval()
-    img = [Image.new("RGB", (64, 64), (200, 30, 30))]
-    d.model.eval()
-    with torch.autocast("cpu", dtype=torch.bfloat16):
-        ea = d.predict_embeddings(img, ["q"])
-        eb = fresh.predict_embeddings(img, ["q"])
-    assert torch.nn.functional.cosine_similarity(ea, eb).item() > 0.99
+def _pred(d, img, prompt, query_len):
+    """Ŝ_Y por el camino de inferencia (consulta rellena hasta `query_len`), con autocast en CPU."""
+    inner = d.model.get_base_model() if hasattr(d.model, "get_base_model") else d.model
+    ids, mask = d._tok(d.query_tok, [prompt], query_len)
+    pv = d._pixel_values([img])
+    with torch.no_grad(), torch.autocast("cpu", dtype=torch.bfloat16):
+        return inner.predictor(inner.x_encoder(pv), ids, mask).float()
 
 
-def test_vljepa_v3_banco_factorizado_y_texto_entrenable(data, tmp_path):
-    """Ajuste v3: una consulta por atributo, InfoNCE bidireccional contra 21 frases, proyección del
-    Y-Encoder y salida del predictor entrenables; X-Encoder y transformer de texto congelados."""
-    from vlmfid.models.bank import ATTRS, FactorizedBank
-
-    cfg = train_cfg(**{"model": "vljepa_fac", "train.micro_batch_size": 8, "model.batch_size": 4,
-                       "train.epochs": 2, "train.text_lr": 5e-3})
-    assert cfg.exp_id.endswith("_qattr_tcan_r4_e2")
-    d = tiny_vljepa_describer(tmp_path, data, target_format="canonical", model="vljepa_fac")
-    assert d.bank_texts == FactorizedBank.build().texts and d.bank_emb.shape[0] == 21
-    bank_before = d.bank_emb.clone()
-    frozen_before = {n: p.detach().clone() for n, p in d.model.named_parameters()
-                     if n.startswith(("x_encoder.", "y_encoder.model."))}
+def test_vljepa_opcion_a(data, tmp_path):
+    cfg = _jepa_cfg()
+    assert cfg.train.selection_metric == "val_loss"
+    d = tiny_vljepa_describer(tmp_path)
+    base_before = {n: p.detach().clone() for n, p in d.model.named_parameters()}
     rc, tr = _run(cfg, d, tmp_path / "runs")
     assert rc == 0
     rd = tmp_path / "runs" / cfg.exp_id
 
     names = [n for n, p in d.model.named_parameters() if p.requires_grad]
-    assert any("predictor.layers" in n and "lora_" in n for n in names)
+    assert any("predictor.layers" in n and "lora_" in n for n in names)          # LoRA en el Predictor
+    assert any("y_encoder.model.layers" in n and "lora_" in n for n in names)    # y en el Y-Encoder
     for mod in ("predictor.vis_proj", "predictor.out_proj", "y_encoder.projector"):
         assert any(f"{mod}.modules_to_save" in n for n in names), mod
-    assert not any("x_encoder" in n or "y_encoder.model" in n for n in names)
+    assert not any("x_encoder" in n for n in names)
     inner = d.model.get_base_model()
-    for n, p in inner.named_parameters():
-        if n in frozen_before:
-            assert torch.equal(p, frozen_before[n]), n            # X-Encoder y EmbeddingGemma intactos
-    assert not torch.equal(bank_before, d.bank_emb)              # el banco siguió a la proyección de texto
-    groups = {g["name"]: g["lr"] for g in tr.optimizer.param_groups}
-    assert set(groups) == {"lora", "connector", "text"}
+    for n, p in inner.named_parameters():                     # la base congelada no cambió (solo LoRA y copias)
+        if n in base_before and "lora_" not in n and "modules_to_save" not in n:
+            assert torch.equal(p, base_before[n]), n
+
+    lrs = {g["name"]: g["initial_lr"] for g in tr.optimizer.param_groups}
+    assert set(lrs) == {"lora", "lora_y_encoder", "connector"}
+    assert lrs["lora_y_encoder"] == pytest.approx(0.05 * lrs["lora"])            # [5] §3.1
+    assert lrs["connector"] == pytest.approx(0.1 * lrs["lora"])                  # incluye y_encoder.projector (P9)
 
     info = json.loads((rd / "status.json").read_text())["model_info"]
-    assert info["bank_kind"] == "factorized" and info["symmetric"] and info["text_trainable"]
-    assert info["n_target_texts"] == 21 and not info["query_truncated"] and info["trainable_text"] > 0
-
+    assert info["lora_layers_predictor"] == 2 * 7 and info["lora_layers_y_encoder"] == 1 * 7
     val = _lines(rd / "val_log.jsonl")
-    assert [r["step"] for r in val] == [0, 2, 4, 6, 8, 10, 12, 14, 16]
-    assert all(0 <= r["val_loss"] for r in val)
-    preds = _lines(rd / "val_predictions" / "step_00016.jsonl")
-    for p in preds:
-        assert p["prediction"].startswith("A ") and p["prediction"].endswith(" of the image.")
-        ex = p["extra"]
-        assert set(ex["attr_pred"]) == set(ATTRS) == set(ex["attr_prob"]) == set(ex["attr_margin_nats"])
-        assert p["prediction"] == FactorizedBank.compose(ex["attr_pred"])
+    assert [r["step"] for r in val] == [0, 2, 4, 6, 8]
+    assert all(r["selection_metric"] == "val_loss" and r["n"] == 8 for r in val)
+    best = json.loads((rd / "best.json").read_text())
+    assert best["value"] == pytest.approx(min(r["val_loss"] for r in val))      # P7: mínima InfoNCE
+    assert min(r["val_loss"] for r in val[1:]) < val[0]["val_loss"]
+    assert not (rd / "val_predictions").exists()                                 # sin Y-Decoder no hay texto
+    train = _lines(rd / "train_log.jsonl")
+    assert all({"loss_p2t", "loss_t2p", "acc_p2t", "dup_pairs"} <= r.keys() for r in train)
 
-    # recarga por el camino de model.adapter_path: la proyección de texto ajustada viaja con el adaptador
+    # la consulta sin relleno del entrenamiento da el mismo Ŝ_Y que la de inferencia (relleno hasta 512)
+    d.model.eval()
+    rec = data["val"][0]
+    img = Image.open(tmp_path / "m3di" / rec["image_path"]).convert("RGB")
+    batch = tr.featurizer.pad(tr.featurizer([(rec, img)]))
+    assert batch["query_ids"].shape[1] == tr.featurizer.query_tokens < 512
+    with torch.no_grad():
+        pred_train, _ = tr.objective.embeddings(batch)
+    pred_infer = _pred(d, img, render(cfg.prompt), d.max_query_len)
+    assert torch.nn.functional.cosine_similarity(pred_train.float(), pred_infer).item() > 0.999
+
+    # recarga por el camino de model.adapter_path: LoRA del Y-Encoder y proyecciones viajan con el adaptador
     from peft import PeftModel
 
     (tmp_path / "f").mkdir()
-    fresh = tiny_vljepa_describer(tmp_path / "f", data, target_format="canonical", model="vljepa_fac")
+    fresh = tiny_vljepa_describer(tmp_path / "f")
     fresh.model = PeftModel.from_pretrained(fresh.model, str(rd / "adapter_last")).eval()
-    fresh.refresh_bank()
-    assert torch.allclose(fresh.bank_emb.float(), d.bank_emb.float(), atol=2e-2)
-    img = [Image.new("RGB", (64, 64), (200, 30, 30))]
-    d.model.eval()
-    with torch.autocast("cpu", dtype=torch.bfloat16):
-        a, b = d.describe(img, ["q"])[0], fresh.describe(img, ["q"])[0]
-    assert a.embedding.shape == (4, 24)
-    assert a.text == b.text or min(a.extra["attr_margin_nats"].values()) < 0.05
+    pa, pb = _pred(d, img, "q", 16), _pred(fresh, img, "q", 16)
+    assert torch.nn.functional.cosine_similarity(pa, pb).item() > 0.99
+    ids, mask = d._tok(d.target_tok, [rec["caption"]], d.max_caption_len)
+    with torch.no_grad(), torch.autocast("cpu", dtype=torch.bfloat16):
+        ya = d.model.get_base_model().y_encoder(ids, mask).float()
+        yb = fresh.model.get_base_model().y_encoder(ids, mask).float()
+    assert torch.nn.functional.cosine_similarity(ya, yb).item() > 0.99
 
 
-def test_vljepa_v3_reanudar_es_identico(data, tmp_path):
-    kw = {"model": "vljepa_fac", "train.micro_batch_size": 8, "model.batch_size": 4, "train.text_lr": 5e-3}
-    cfg = train_cfg(**kw)
-    (tmp_path / "a").mkdir()
-    (tmp_path / "b").mkdir()
-    rc, _ = _run(cfg, tiny_vljepa_describer(tmp_path / "a", data, "canonical", "vljepa_fac"), tmp_path / "ra")
+def test_vljepa_reanudar_es_identico(data, tmp_path):
+    cfg = _jepa_cfg()
+    for sub in ("a", "b", "c"):
+        (tmp_path / sub).mkdir()
+    rc, _ = _run(cfg, tiny_vljepa_describer(tmp_path / "a"), tmp_path / "ra")
     assert rc == 0
-    rc, _ = _run(cfg, tiny_vljepa_describer(tmp_path / "b", data, "canonical", "vljepa_fac"), tmp_path / "rb",
-                 stop_after=3)
-    assert rc != 0
-    (tmp_path / "c").mkdir()
-    rc, _ = _run(cfg, tiny_vljepa_describer(tmp_path / "c", data, "canonical", "vljepa_fac"), tmp_path / "rb")
+    rc, _ = _run(cfg, tiny_vljepa_describer(tmp_path / "b"), tmp_path / "rb", stop_after=3)
+    assert rc == 128 + signal.SIGTERM
+    rc, _ = _run(cfg, tiny_vljepa_describer(tmp_path / "c"), tmp_path / "rb")
     assert rc == 0
-    la, lb = _lines(tmp_path / "ra" / cfg.exp_id / "train_log.jsonl"), _lines(tmp_path / "rb" / cfg.exp_id / "train_log.jsonl")
+    la = _lines(tmp_path / "ra" / cfg.exp_id / "train_log.jsonl")
+    lb = _lines(tmp_path / "rb" / cfg.exp_id / "train_log.jsonl")
     assert [r["loss"] for r in la] == pytest.approx([r["loss"] for r in lb], rel=1e-3)
+
+
+def test_vljepa_x_encoder_por_trozos_no_cambia_la_perdida(data, tmp_path):
+    """El X-Encoder congelado en trozos (memoria) da la misma pérdida que de una vez."""
+    cfg = _jepa_cfg()
+    d = tiny_vljepa_describer(tmp_path)
+    tr = loop.Trainer(cfg, describer=d, run_root=tmp_path / "runs")
+    tr.root = tmp_path / "m3di"
+    tr._setup(data["train"], data["val"])
+    pairs = [(r, Image.open(tmp_path / "m3di" / r["image_path"]).convert("RGB")) for r in data["train"][:8]]
+    batch = tr.featurizer.pad(tr.featurizer(pairs))
+    d.model.eval()
+    out = []
+    for chunk in (0, 3):
+        tr.objective.chunk = chunk
+        with torch.no_grad():
+            out.append(float(tr.objective.loss(batch)[0]))
+    assert out[0] == pytest.approx(out[1], rel=1e-3)

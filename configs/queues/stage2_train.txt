@@ -1,0 +1,21 @@
+# Pasos 2.1 y 2.2 — AJUSTE COMPLETO: 1 época de train (977 pasos con lote 128), checkpoint elegido en val.
+# Requisitos ANTES de lanzar:
+#   1. Prueba de humo revisada (stage2_smoke.txt) y P8 decidido (lote efectivo común).
+#   2. Barrido de LR hecho (stage2_sweep.txt) y el ganador anotado en configs/train/models/<modelo>.yaml.
+#   3. Valores de configs/train/budget.yaml confirmados por el usuario -> train.hparams_confirmed: true
+#      (mientras sea false, compose_train rechaza estas líneas).
+# NF4 = condición principal; bf16 = control D6, idéntico en lo demás. Cada adaptador se evalúa con la precisión
+# con que se entrenó. Al terminar, anotar runs/<exp_id>/adapter_best en configs/final_test.yaml (*_ft_*).
+#   SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_train scripts/run_queue.sh configs/queues/stage2_train.txt
+#   (o repartir: NF4 en la GPU 0 y bf16 en la GPU 1, con grep '^model' ... como en ydecoder_msrvtt.txt)
+model=vljepa
+model=qwen35
+model=internvl3
+model=llava_ov
+model=vljepa     model.quant=bf16
+model=qwen35     model.quant=bf16
+model=internvl3  model.quant=bf16
+model=llava_ov   model.quant=bf16
+#
+# Después de VL-JEPA: su Y-Decoder de la etapa 2 sobre el Y-Encoder AJUSTADO (configs/queues/ydecoder_msrvtt.txt,
+# sección 4) y la pérdida de información de la etapa 2 (configs/queues/stage2_infoloss.txt).

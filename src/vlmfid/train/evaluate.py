@@ -1,16 +1,11 @@
-"""Evaluación en validación durante el entrenamiento.
+"""Evaluación en val durante el ajuste de los VLM (docs/metodologia.md §2.3).
 
-Dos señales en las mismas 500 imágenes de val (idénticas para los 4 modelos):
+El modelo describe cada imagen de val con `describer.describe`, el MISMO camino que `scripts/infer.py`
+usa en la etapa 1 y en test (generación greedy con `model.generation`), y el texto pasa por
+`vlmfid.eval.attributes.score_texts`: exactitud por atributo y `attr_mean`, que elige el checkpoint.
 
-  * Índice macro y exactitud por atributo: el modelo describe cada imagen con `describer.describe`,
-    el MISMO camino que `scripts/infer.py` usará en test (generación greedy con `model.generation`,
-    o recuperación sobre el banco de train en VL-JEPA), y el texto pasa por `vlmfid.eval.attributes`.
-    Es la métrica con que se elige el checkpoint.
-  * Pérdida de validación (teacher forcing / InfoNCE): barata y útil para ver sobreajuste, pero no se
-    alinea necesariamente con la exactitud (la plantilla elegida al azar domina la entropía cruzada).
-
-Con el split composicional (`data.holdout: compositional`) las métricas se calculan además por separado
-sobre las combinaciones vistas (`seen_*`, las que deciden el checkpoint) y retiradas (`unseen_*`).
+VL-JEPA no pasa por aquí: sin Y-Decoder no produce texto durante el ajuste y se selecciona por la
+InfoNCE en val (P7; `vlmfid.train.jepa`).
 """
 
 from __future__ import annotations
@@ -35,9 +30,9 @@ def _describe_safe(describer, images, prompts):
         return _describe_safe(describer, images[:h], prompts[:h]) + _describe_safe(describer, images[h:], prompts[h:])
 
 
-def generate_and_score(describer, records, root, prompt_text: str, batch_size: int, amp, num_workers: int = 2,
-                       target_fn=None, groups: dict | None = None):
-    """`groups` = {prefijo: función registro -> bool}: métricas adicionales sobre esos subconjuntos."""
+def generate_and_score(describer, records, root, prompt_text: str, batch_size: int, amp,
+                       json_mode: bool, num_workers: int = 2) -> tuple[dict, list[dict]]:
+    """`json_mode` = `attributes.json_mode_for(cfg)`: el mismo extractor que puntúa la etapa 1."""
     loader = DataLoader(ImageRecordDataset(records, root), batch_size=batch_size, num_workers=num_workers,
                         collate_fn=ImageRecordDataset.collate, shuffle=False, generator=torch.Generator())
     texts, preds, t0 = [], [], time.time()
@@ -46,34 +41,8 @@ def generate_and_score(describer, records, root, prompt_text: str, batch_size: i
             outs = _describe_safe(describer, imgs, [prompt_text] * len(imgs))
             for r, o in zip(recs, outs):
                 texts.append(o.text)
-                preds.append({"id": r["id"], "prediction": o.text, "reference": r["caption"],
-                              **({"target": target_fn(r)} if target_fn else {}),
-                              "extra": {k: v for k, v in o.extra.items() if k != "topk"}})
-    metrics = score_texts(texts, records)
-    for prefix, keep in (groups or {}).items():
-        sel = [i for i, r in enumerate(records) if keep(r)]
-        sub = score_texts([texts[i] for i in sel], [records[i] for i in sel])
-        metrics |= {f"{prefix}_{k}": v for k, v in sub.items()}
+                preds.append({"id": r["id"], "prediction": o.text, "reference": r["caption"], "extra": o.extra})
+    metrics = score_texts(texts, records, json_mode=json_mode)
+    metrics["truncated"] = sum(bool(p["extra"].get("truncated")) for p in preds) / max(len(preds), 1)
     metrics["gen_seconds"] = round(time.time() - t0, 1)
     return metrics, preds
-
-
-def score_predictions(pred_path, records, groups: dict | None = None) -> dict:
-    """Métricas de un predictions.jsonl de `scripts/infer.py` sobre `records` (mismas que en val)."""
-    import json
-
-    by_id = {}
-    with open(pred_path, encoding="utf-8") as f:
-        for line in f:
-            p = json.loads(line)
-            by_id[p["id"]] = p["prediction"]
-    missing = [r["id"] for r in records if r["id"] not in by_id]
-    if missing:
-        raise ValueError(f"{pred_path}: faltan {len(missing)} predicciones (p. ej. {missing[:3]})")
-    texts = [by_id[r["id"]] for r in records]
-    metrics = score_texts(texts, records)
-    for prefix, keep in (groups or {}).items():
-        sel = [i for i, r in enumerate(records) if keep(r)]
-        metrics |= {f"{prefix}_{k}": v for k, v in score_texts([texts[i] for i in sel],
-                                                               [records[i] for i in sel]).items()}
-    return metrics

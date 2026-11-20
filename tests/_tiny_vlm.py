@@ -148,12 +148,15 @@ def tiny_describer(max_new_tokens: int = 24):
 
 
 def train_cfg(**overrides):
+    """Config de la etapa 2 para los modelos diminutos. `hparams_confirmed=true` levanta el candado de la
+    propuesta de hiperparámetros: aquí los valores son de prueba, no del protocolo."""
     from vlmfid.train.config import compose_train
 
-    base = ["model=qwen35", "model.quant=bf16", "train.effective_batch_size=8", "train.micro_batch_size=4",
-            "train.eval_every=2", "train.save_every=1", "train.log_every=1", "data.num_workers=0",
-            "data.val_limit=8", "lora.r=4", "lora.alpha=8", "train.lr=5e-3", "train.connector_lr=5e-4",
-            "model.batch_size=4", "train.max_target_tokens=128"]
+    base = ["model=qwen35", "model.quant=bf16", "train.hparams_confirmed=true", "train.effective_batch_size=8",
+            "train.micro_batch_size=4", "train.eval_every=2", "train.save_every=1", "train.log_every=1",
+            "data.num_workers=0", "data.val_limit=8", "lora.r=4", "lora.alpha=8", "train.lr=5e-3",
+            "train.connector_lr_mult=0.1", "train.max_grad_norm=1.0", "model.batch_size=4",
+            "train.max_target_tokens=128"]
     return compose_train(base + [f"{k}={v}" for k, v in overrides.items()])
 
 
@@ -196,7 +199,11 @@ def write_m3di(root, n: int, split: str):
 
 
 class TensorCharTokenizer(CharTokenizer):
-    """Interfaz de tokenizador de HF que usa VLJEPADescriber._tok (relleno a max_length, tensores)."""
+    """Interfaz de tokenizador de HF que usa VLJEPADescriber._tok (relleno a la derecha, tensores)."""
+
+    def __init__(self):
+        super().__init__()
+        self.padding_side = "right"
 
     def __call__(self, text, max_length=None, padding=None, truncation=False, return_tensors=None,
                  add_special_tokens=True, **_):
@@ -212,10 +219,10 @@ class TensorCharTokenizer(CharTokenizer):
         return {"input_ids": torch.tensor(ids), "attention_mask": torch.tensor(att)}
 
 
-def tiny_vljepa_describer(tmp, records_by_split, target_format: str = "original", model: str = "vljepa"):
+def tiny_vljepa_describer(tmp, quant: str = "bf16"):
     """VLJEPADescriber con un OpenVLJEPA diminuto (V-JEPA 2 + Llama + Gemma3 aleatorios, guardados en
-    `tmp`). `records_by_split` alimenta el banco de recuperación en lugar del manifiesto real; el banco
-    queda en `target_format` (original | canonical), como lo fija compose_train al entrenar."""
+    `tmp`), sin `load()`. Mismos nombres de módulo que el real: predictor.layers.*, y_encoder.model.layers.*,
+    predictor.vis_proj, predictor.out_proj, y_encoder.projector."""
     import sys
 
     import transformers as T
@@ -244,25 +251,14 @@ def tiny_vljepa_describer(tmp, records_by_split, target_format: str = "original"
                    {"llama_name": str(tmp / "llama"), "n_keep_layers": 2, "proj_dim": 24},
                    torch_dtype=torch.bfloat16).to(torch.bfloat16).eval()
 
-    mcfg = _load_model(model)
-    mcfg.quant = "bf16"
+    mcfg = _load_model("vljepa")
+    mcfg.quant = quant
     mcfg.batch_size = 4
-    mcfg.bank.max_captions = 1000
-    mcfg.bank.target_format = target_format
     d = vj.VLJEPADescriber(mcfg)
     d.model = m
     d.ckpt_path = tmp / "best.pt"
-    d.ckpt_path.write_bytes(b"x")
-    # las consultas por atributo del banco factorizado no se pueden truncar (tokenizador por caracteres)
-    d.max_query_len, d.max_caption_len, d.num_frames = (72 if model == "vljepa_fac" else 16), 64, 8
-    d.query_tok = d.target_tok = TensorCharTokenizer()
+    # tokenizador por caracteres: el caption más largo de write_m3di pasa de 96 caracteres
+    d.max_query_len, d.max_caption_len, d.num_frames = 512, 160, 8
+    d.query_tok, d.target_tok = TensorCharTokenizer(), TensorCharTokenizer()
     d.transform = TV.Compose([TV.Resize(32, antialias=True), TV.CenterCrop(32), TV.ToTensor()])
-    orig = vj.load_manifest
-    vj.load_manifest = lambda split, **k: records_by_split[split]
-    old_cache = vj.CACHE
-    vj.CACHE = tmp / "cache"
-    try:
-        d._build_bank()
-    finally:
-        vj.load_manifest, vj.CACHE = orig, old_cache
     return d

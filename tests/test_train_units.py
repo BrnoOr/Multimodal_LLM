@@ -1,4 +1,7 @@
-"""Etapa 2: piezas sin GPU ni modelos — presupuesto común, orden de datos, etiquetas y pérdidas."""
+"""Etapa 2: piezas sin GPU ni modelos — presupuesto común, candado de hiperparámetros, orden de datos y
+pérdidas (docs/metodologia.md §2.3)."""
+
+import math
 
 import pytest
 import torch
@@ -7,138 +10,119 @@ from omegaconf import OmegaConf
 from vlmfid.paths import CONFIGS
 from vlmfid.train.config import ALLOWED_MODEL_KEYS, compose_train, load_model_train
 from vlmfid.train.data import EpochSampler, steps_per_epoch
-from vlmfid.train.objectives import bank_infonce_loss, duplicate_mask, infonce_loss
+from vlmfid.train.objectives import duplicate_mask, duplicate_stats, infonce_loss
 
 MODELS = ["llava_ov", "internvl3", "qwen35", "vljepa"]
+SHORT = ["train.max_steps=10"]          # corrida corta: la única permitida mientras no se confirmen los valores
 
 
 @pytest.mark.parametrize("m", MODELS)
 def test_presupuesto_comun(m):
-    c = compose_train([f"model={m}"])
+    c = compose_train([f"model={m}", *SHORT])
     budget = OmegaConf.load(CONFIGS / "train" / "budget.yaml")
-    for k in ["epochs", "effective_batch_size", "lr", "connector_lr", "warmup_ratio", "schedule",
-              "max_grad_norm", "weight_decay", "selection_metric"]:
+    for k in ["epochs", "effective_batch_size", "connector_lr_mult", "y_encoder_lr_mult", "warmup_ratio",
+              "schedule", "max_grad_norm", "weight_decay", "optimizer", "betas"]:
         assert c.train[k] == budget.train[k], k
     for k in ["r", "alpha", "dropout"]:
         assert c.lora[k] == budget.lora[k], k
-    assert c.data.val_limit == 500 and c.data.val_split == "val"
+    assert c.data.val_limit == 500 and c.data.val_split == "val" and c.data.train_split == "train"
     assert c.model.quant == "nf4"                               # QLoRA, como la etapa 1
-    assert c.lora.connector_modules                              # conector entrenable (decisión)
-    assert c.target.format == "canonical" and c.data.holdout is None
-    assert c.train.selection_metric == "shape_pos"
-    assert c.exp_id == f"train_{c.model.name}_nf4_{c.prompt.id}_tcan_r16_e1"
+    assert c.lora.connector_modules                              # conector entrenable
+    assert c.prompt.id == "p1_attributes"                        # el mismo prompt en los 4 (decisión del usuario)
+    assert c.exp_id == f"train_{c.model.name}_nf4_p1_attributes_r64_lr0.0002_e1_m10"
 
 
-def test_prompts_de_la_etapa_2():
-    # reformulación: el mismo prompt en los 4 (VL-JEPA dejaba p4m, truncado a 64 tokens)
-    assert {compose_train([f"model={m}"]).prompt.id for m in MODELS} == {"p1_attributes"}
+def test_seleccion_por_familia():
+    for m in ["llava_ov", "internvl3", "qwen35"]:
+        c = compose_train([f"model={m}", *SHORT])
+        assert c.train.selection_metric == "attr_mean" and c.objective.kind == "lm"
+    c = compose_train(["model=vljepa", *SHORT])
+    assert c.train.selection_metric == "val_loss" and c.objective.kind == "infonce"           # P7
+    assert c.train.micro_batch_size == c.train.effective_batch_size                         # lote físico = efectivo
+    assert list(c.lora.connector_modules) == ["predictor.vis_proj", "predictor.out_proj", "y_encoder.projector"]
 
 
-def test_exp_id_de_las_variantes():
-    assert compose_train(["model=qwen35", "target.format=original"]).exp_id.endswith("_torig_r16_e1")
-    c = compose_train(["model=qwen35", "train.epochs=2", "data.holdout=compositional", "seed=1"])
-    assert c.exp_id == "train_qwen35_08b_base_nf4_p1_attributes_tcan_r16_e2_hc_s1"
-    with pytest.raises(ValueError, match="target.format"):
-        compose_train(["model=qwen35", "target.format=json"])
-    with pytest.raises(ValueError, match="holdout"):
-        compose_train(["model=qwen35", "data.holdout=random"])
+def test_candado_de_hiperparametros():
+    with pytest.raises(ValueError, match="sin confirmar"):
+        compose_train(["model=qwen35"])
+    c = compose_train(["model=qwen35", "train.hparams_confirmed=true"])
+    assert c.exp_id == "train_qwen35_08b_base_nf4_p1_attributes_r64_lr0.0002_e1"
 
 
-def test_vljepa_banco_en_el_formato_del_objetivo():
-    c = compose_train(["model=vljepa"])
-    assert c.objective.negatives == "bank" and c.model.bank.target_format == "canonical"
-    assert compose_train(["model=vljepa", "target.format=original"]).model.bank.target_format == "original"
+def test_control_bf16_y_variantes_en_el_exp_id():
+    assert "_bf16_" in compose_train(["model=llava_ov", "model.quant=bf16", *SHORT]).exp_id
+    c = compose_train(["model=qwen35", "train.lr=5e-4", "seed=1", *SHORT])
+    assert c.exp_id == "train_qwen35_08b_base_nf4_p1_attributes_r64_lr0.0005_e1_s1_m10"
+
+
+def test_rechaza_lo_que_rompe_el_protocolo():
+    with pytest.raises(ValueError, match="lote físico"):
+        compose_train(["model=vljepa", "train.micro_batch_size=64", *SHORT])
+    with pytest.raises(ValueError, match="val_loss"):
+        compose_train(["model=vljepa", "train.selection_metric=attr_mean", *SHORT])
+    with pytest.raises(ValueError, match="exactitud por atributo"):
+        compose_train(["model=qwen35", "train.selection_metric=val_loss", *SHORT])
+    with pytest.raises(ValueError, match="no corresponde"):
+        compose_train(["model=qwen35", "objective.kind=infonce", *SHORT])
+    with pytest.raises(ValueError, match="D4"):
+        compose_train(["model=vljepa", "train.effective_batch_size=256", "train.micro_batch_size=256", *SHORT])
+    with pytest.raises(ValueError, match="train_limit"):
+        compose_train(["model=qwen35", "data.train_limit=100", *SHORT])
+    with pytest.raises(ValueError, match="test"):
+        compose_train(["model=qwen35", "data.val_split=test", *SHORT])
+    with pytest.raises(ValueError, match="adapter_path"):
+        compose_train(["model=qwen35", "model.adapter_path=runs/x", *SHORT])
+    with pytest.raises(ValueError, match="decoder_path"):
+        compose_train(["model=vljepa", "model.decoder_path=runs/x", *SHORT])
+    with pytest.raises(ValueError, match="sin valor"):
+        compose_train(["model=qwen35", "train.lr=null", *SHORT])
 
 
 def test_archivo_por_modelo_no_puede_cambiar_el_presupuesto(tmp_path, monkeypatch):
     import vlmfid.train.config as tc
 
     (tmp_path / "models").mkdir()
-    (tmp_path / "models" / "x.yaml").write_text("prompt: p0_minimal\ntrain:\n  lr: 1.0\n")
+    (tmp_path / "models" / "x.yaml").write_text("train:\n  epochs: 3\n")
     monkeypatch.setattr(tc, "TRAIN_CONFIGS", tmp_path)
     with pytest.raises(ValueError, match="no permitidas"):
         load_model_train("x")
-    assert "train.micro_batch_size" in ALLOWED_MODEL_KEYS
-
-
-def test_infonce_exige_microlote_igual_al_efectivo():
-    with pytest.raises(ValueError, match="infonce"):
-        compose_train(["model=vljepa", "objective.negatives=batch", "train.micro_batch_size=32"])
-    # con el banco como negativos cada muestra es independiente: se puede acumular gradiente
-    assert compose_train(["model=vljepa", "train.micro_batch_size=32"]).train.micro_batch_size == 32
-    with pytest.raises(ValueError, match="múltiplo"):
-        compose_train(["model=qwen35", "train.micro_batch_size=24"])
-
-
-def test_train_completo_sin_limite():
-    c = compose_train(["model=qwen35"])
-    assert "train_limit" not in c.data and c.train.drop_last is False
-    with pytest.raises(ValueError, match="train_limit"):
-        compose_train(["model=qwen35", "data.train_limit=1280"])
-
-
-def test_smoke_cambia_exp_id():
-    # un run cortado con max_steps escribe summary.json: no puede compartir exp_id con el run completo
-    assert compose_train(["model=qwen35", "train.max_steps=20"]).exp_id.endswith("_tcan_r16_e1_m20")
+    assert "train.epochs" not in ALLOWED_MODEL_KEYS and "train.effective_batch_size" not in ALLOWED_MODEL_KEYS
 
 
 @pytest.mark.parametrize("m", MODELS)
-def test_test_usa_el_adaptador_y_el_subconjunto_del_zeroshot(m):
-    from vlmfid.train.config import compose_test
-
-    c = compose_train([f"model={m}"])
-    t = compose_test(c)
-    # mismos exp_id que configs/queues/stage2b_test.txt
-    assert t.exp_id == f"finetuned_{c.exp_id.removeprefix('train_')}_test"
-    assert t.model.adapter_path == f"runs/{c.exp_id}/adapter_best"
-    assert t.stage == "finetuned" and t.data.split == "test" and t.data.limit == 10000
-    assert t.data.subset_seed == 0 and t.prompt.id == c.prompt.id
-    if m == "vljepa":
-        assert t.model.bank.target_format == "canonical" and t.infer.save_embeddings
-    smoke = compose_test(compose_train([f"model={m}", "train.max_steps=20", "test.limit=64"]))
-    assert smoke.exp_id.endswith("_m20_test_n64") and smoke.data.limit == 64
+def test_archivos_reales_solo_usan_claves_permitidas(m):
+    load_model_train(m)
 
 
-def test_orden_de_datos_determinista_y_reanudable():
-    assert steps_per_epoch(125_000, 64, drop_last=False) == 1954            # todo train: el último paso con 8
-    assert steps_per_epoch(125_000, 64, drop_last=True) == 1953
-    every = list(EpochSampler(1000, 64, seed=0, epoch=0, drop_last=False))
-    assert sorted(every) == list(range(1000))                               # sin límite: cada imagen una vez
-    full = list(EpochSampler(1000, 64, seed=0, epoch=0))
-    assert len(full) == 15 * 64 and len(set(full)) == len(full)
-    assert full == list(EpochSampler(1000, 64, seed=0, epoch=0))            # mismos lotes en los 4 modelos
-    assert list(EpochSampler(1000, 64, seed=0, epoch=0, start_step=5)) == full[5 * 64:]
-    assert full != list(EpochSampler(1000, 64, seed=0, epoch=1))
+def test_orden_de_datos_comun_y_reanudable():
+    n, b = 1000, 128
+    assert steps_per_epoch(n, b, drop_last=False) == 8 and steps_per_epoch(125_000, 128, drop_last=False) == 977
+    full = list(EpochSampler(n, b, seed=0, epoch=0, drop_last=False))
+    assert sorted(full) == list(range(n))                                   # todo train, sin repetir
+    assert list(EpochSampler(n, b, seed=0, epoch=0, start_step=3, drop_last=False)) == full[3 * b:]
+    assert list(EpochSampler(n, b, seed=0, epoch=1, drop_last=False)) != full
 
 
-def test_mascara_de_duplicados():
-    m = duplicate_mask(["a", "b", "a", "c", "b"], "cpu")
-    assert m.tolist() == [[False, False, True, False, False], [False, False, False, False, True],
-                          [True, False, False, False, False], [False] * 5, [False, True, False, False, False]]
-
-
-def test_infonce_no_penaliza_captions_repetidos():
+def test_infonce_bidireccional_como_open_vljepa():
     torch.manual_seed(0)
-    t = torch.nn.functional.normalize(torch.randn(4, 8), dim=-1)
-    t[2] = t[0]                                   # dos imágenes con el mismo caption -> mismo objetivo
-    p = t.clone()                                 # predicción perfecta
-    sin = infonce_loss(p, t, 0.07)
-    con = infonce_loss(p, t, 0.07, ["x", "y", "x", "z"])
-    # sin máscara, las filas 0 y 2 reparten su probabilidad entre dos "positivos" idénticos: cada una paga
-    # ≈ log 2 en ambas direcciones, es decir ≈ 2·log 2 / 4 ≈ 0,35 de pérdida media extra
-    assert sin - con == pytest.approx(0.5 * torch.log(torch.tensor(2.0)).item(), abs=0.05)
-    assert con < 0.05
+    p, t = torch.randn(6, 8), torch.randn(6, 8)
+    loss, stats = infonce_loss(p, t, 0.07)
+    pn, tn = torch.nn.functional.normalize(p, dim=-1), torch.nn.functional.normalize(t, dim=-1)
+    logits = pn @ tn.T / 0.07
+    lab = torch.arange(6)
+    ref = (torch.nn.functional.cross_entropy(logits, lab) + torch.nn.functional.cross_entropy(logits.T, lab)) / 2
+    assert torch.allclose(loss, ref)
+    assert math.isclose((stats["loss_p2t"] + stats["loss_t2p"]) / 2, float(ref), rel_tol=1e-5)
+    # pares perfectos -> pérdida baja y recuperación exacta
+    loss_ok, s_ok = infonce_loss(t, t, 0.07)
+    assert float(loss_ok) < 0.1 and s_ok["acc_p2t"] == s_ok["acc_t2p"] == 1.0
 
 
-def test_infonce_contra_el_banco():
-    torch.manual_seed(0)
-    bank = torch.nn.functional.normalize(torch.randn(10, 8), dim=-1)
-    idx = torch.tensor([3, 3, 7, 1])                             # dos muestras con el mismo objetivo: misma clase
-    perfect = bank_infonce_loss(bank[idx], bank, idx, 0.07) / 4
-    noisy = bank_infonce_loss(torch.randn(4, 8), bank, idx, 0.07) / 4
-    assert perfect < noisy
-    # suma por muestra: partir el lote en micro-lotes y sumar da exactamente lo mismo (acumulación válida)
-    pred = torch.randn(4, 8)
-    whole = bank_infonce_loss(pred, bank, idx, 0.07)
-    parts = bank_infonce_loss(pred[:2], bank, idx[:2], 0.07) + bank_infonce_loss(pred[2:], bank, idx[2:], 0.07)
-    assert torch.allclose(whole, parts)
+def test_duplicados_d4():
+    caps = ["a", "b", "a", "c", "a"]
+    m = duplicate_mask(caps, "cpu")
+    assert m[0, 2] and m[2, 4] and not m[0, 0] and not m[0, 1]
+    assert duplicate_stats(caps) == {"dup_pairs": 3, "dup_samples": 3}
+    t = torch.randn(5, 4)
+    masked, _ = infonce_loss(t, t, 0.07, caps)
+    assert torch.isfinite(masked)

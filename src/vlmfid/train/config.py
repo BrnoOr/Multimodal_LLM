@@ -1,24 +1,24 @@
-"""Composición de la configuración de entrenamiento (etapa 2).
+"""Composición y validación de la configuración de entrenamiento (etapa 2).
 
     configuración = configs/train/budget.yaml                (común a los 4 modelos)
-                  ⊕ configs/train/models/<model>.yaml        (prompt, micro-lote, conector, objetivo)
-                  ⊕ model:  configs/models/<model>.yaml      (la MISMA config de inferencia)
-                  ⊕ prompt: configs/prompts.yaml[<prompt>]
+                  ⊕ configs/train/models/<model>.yaml        (micro-lote, conector, objetivo, selección, LR)
+                  ⊕ model:  configs/models/<model>.yaml      (la MISMA config de inferencia de la etapa 1)
+                  ⊕ prompt: configs/prompts.yaml[<prompt>]   (p1_attributes en los 4, budget.yaml)
                   ⊕ overrides por línea de comandos (dotlist)
 
-La config del modelo es la de inferencia, sin copias: así el modelo que se entrena se carga, cuantiza
-y preprocesa exactamente igual que en la etapa 1 y que en la evaluación final con `scripts/infer.py`.
+La config del modelo es la de inferencia, sin copias: el modelo que se entrena se carga, cuantiza y
+preprocesa igual que en la etapa 1 y que en la evaluación final.
 
-El archivo por modelo solo puede tocar las claves de `ALLOWED_MODEL_KEYS`. Cualquier otra (lr,
-épocas, rango LoRA...) rompería el "mismo presupuesto" y se rechaza. Desde la línea de comandos sí se
-puede cambiar todo (pruebas de humo, ablaciones), pero el cambio queda en el exp_id o en config.yaml.
+El archivo por modelo solo puede tocar `ALLOWED_MODEL_KEYS`. `train.lr` está permitido porque el LR de
+LoRA se elige por modelo con el mismo barrido en val (decisión del usuario 16-11-2026); el resto del
+presupuesto (épocas, lote efectivo, esquema, r, α...) es común. Desde la línea de comandos se puede
+cambiar todo, y el cambio queda en config.yaml del run (y en el exp_id lo que lo distingue).
 
-exp_id por defecto (reformulación, docs/ETAPA2B_REFORMULACION.md):
-    train_<model>_<quant>_<prompt>_t<can|orig>_r<r>_e<epochs>[_hc][_s<seed>][_m<max_steps>]
-    (_hc = split composicional; _s<seed> solo si seed != 0; _m<max_steps> solo en pruebas de humo)
+Candado de hiperparámetros: mientras `train.hparams_confirmed` sea false (los valores de budget.yaml son
+una propuesta, docs/metodologia.md §4), solo se aceptan corridas cortas con `train.max_steps`.
 
-Train se usa SIEMPRE completo (las 125 000 imágenes, o todas las no retiradas con el split
-composicional): no hay `data.train_limit` y pasarlo es un error.
+exp_id por defecto:
+    train_<model.name>_<quant>_<prompt>_r<r>_lr<lr>_e<epochs>[_s<seed>][_m<max_steps>]
 """
 
 from __future__ import annotations
@@ -28,24 +28,26 @@ import json
 from omegaconf import DictConfig, OmegaConf
 
 from ..config import _load_model, _load_prompt, as_dict
-from ..data.targets import HOLDOUTS, TARGET_FORMATS
+from ..eval.attributes import METRICS
 from ..paths import CONFIGS
 
 TRAIN_CONFIGS = CONFIGS / "train"
-ALLOWED_MODEL_KEYS = {"prompt", "train.micro_batch_size", "lora.connector_modules", "objective.kind",
-                      "objective.temperature", "objective.mask_duplicate_captions", "objective.negatives",
-                      # ajuste v3 de VL-JEPA (docs/VLJEPA_AJUSTE_V3.pdf): lado de texto entrenable e
-                      # InfoNCE bidireccional. Las épocas NO están aquí: van por línea de comandos y al exp_id.
-                      # Viven solo en configs/train/models/vljepa_fac.yaml (no en budget.yaml) para que la
-                      # config resuelta de los runs ya hechos no cambie y sigan siendo reanudables.
-                      "lora.text_modules", "objective.symmetric", "train.text_lr"}
-SELECTION_METRICS = ("macro", "shape_pos", "macro_cat", "shape", "pos", "color", "color_adj", "name", "val_loss")
-TARGET_TAG = {"canonical": "tcan", "original": "torig"}
-# Claves que pueden cambiar al reanudar un entrenamiento sin alterar su resultado.
-# (max_steps no: un run cortado con max_steps escribe summary.json y adapter_best, así que va en el exp_id)
+ALLOWED_MODEL_KEYS = {"train.micro_batch_size", "train.selection_metric", "train.lr", "lora.connector_modules",
+                      "objective.kind"}
+SELECTION_METRICS = tuple(METRICS) + ("val_loss",)
+FAMILY_OBJECTIVE = {"hf": "lm", "qwen_vl": "lm", "vljepa": "infonce"}
+OPTIMIZERS = ("adamw", "paged_adamw")
+SCHEDULES = ("cosine", "constant")
+# D4 (docs/metodologia.md §2.3): sin máscara de captions duplicados solo con lote físico ≤ 128
+MAX_BATCH_WITHOUT_MASK = 128
+# Claves que pueden cambiar al reanudar sin alterar el resultado. El micro-lote de los VLM solo reparte el
+# lote efectivo en la GPU (la pérdida se normaliza por los tokens del lote efectivo); en VL-JEPA el
+# micro-lote es el lote efectivo, que no está aquí. max_steps no: un run corto escribe summary.json.
 RESUME_SAFE = {"data.num_workers", "train.micro_batch_size", "train.log_every", "train.save_every",
-               "train.eval_every", "test"}
-TEST_DEFAULT_LIMIT = 10000      # el subconjunto de test del zero-shot: sin sufijo _n en el exp_id
+               "train.eval_every", "train.x_encoder_chunk", "train.hparams_confirmed"}
+REQUIRED = ("train.epochs", "train.effective_batch_size", "train.lr", "train.connector_lr_mult",
+            "train.weight_decay", "train.schedule", "train.warmup_ratio", "train.max_grad_norm",
+            "train.optimizer", "lora.r", "lora.alpha", "lora.dropout")
 
 
 def _flat_keys(d: dict, prefix: str = "") -> set[str]:
@@ -72,6 +74,17 @@ def load_model_train(name: str) -> DictConfig:
     return cfg
 
 
+def _fmt_lr(lr: float) -> str:
+    return f"{float(lr):g}"
+
+
+def default_exp_id(cfg: DictConfig) -> str:
+    t = cfg.train
+    return (f"train_{cfg.model.name}_{cfg.model.quant}_{cfg.prompt.id}_r{cfg.lora.r}_lr{_fmt_lr(t.lr)}_e{t.epochs}"
+            + (f"_s{cfg.seed}" if int(cfg.seed) != 0 else "")
+            + (f"_m{t.max_steps}" if t.get("max_steps") else ""))
+
+
 def compose_train(args: list[str] | None = None) -> DictConfig:
     kv = {}
     for a in args or []:
@@ -84,99 +97,74 @@ def compose_train(args: list[str] | None = None) -> DictConfig:
     model_name = kv.pop("model")
 
     cfg = OmegaConf.load(TRAIN_CONFIGS / "budget.yaml")
-    per_model = load_model_train(model_name)
-    prompt_name = kv.pop("prompt", per_model.get("prompt"))
-    if not prompt_name:
-        raise ValueError(f"configs/train/models/{model_name}.yaml no define `prompt`")
-    cfg = OmegaConf.merge(cfg, {k: v for k, v in per_model.items() if k != "prompt"})
+    cfg = OmegaConf.merge(cfg, load_model_train(model_name))
+    prompt_name = kv.pop("prompt", cfg.prompt)
     cfg.model = _load_model(model_name)
     cfg.model_key = model_name
     cfg.prompt = _load_prompt(str(prompt_name))
     cfg = OmegaConf.merge(cfg, OmegaConf.from_dotlist([f"{k}={v}" for k, v in kv.items()]))
-
-    t = cfg.train
-    if t.micro_batch_size is None:
-        t.micro_batch_size = t.effective_batch_size
-    if t.effective_batch_size % t.micro_batch_size:
-        raise ValueError(f"effective_batch_size={t.effective_batch_size} no es múltiplo de "
-                         f"micro_batch_size={t.micro_batch_size}")
-    if cfg.objective.kind not in ("lm", "infonce"):
-        raise ValueError(f"objective.kind='{cfg.objective.kind}' inválido (lm | infonce)")
-    negatives = cfg.objective.get("negatives", "batch")
-    if negatives not in ("batch", "bank"):
-        raise ValueError(f"objective.negatives='{negatives}' inválido (batch | bank)")
-    if (cfg.objective.kind == "infonce" and negatives == "batch"
-            and t.micro_batch_size != t.effective_batch_size):
-        raise ValueError("objective=infonce con negatives=batch: los negativos salen del micro-lote, que debe ser "
-                         "igual al lote efectivo (acumular gradientes cambia la pérdida). Ajusta "
-                         "train.effective_batch_size o usa objective.negatives=bank.")
-    symmetric = bool(cfg.objective.get("symmetric", False))
-    if symmetric and (cfg.objective.kind != "infonce" or negatives != "bank"):
-        raise ValueError("objective.symmetric=true solo aplica a objective.kind=infonce con negatives=bank")
-    if symmetric and t.micro_batch_size != t.effective_batch_size:
-        raise ValueError("objective.symmetric=true: el término texto -> predictor usa las predicciones de todo el "
-                         "lote, así que micro_batch_size debe ser igual a effective_batch_size.")
-    factorized = cfg.model.family == "vljepa" and cfg.model.bank.get("kind", "captions") == "factorized"
-    if cfg.lora.get("text_modules") and not factorized:
-        raise ValueError("lora.text_modules solo aplica a VL-JEPA con model.bank.kind=factorized")
-    if factorized and (cfg.target.format != "canonical" or negatives != "bank"):
-        raise ValueError("model.bank.kind=factorized requiere target.format=canonical y objective.negatives=bank")
-    if cfg.model.get("adapter_path"):
-        raise ValueError("model.adapter_path debe ser null al entrenar (el adaptador se crea desde cero)")
-    if cfg.target.format not in TARGET_FORMATS:
-        raise ValueError(f"target.format='{cfg.target.format}' inválido ({' | '.join(TARGET_FORMATS)})")
-    if cfg.data.get("train_limit") not in (None, "", "null"):
-        raise ValueError("data.train_limit no existe: el entrenamiento usa train completo. Para una prueba "
-                         "corta usa train.max_steps (agrega _m<N> al exp_id).")
-    if cfg.data.get("holdout") in ("", "null"):
-        cfg.data.holdout = None
-    if cfg.data.get("holdout") not in HOLDOUTS:
-        raise ValueError(f"data.holdout='{cfg.data.holdout}' inválido (null | compositional)")
-    if t.selection_metric not in SELECTION_METRICS:
-        raise ValueError(f"train.selection_metric='{t.selection_metric}' inválido {SELECTION_METRICS}")
-    if cfg.model.family == "vljepa":
-        # el banco de recuperación (val durante el ajuste y test después) debe estar en el formato aprendido
-        cfg.model.bank.target_format = cfg.target.format
-
+    validate(cfg)
     if cfg.get("exp_id") in (None, "", "null"):
-        # banco factorizado: el modelo no ve el prompt sino una consulta por atributo (vlmfid.models.bank)
-        prompt_tag = "qattr" if factorized else cfg.prompt.id
-        cfg.exp_id = (f"train_{cfg.model.name}_{cfg.model.quant}_{prompt_tag}_{TARGET_TAG[cfg.target.format]}"
-                      f"_r{cfg.lora.r}_e{t.epochs}"
-                      + ("_hc" if cfg.data.holdout == "compositional" else "")
-                      + (f"_s{cfg.seed}" if int(cfg.seed) != 0 else "")
-                      + (f"_m{t.max_steps}" if t.get("max_steps") else ""))
+        cfg.exp_id = default_exp_id(cfg)
     return cfg
 
 
-def compose_test(cfg: DictConfig) -> DictConfig:
-    """Config de `scripts/infer.py` para evaluar en test el adaptador elegido en val.
+def validate(cfg: DictConfig) -> None:
+    """Falla ante cualquier configuración que rompa el protocolo de la etapa 2."""
+    t, o = cfg.train, cfg.objective
+    missing = [k for k in REQUIRED if OmegaConf.select(cfg, k) in (None, "", "null")]
+    if missing:
+        raise ValueError(f"Hiperparámetros sin valor: {missing}. Cada uno necesita fuente (docs/metodologia.md §4).")
+    if t.get("max_steps") in ("", "null"):
+        t.max_steps = None
+    if not bool(t.hparams_confirmed) and not t.get("max_steps"):
+        raise ValueError(
+            "Los hiperparámetros de configs/train/budget.yaml son una propuesta sin confirmar "
+            "(docs/metodologia.md §4). Hasta fijarlos (train.hparams_confirmed=true) solo se aceptan corridas "
+            "cortas con train.max_steps: prueba de humo y barrido (configs/queues/stage2_*.txt).")
 
-    Parte de configs/defaults.yaml (como el zero-shot) y toma de la config de entrenamiento el modelo
-    tal como se entrenó (cuantización, banco de VL-JEPA en el formato aprendido), el prompt y la semilla.
-    El exp_id coincide con el de configs/queues/stage2b_test.txt, así que ambos caminos comparten run.
-    """
-    from ..config import compose
-    from ..paths import ROOT, RUNS
-
-    t = cfg.test
-    if t.split == cfg.data.val_split or t.split == cfg.data.train_split:
-        raise ValueError(f"test.split='{t.split}' no puede ser el split de train o val")
-    limit = None if t.get("limit") in (None, "", "null") else int(t.limit)
-    exp_id = cfg.exp_id.removeprefix("train_")
-    exp_id = f"finetuned_{exp_id}_test" + (f"_n{limit}" if limit != TEST_DEFAULT_LIMIT else "")
-    tcfg = compose([f"model={cfg.model_key}", f"prompt={cfg.prompt.id}", "stage=finetuned", f"exp_id={exp_id}",
-                    f"seed={cfg.seed}", f"data.split={t.split}", f"data.limit={'null' if limit is None else limit}",
-                    f"data.variant={cfg.data.variant}", f"data.subset_seed={cfg.data.subset_seed}"])
-    adapter = RUNS / cfg.exp_id / "adapter_best"
-    if adapter.is_relative_to(ROOT):        # relativa, como en stage2b_test.txt (config.yaml comparable)
-        adapter = adapter.relative_to(ROOT)
-    tcfg.model = OmegaConf.merge(cfg.model, {"adapter_path": adapter.as_posix()})
-    if cfg.data.get("root") is not None:
-        tcfg.data.root = cfg.data.root
-    tcfg.infer.batch_size = cfg.model.get("batch_size", 8)
-    tcfg.infer.save_embeddings = cfg.model.family == "vljepa"
-    return tcfg
+    family = str(cfg.model.family)
+    expected = FAMILY_OBJECTIVE.get(family)
+    if expected is None:
+        raise ValueError(f"Familia de modelo desconocida: {family}")
+    if o.kind != expected:
+        raise ValueError(f"objective.kind='{o.kind}' no corresponde a la familia {family} (se espera '{expected}')")
+    if t.micro_batch_size is None:
+        t.micro_batch_size = t.effective_batch_size
+    if int(t.effective_batch_size) % int(t.micro_batch_size):
+        raise ValueError(f"effective_batch_size={t.effective_batch_size} no es múltiplo de "
+                         f"micro_batch_size={t.micro_batch_size}")
+    if o.kind == "infonce":
+        if int(t.micro_batch_size) != int(t.effective_batch_size):
+            raise ValueError("VL-JEPA: InfoNCE toma los negativos del lote, así que el lote físico debe ser el "
+                             "efectivo (micro_batch_size == effective_batch_size; docs/metodologia.md §2.3).")
+        if int(t.effective_batch_size) > MAX_BATCH_WITHOUT_MASK and not bool(o.mask_duplicate_captions):
+            raise ValueError(f"Lote de {t.effective_batch_size} > {MAX_BATCH_WITHOUT_MASK} sin máscara de captions "
+                             "duplicados: D4 pide reconsiderarlo (docs/metodologia.md §2.3).")
+        if t.selection_metric != "val_loss":
+            raise ValueError("VL-JEPA se selecciona por la InfoNCE en val (P7): train.selection_metric=val_loss. "
+                             "Sin Y-Decoder no hay texto que puntuar durante el ajuste.")
+    elif t.selection_metric not in METRICS:
+        raise ValueError(f"VLM: train.selection_metric debe ser una exactitud por atributo {METRICS} (CLAUDE.md §3)")
+    if t.selection_metric not in SELECTION_METRICS:
+        raise ValueError(f"train.selection_metric='{t.selection_metric}' inválido {SELECTION_METRICS}")
+    if t.optimizer not in OPTIMIZERS:
+        raise ValueError(f"train.optimizer='{t.optimizer}' inválido {OPTIMIZERS}")
+    if t.schedule not in SCHEDULES:
+        raise ValueError(f"train.schedule='{t.schedule}' inválido {SCHEDULES}")
+    if not cfg.lora.get("connector_modules"):
+        raise ValueError("lora.connector_modules vacío: el conector se entrena (CLAUDE.md §3)")
+    if cfg.model.get("adapter_path"):
+        raise ValueError("model.adapter_path debe ser null al entrenar (el adaptador se crea desde cero)")
+    if family == "vljepa" and cfg.model.get("decoder_path"):
+        raise ValueError("model.decoder_path debe ser null al entrenar VL-JEPA: el Y-Decoder de la etapa 2 se "
+                         "entrena después, sobre el Y-Encoder ajustado (docs/metodologia.md §2.3)")
+    if cfg.data.get("train_limit") not in (None, "", "null"):
+        raise ValueError("data.train_limit no existe: el entrenamiento usa train completo. Para una corrida "
+                         "corta usa train.max_steps (agrega _m<N> al exp_id).")
+    for split in (cfg.data.train_split, cfg.data.val_split):
+        if str(split) == "test":
+            raise ValueError("El entrenamiento no lee test: solo scripts/final_test.py (CLAUDE.md §5)")
 
 
 def strip_resume_safe(cfg: dict) -> dict:

@@ -1,91 +1,91 @@
-# Etapa 2 — presupuesto y optimización COMUNES a los cuatro modelos.
+# Etapa 2 — presupuesto y optimización COMUNES a los cuatro modelos (docs/metodologia.md §2.3 y §4).
 #
 # Todo lo que está aquí es igual para LLaVA-OV, InternVL3, Qwen3.5 y VL-JEPA: esa es la definición
-# operativa de "mismo presupuesto de cómputo". Lo único que cambia por modelo vive en
-# configs/train/models/<modelo>.yaml y está restringido a: el prompt (mejor zero-shot de la etapa 1),
-# el micro-lote (solo memoria: no cambia la matemática), el conector entrenable y el objetivo.
-# `vlmfid.train.config` rechaza cualquier otra clave en esos archivos.
+# operativa de "mismo presupuesto" (CLAUDE.md §3, comparabilidad). Lo que cambia por modelo vive en
+# configs/train/models/<modelo>.yaml y está restringido a las claves de
+# `vlmfid.train.config.ALLOWED_MODEL_KEYS` (micro-lote, conector, objetivo, criterio de selección y el
+# LR que gane el barrido). Cualquier otra clave en esos archivos se rechaza.
 #
-# Decisiones de diseño (tomadas con el equipo, 14-10-2026):
-#   * modelos: los 4 de la etapa 1 (sin el control Instruct)
-#   * objetivo: el caption original de M3DI, con sus 5 plantillas
-#   * prompt: el mejor zero-shot de cada modelo en la etapa 1 (LLaVA-OV usa p1: su mejor, p3, pide JSON)
-#   * precisión: QLoRA, base en NF4 + doble cuantización, cómputo bf16 (como la etapa 1)
-#   * presupuesto: 1 época completa de train (125 000 imágenes), mismo lote efectivo
-#   * entrenables: LoRA en el transformer de lenguaje / predictor + conector multimodal completo
-#   * checkpoint: el mejor en val (500 imágenes fijas) según el Índice macro de la etapa 1
+# Protocolo (fijo, de los papers o de decisiones del usuario):
+#   * objetivo: el caption ORIGINAL de M3DI, con sus 5 plantillas (CLAUDE.md §3)
+#   * prompt: p1_attributes en los 4 modelos (decisión del usuario; M §2.3)
+#   * QLoRA: base en NF4 + doble cuantización, cómputo bf16 [8, Ap. B.2]; control bf16 con model.quant=bf16 (D6)
+#   * entrenables: LoRA en todas las lineales del LLM / Predictor (+ Y-Encoder en VL-JEPA) y conector completo
+#   * presupuesto: 1 época de train (125 000 imágenes), mismo lote efectivo (CLAUDE.md §3; [5] §4.5)
+#   * selección: VLM por attr_mean en val; VL-JEPA por la InfoNCE en val (P7, decisión del usuario 16-11-2026)
 #
-# Reformulación (23-10-2026, docs/ETAPA2B_REFORMULACION.md). Cambian, para los 4 modelos por igual:
-#   * objetivo: caption CANÓNICO ("A <color básico> <forma> is at the <v>-<h> of the image.");
-#     el original queda como control con target.format=original
-#   * prompt: p1_attributes en los 4 (VL-JEPA dejaba p4m, que se truncaba a 64 tokens)
-#   * selección: forma + posición (shape_pos); color ±1 está saturado y diluía el macro
-#   * train COMPLETO en todos los runs: sin data.train_limit y sin descartar el último lote incompleto
-#     (drop_last=false: 1954 pasos, se usan las 125 000 imágenes); data.holdout: split composicional
-#   * VL-JEPA: negativos = banco completo de objetivos (objective.negatives, en su archivo de modelo)
+# Hiperparámetros: PROPUESTA A CONFIRMAR (decisión del usuario 16-11-2026: código + propuesta citada, y
+# LR por barrido corto en val, configs/queues/stage2_sweep.txt). Mientras `train.hparams_confirmed` sea
+# false, `compose_train` solo deja lanzar corridas cortas (con train.max_steps): humo y barrido.
 #
 # Uso: uv run --no-sync python scripts/train.py model=<llava_ov|internvl3|qwen35|vljepa> [clave=valor ...]
 
-exp_id: null            # null -> train_<model>_<quant>_<prompt>_t<can|orig>_r<r>_e<epochs>[_hc][_s<seed>][_m<max_steps>]
+exp_id: null            # null -> train_<model>_<quant>_<prompt>_r<r>_lr<lr>_e<epochs>[_s<seed>][_m<max_steps>]
 stage: finetuned
 seed: 0
-
-target:
-  format: canonical     # canonical | original (control: el caption de M3DI con sus 5 plantillas)
+prompt: p1_attributes   # decisión del usuario: el mismo prompt en los 4 modelos (no el mejor zero-shot)
 
 data:
   dataset: m3di
   variant: base
   root: null            # null -> M3DI_ROOT
-  train_split: train    # siempre completo (125 000): no hay train_limit, compose_train lo rechaza
-  holdout: null        # null | compositional: retira 14 de 63 combinaciones forma × posición de train
-  val_split: val        # nunca test: test se reserva para la evaluación final con scripts/infer.py
-  val_limit: 500        # mismas 500 imágenes para los 4 modelos (subconjunto determinista)
+  train_split: train    # siempre completo (125 000); no hay train_limit (compose_train lo rechaza)
+  val_split: val        # test nunca: solo scripts/final_test.py lo lee
+  val_limit: 500        # P1: mismas 500 imágenes de val durante el ajuste para los 4 modelos
   subset_seed: 0
-  num_workers: 4        # el preprocesado de imágenes corre en los workers; el cluster tiene 8 núcleos
+  num_workers: 4
 
 train:
-  epochs: 1
-  effective_batch_size: 64      # muestras por paso de optimización, igual en los 4 modelos
+  hparams_confirmed: false      # true cuando el usuario fije los valores marcados A CONFIRMAR (M §4)
+  epochs: 1                     # CLAUDE.md §3
+  # P8. A CONFIRMAR. 128 es el lote efectivo de la comparación controlada de [5] §4.5 (VL-JEPA 1.6B vs VLM).
+  # VL-JEPA necesita lote FÍSICO = efectivo (InfoNCE toma los negativos del lote, M §2.3). Si no cabe en
+  # 24 GB (se mide en la prueba de humo), bajar a 64, que es el lote con que se entrenó el checkpoint de
+  # open-vljepa (configs/stage_b_retrain.yaml del submódulo). 125 000 = 976·128 + 72 -> 977 pasos.
+  effective_batch_size: 128
   micro_batch_size: null        # lo fija configs/train/models/<modelo>.yaml (solo memoria)
-  drop_last: false              # 125 000 = 1953·64 + 8 -> 1954 pasos; el último lleva las 8 restantes (todo train)
-  lr: 2.0e-4                    # LoRA
-  connector_lr: 2.0e-5          # conector multimodal (parámetros completos preentrenados): lr / 10
-  weight_decay: 0.0
-  betas: [0.9, 0.999]
+  drop_last: false              # se usan las 125 000 imágenes; el último paso lleva el resto
+  optimizer: adamw              # A CONFIRMAR. [8] usa paged AdamW, crítico solo en 33B/65B (§4); con 0.5-1B el
+                                #   estado del optimizador es chico. adamw | paged_adamw
+  # LR de LoRA. A CONFIRMAR POR BARRIDO (stage2_sweep.txt): {1e-4, 2e-4, 5e-4}. 2e-4 es el de [8] Tabla 9
+  # para 7B/13B; 1e-4 el de 33B/65B. El ganador por modelo va a configs/train/models/<modelo>.yaml.
+  lr: 2.0e-4
+  # Conector y proyecciones de VL-JEPA, como múltiplo del LR de LoRA. A CONFIRMAR. 1.0: open-vljepa entrena
+  # vis_proj y out_proj con el LR base del Predictor (scripts/train.py::build_optimizer del submódulo); los
+  # papers de los VLM no cubren "conector + LoRA" (M §4).
+  connector_lr_mult: 1.0
+  # VL-JEPA: LoRA del Y-Encoder con LR × 0.05 ([5] §3.1, Tabla 7b). La cabeza y_encoder.projector va con el
+  # conector, a LR completo (P9, decisión del usuario 16-11-2026). Nota: open-vljepa la entrena a × 0.05.
+  y_encoder_lr_mult: 0.05
+  weight_decay: 0.0             # A CONFIRMAR. Sin weight decay en LLaVA [2, Ap.]
+  betas: [0.9, 0.999]           # β₂ = 0.999 [8, Ap. B.2]
   eps: 1.0e-8
-  schedule: cosine              # cosine | constant (ambos con calentamiento lineal)
-  warmup_ratio: 0.03            # ≈ 59 de 1954 pasos
+  schedule: cosine              # A CONFIRMAR. coseno con calentamiento 3 % [2, Ap.]; VL-JEPA SFT también usa
+                                #   coseno [5] §3.2. Alternativa: constant [8, Ap. B.2]
+  warmup_ratio: 0.03            # [2, Ap.]; ≈ 29 de 977 pasos
   min_lr_ratio: 0.0
-  max_grad_norm: 1.0
-  max_target_tokens: 64         # el caption más largo de M3DI son 21 palabras; si alguno excede, falla
+  max_grad_norm: 0.3            # A CONFIRMAR. [8, Ap. B.2]
+  max_target_tokens: 64         # cota de seguridad: el caption más largo tiene 31 tokens; si alguno excede, falla
   gradient_checkpointing: true
-  eval_every: 200               # pasos entre evaluaciones en val (+ paso 0 y el último)
-  eval_at_start: true           # paso 0 = modelo base con el adaptador en cero (control de paridad)
+  x_encoder_chunk: 32           # VL-JEPA: el X-Encoder (congelado, sin gradiente) se pasa en trozos de este tamaño;
+                                #   no cambia la pérdida, solo la memoria pico
+  eval_every: 100               # pasos entre evaluaciones en val (+ paso 0 y el último) -> ~10 por época
+  eval_at_start: true           # paso 0 = modelo base con el adaptador en cero (control de paridad con la etapa 1)
   save_every: 100               # pasos entre checkpoints de reanudación
   log_every: 10
-  max_steps: null               # SOLO pruebas de humo: corta el run sin cambiar el schedule (exp_id ..._m<N>)
-  selection_metric: shape_pos   # shape_pos | macro | macro_cat | shape | pos | color | color_adj | name | val_loss
+  max_steps: null               # corridas cortas (humo, barrido): corta el run Y el schedule (exp_id ..._m<N>)
+  selection_metric: attr_mean   # VLM: attr_mean (máx.). VL-JEPA: val_loss (mín.), en su archivo de modelo (P7)
 
 lora:
-  r: 16
-  alpha: 32
-  dropout: 0.05
+  # A CONFIRMAR. Valores de [8, Ap. B.2] para ≤ 13B (los mismos que el Y-Decoder). [8, Ap. A.2]: r no
+  # importa si LoRA va en todas las capas, con evidencia en 7B. Sin barrido de r.
+  r: 64
+  alpha: 16
+  dropout: 0.1
   bias: none
-  connector_modules: []         # lo fija el archivo del modelo; [] = conector congelado
+  connector_modules: []         # lo fija el archivo del modelo
 
 objective:
   kind: lm                      # lm (VLM autorregresivo) | infonce (VL-JEPA)
-  temperature: 0.07             # solo infonce: la del preentrenamiento del checkpoint
-  mask_duplicate_captions: true # solo infonce con negatives=batch: captions idénticos en el lote no son negativos
-  negatives: batch              # solo infonce: batch (las otras muestras del lote) | bank (todos los objetivos únicos)
-
-# Evaluación final en test, en el mismo proceso al terminar el entrenamiento (scripts/train.py).
-# Carga adapter_best (el mejor checkpoint en val) y corre scripts/infer.py: mismo camino, formato y
-# subconjunto que el zero-shot de la etapa 1. Test nunca se mira durante el entrenamiento.
-# Resultado en runs/finetuned_<exp_id sin "train_">_test[_n<limit>]/ (predictions.jsonl + test_metrics.json),
-# los mismos exp_id que configs/queues/stage2b_test.txt. Reanudable e idempotente como cualquier inferencia.
-test:
-  enabled: true
-  split: test
-  limit: 10000                  # las mismas 10 000 imágenes del zero-shot (data.limit de la etapa 1)
+  temperature: 0.07             # solo infonce: la del checkpoint (open-vljepa configs/stage_b_retrain.yaml); M §4
+  mask_duplicate_captions: false   # D4: sin máscara con lote físico ≤ 128; se reporta la tasa de duplicados

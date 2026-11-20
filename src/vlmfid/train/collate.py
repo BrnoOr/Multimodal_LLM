@@ -26,12 +26,21 @@ VLM autorregresivo — la muestra se arma igual que en la inferencia:
     final, y basta calcular logits para las últimas max(len objetivo)+1 posiciones (`logits_to_keep`).
     Con RoPE el desplazamiento constante de posiciones por el relleno no altera la atención.
 
-VL-JEPA — la imagen se repite como video estático igual que en `VLJEPADescriber.predict_embeddings`;
-la consulta es el prompt tokenizado con el tokenizador del predictor; el objetivo es el embedding del
-caption según el Y-Encoder congelado (se precalcula una vez por caption único).
+VL-JEPA — la imagen se repite como video estático igual que en `VLJEPADescriber.predict_stages`; la
+consulta es el prompt tokenizado con el tokenizador del Predictor; el objetivo es el caption tokenizado
+con el del Y-Encoder, que se codifica en cada paso porque el Y-Encoder se entrena (opción A,
+docs/metodologia.md §2.3).
 
-El texto objetivo sale de `target_fn(registro)` (vlmfid.data.targets): el caption original o el canónico,
-según `target.format`. En las muestras queda en la clave "caption" (el texto que se aprende).
+  * Consulta: se tokeniza sin relleno (largo propio) en lugar de rellenar hasta `max_query_len` (512)
+    como en inferencia. Es equivalente porque el Predictor enmascara el relleno en la atención y en el
+    promedio (open-vljepa `Predictor.forward`) y, con relleno a la DERECHA, las posiciones de los tokens
+    reales no cambian; por eso se exige `padding_side == "right"` en el tokenizador del Predictor. Con
+    512 posiciones de relleno por muestra el lote de 128 no cabría en 24 GB.
+  * Caption: se tokeniza EXACTAMENTE como `VLJEPADescriber.encode_texts` (relleno hasta
+    `max_caption_len`), para que el S_Y con que se entrena sea el mismo que verá el Y-Decoder.
+  * Nada se trunca: si una consulta o un caption excede su límite, falla (como en inferencia).
+
+El texto objetivo es siempre el caption original de M3DI (`rec["caption"]`, CLAUDE.md §3).
 """
 
 from __future__ import annotations
@@ -173,58 +182,48 @@ class GenerativeFeaturizer:
 
 
 class JEPAFeaturizer:
-    """Muestras de VL-JEPA. En la clave "caption" va el texto cuyo embedding se aprende.
+    """Muestras de VL-JEPA: fotograma, consulta (el prompt, igual para todo el lote) y caption objetivo."""
 
-    Banco de captions (`per_attribute=False`): una consulta (el prompt) y el caption objetivo.
-    Banco factorizado (`per_attribute=True`): una consulta por atributo y, como objetivo, la frase de
-    referencia del valor verdadero de ese atributo.
-      * entrenamiento (`expand=False`): UNA consulta por imagen y por época, elegida por la rotación
-        determinista `vlmfid.models.bank.query_rotation` (el bucle fija `self.epoch` antes de crear el
-        DataLoader de cada época). El lote sigue teniendo `effective_batch_size` muestras.
-      * validación (`expand=True`): las cuatro consultas de cada imagen.
-    """
-
-    def __init__(self, describer, prompt_text: str, target_fn=_caption, per_attribute: bool = False,
-                 expand: bool = False, seed: int = 0):
+    def __init__(self, describer, prompt_text: str, target_fn=_caption):
         self.target_fn = target_fn
         self.transform = describer.transform
         self.num_frames = describer.num_frames
-        self.per_attribute, self.expand, self.seed, self.epoch = per_attribute, expand, int(seed), 0
-        if per_attribute:
-            from ..models.bank import ATTRS, QUERIES
+        self.target_tok = describer.target_tok
+        self.max_caption_len = int(describer.max_caption_len)
+        if getattr(describer.query_tok, "padding_side", "right") != "right":
+            raise ValueError("El tokenizador del Predictor rellena a la izquierda: tokenizar la consulta sin relleno "
+                             "cambiaría las posiciones respecto de la inferencia (ver el docstring del módulo).")
+        query = describer.cfg.get("query_override") or prompt_text
+        n_query = describer.token_lengths([query], "query")[0]
+        if n_query > describer.max_query_len:
+            raise ValueError(f"La consulta tiene {n_query} tokens > max_query_len={describer.max_query_len}")
+        enc = describer.query_tok([query], max_length=n_query, padding="max_length", truncation=False,
+                                  return_tensors="pt")
+        self.query_ids, self.query_mask = enc["input_ids"], enc["attention_mask"]      # (1, Lq)
+        if int(self.query_mask.sum()) != n_query:
+            raise RuntimeError("La consulta tokenizada no coincide con su largo medido")
+        self.query_tokens = n_query
 
-            self.attrs, self.fbank = ATTRS, describer.fbank
-            queries = [QUERIES[a] for a in ATTRS]
-        else:
-            queries = [describer.cfg.get("query_override") or prompt_text]
-        enc = describer.query_tok(queries, max_length=describer.max_query_len, padding="max_length",
-                                  truncation=True, return_tensors="pt")
-        self.query_ids, self.query_mask = enc["input_ids"], enc["attention_mask"]      # (Q, L)
-        n_real = max(len(describer.query_tok([q], add_special_tokens=True)["input_ids"][0]) for q in queries)
-        self.query_truncated = n_real > describer.max_query_len
-        self.query_tokens = n_real
+    def caption_ids(self, captions: list[str]) -> tuple[torch.Tensor, torch.Tensor]:
+        """Captions -> (ids, máscara), igual que `VLJEPADescriber.encode_texts` (relleno a max_caption_len)."""
+        lens = [len(self.target_tok([c], add_special_tokens=True)["input_ids"][0]) for c in set(captions)]
+        if max(lens) > self.max_caption_len:
+            raise ValueError(f"Caption de {max(lens)} tokens > max_caption_len={self.max_caption_len}")
+        enc = self.target_tok(captions, max_length=self.max_caption_len, padding="max_length", truncation=True,
+                              return_tensors="pt")
+        return enc["input_ids"], enc["attention_mask"]
 
     def __call__(self, batch):
-        if not self.per_attribute:
-            return [{"frame": self.transform(img), "id": rec["id"], "caption": self.target_fn(rec), "q": 0}
-                    for rec, img in batch]
-        from ..models.bank import query_rotation
-
-        out = []
-        for rec, img in batch:
-            frame, phrases = self.transform(img), self.fbank.target_phrases(rec)
-            asked = self.attrs if self.expand else (query_rotation(rec["id"], self.seed, self.epoch),)
-            out += [{"frame": frame, "id": rec["id"], "caption": phrases[a], "q": self.attrs.index(a), "attr": a}
-                    for a in asked]
-        return out
+        return [{"frame": self.transform(img), "id": rec["id"], "caption": self.target_fn(rec)}
+                for rec, img in batch]
 
     def pad(self, samples: list[dict]) -> dict:
         frames = torch.stack([s["frame"] for s in samples])                       # (B,3,H,W)
         pv = frames.unsqueeze(1).repeat(1, self.num_frames, 1, 1, 1)               # (B,T,3,H,W)
         B = len(samples)
-        q = torch.tensor([s["q"] for s in samples], dtype=torch.long)
-        return {"pixel_values": pv, "query_ids": self.query_ids[q].clone(),
-                "query_mask": self.query_mask[q].clone(),
-                "captions": [s["caption"] for s in samples], "ids": [s["id"] for s in samples],
-                "attrs": [s.get("attr") for s in samples],
+        captions = [s["caption"] for s in samples]
+        cap_ids, cap_mask = self.caption_ids(captions)
+        return {"pixel_values": pv, "query_ids": self.query_ids.expand(B, -1).clone(),
+                "query_mask": self.query_mask.expand(B, -1).clone(), "caption_ids": cap_ids,
+                "caption_mask": cap_mask, "captions": captions, "ids": [s["id"] for s in samples],
                 "n_target_tokens": B, "max_target_len": 0}

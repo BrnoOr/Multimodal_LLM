@@ -1,21 +1,24 @@
-"""Qué se entrena: LoRA en el transformer de lenguaje / predictor + conector multimodal completo.
+"""Qué se entrena: LoRA en las lineales del transformer + conector completo (docs/metodologia.md §2.3).
 
-Base congelada y cuantizada (NF4, cómputo bf16), exactamente como se cargó en la etapa 1. Encima:
+Base congelada y cuantizada exactamente como se cargó en la etapa 1 (NF4, o bf16 en el control D6).
+Encima:
 
-  * LoRA en las proyecciones lineales de atención y MLP del transformer que produce el texto
-    (VLM: `language_model`; VL-JEPA: las 8 capas Llama del predictor). Los patrones son los que ya
-    exponía cada adaptador con `lora_target_modules()`, de modo que el encoder visual nunca recibe LoRA.
-  * El conector multimodal se entrena completo (`modules_to_save` de PEFT): una copia entrenable que se
-    guarda junto al adaptador. VLM: el proyector (LLaVA-OV, InternVL3) o el merger (Qwen3.5);
-    VL-JEPA: `predictor.vis_proj` y, en el ajuste v3, también `predictor.out_proj`.
-  * Lado de texto de VL-JEPA (`lora.text_modules`, ajuste v3): la proyección lineal del Y-Encoder
-    (`y_encoder.projector`) se entrena completa, con su propio lr (`train.text_lr` = 0,05 × lr, el
-    multiplicador del paper de VL-JEPA). El transformer de texto (EmbeddingGemma) sigue congelado.
-    También va en `modules_to_save`, así que se guarda y se recarga con el adaptador.
+  * LoRA en todas las proyecciones lineales de atención y MLP de los bloques ([8] §4). Los patrones
+    salen de `describer.lora_target_modules()`, que nunca alcanzan el encoder visual:
+      VLM      el `language_model` (168 lineales en LLaVA-OV e InternVL3, 186 en Qwen3.5)
+      VL-JEPA  las 8 capas del Predictor (56) y las del transformer del Y-Encoder (EmbeddingGemma)
+  * El conector se entrena completo (`modules_to_save` de PEFT: copia entrenable que se guarda con el
+    adaptador). VLM: el proyector o el merger. VL-JEPA: `predictor.vis_proj`, `predictor.out_proj` e
+    `y_encoder.projector`.
 
-Precisión: los parámetros entrenables se guardan en fp32 (pesos maestros) y el forward corre en
-autocast bf16. Con AdamW y lr 2e-5, una actualización típica queda por debajo de la resolución de bf16
-(≈3 cifras significativas): entrenar el conector en bf16 lo dejaría prácticamente congelado.
+Grupos de LR (`param_groups`):
+    lora            LoRA fuera del Y-Encoder                      train.lr
+    lora_y_encoder  LoRA del Y-Encoder (solo VL-JEPA)             train.lr × train.y_encoder_lr_mult  ([5] §3.1)
+    connector       conector y proyecciones (incl. y_encoder.projector, P9)   train.lr × train.connector_lr_mult
+
+Precisión: los parámetros entrenables se guardan en fp32 (pesos maestros) y el forward corre en autocast
+bf16. Una actualización de AdamW típica queda por debajo de la resolución de bf16, así que entrenar el
+conector en bf16 lo dejaría prácticamente congelado.
 """
 
 from __future__ import annotations
@@ -23,10 +26,7 @@ from __future__ import annotations
 import torch
 
 CONNECTOR_TAG = ".modules_to_save."
-
-
-def _is_text(name: str, text_modules: list[str]) -> bool:
-    return any(f"{m}{CONNECTOR_TAG}" in name for m in text_modules)
+Y_ENCODER_TAG = "y_encoder."
 
 
 def _enable_layer_checkpointing(layers) -> None:
@@ -45,8 +45,16 @@ def _enable_layer_checkpointing(layers) -> None:
         layer.forward = ckpt_forward
 
 
+def _component(name: str) -> str:
+    if Y_ENCODER_TAG in name:
+        return "y_encoder"
+    if "predictor." in name:
+        return "predictor"
+    return "llm"
+
+
 def attach_lora(describer, cfg) -> dict:
-    """Envuelve `describer.model` con PEFT (in situ) y devuelve un resumen de parámetros."""
+    """Envuelve `describer.model` con PEFT (in situ) y devuelve el conteo de entrenables por componente."""
     from peft import LoraConfig, get_peft_model
 
     base = describer.model
@@ -62,12 +70,10 @@ def attach_lora(describer, cfg) -> dict:
     elif cfg.train.gradient_checkpointing:
         base.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
 
-    connector = list(cfg.lora.get("connector_modules") or [])
-    text = list(cfg.lora.get("text_modules") or [])
+    connector = list(cfg.lora.connector_modules)
     lcfg = LoraConfig(
         r=int(cfg.lora.r), lora_alpha=int(cfg.lora.alpha), lora_dropout=float(cfg.lora.dropout),
-        bias=str(cfg.lora.bias), target_modules=describer.lora_target_modules(),
-        modules_to_save=(connector + text) or None,
+        bias=str(cfg.lora.bias), target_modules=describer.lora_target_modules(), modules_to_save=connector,
     )
     model = get_peft_model(base, lcfg)
     for _, p in model.named_parameters():
@@ -75,54 +81,59 @@ def attach_lora(describer, cfg) -> dict:
             p.data = p.data.float()
     describer.model = model
 
-    n_lora = n_conn = n_text = n_lora_layers = 0
+    counts = {"trainable_connector": 0}
+    layers: dict[str, int] = {}
     unexpected = []
     for name, p in model.named_parameters():
         if not p.requires_grad:
             continue
         if CONNECTOR_TAG in name:
             # PEFT elige los módulos por sufijo del nombre: se comprueba que solo entren los declarados
-            if not any(f"{m}{CONNECTOR_TAG}" in name for m in connector + text):
+            if not any(f"{m}{CONNECTOR_TAG}" in name for m in connector):
                 unexpected.append(name)
-            elif _is_text(name, text):
-                n_text += p.numel()
-            else:
-                n_conn += p.numel()
+            counts["trainable_connector"] += p.numel()
         elif "lora_" in name:
-            n_lora += p.numel()
-            n_lora_layers += name.endswith("lora_A.default.weight")
+            comp = _component(name)
+            counts[f"trainable_lora_{comp}"] = counts.get(f"trainable_lora_{comp}", 0) + p.numel()
+            if name.endswith("lora_A.default.weight"):
+                layers[comp] = layers.get(comp, 0) + 1
         else:
             unexpected.append(name)
-    if jepa:       # el X-Encoder nunca se entrena (un sufijo como `predictor.out_proj` no debe alcanzarlo)
-        unexpected += [n for n, p in model.named_parameters() if p.requires_grad and "x_encoder" in n]
+    # el encoder visual nunca recibe LoRA (VLM: vision_modules; VL-JEPA: X-Encoder, que tampoco puede quedar
+    # alcanzado por un sufijo de modules_to_save como `predictor.out_proj`)
+    vision = ["x_encoder"] if jepa else list(cfg.model.get("vision_modules") or [])
+    unexpected += [n for n, p in model.named_parameters() if p.requires_grad
+                   and ("lora_" in n or jepa) and any(f"{v}." in n for v in vision)]
     if unexpected:
-        raise RuntimeError(f"Parámetros entrenables inesperados: {unexpected[:5]}")
-    if n_lora_layers == 0:
-        raise RuntimeError("LoRA no se aplicó a ninguna capa: revisa lora_target_modules")
-    for c in connector + text:
-        if not any(CONNECTOR_TAG in n and f"{c}{CONNECTOR_TAG}" in n for n, _ in model.named_parameters()):
-            raise RuntimeError(f"El módulo '{c}' no quedó entrenable: revisa lora.connector_modules / text_modules")
-    n_total = sum(p.numel() for p in model.parameters())
-    out = {"trainable_lora": n_lora, "trainable_connector": n_conn, "lora_layers": n_lora_layers,
-           "trainable_total": n_lora + n_conn + n_text, "params_total_stored": n_total,
-           "connector_modules": connector}
-    if text:
-        out |= {"trainable_text": n_text, "text_modules": text}
-    return out
+        raise RuntimeError(f"Parámetros entrenables inesperados: {sorted(set(unexpected))[:5]}")
+    expected_components = ("predictor", "y_encoder") if jepa else ("llm",)
+    for comp in expected_components:
+        if not layers.get(comp):
+            raise RuntimeError(f"LoRA no se aplicó a ninguna capa de '{comp}': revisa lora_target_modules")
+    for c in connector:
+        if not any(f"{c}{CONNECTOR_TAG}" in n for n, _ in model.named_parameters()):
+            raise RuntimeError(f"El módulo '{c}' no quedó entrenable: revisa lora.connector_modules")
+    counts["trainable_total"] = sum(v for k, v in counts.items() if k.startswith("trainable_"))
+    counts |= {f"lora_layers_{k}": v for k, v in layers.items()}
+    counts |= {"params_total_stored": sum(p.numel() for p in model.parameters()), "connector_modules": connector}
+    return counts
 
 
 def param_groups(model, cfg) -> list[dict]:
-    text_modules = list(cfg.lora.get("text_modules") or [])
-    lora, conn, text = [], [], []
+    t = cfg.train
+    lr = float(t.lr)
+    groups = {"lora": [], "lora_y_encoder": [], "connector": []}
     for name, p in model.named_parameters():
-        if p.requires_grad:
-            (text if _is_text(name, text_modules) else conn if CONNECTOR_TAG in name else lora).append(p)
-    groups = [{"params": lora, "lr": float(cfg.train.lr), "name": "lora"}]
-    if conn:
-        groups.append({"params": conn, "lr": float(cfg.train.connector_lr), "name": "connector"})
-    if text:
-        groups.append({"params": text, "lr": float(cfg.train.text_lr), "name": "text"})
-    return groups
+        if not p.requires_grad:
+            continue
+        if CONNECTOR_TAG in name:
+            groups["connector"].append(p)
+        elif Y_ENCODER_TAG in name:
+            groups["lora_y_encoder"].append(p)
+        else:
+            groups["lora"].append(p)
+    mult = {"lora": 1.0, "lora_y_encoder": float(t.y_encoder_lr_mult), "connector": float(t.connector_lr_mult)}
+    return [{"params": ps, "lr": lr * mult[k], "name": k} for k, ps in groups.items() if ps]
 
 
 def trainable_state(model) -> dict[str, torch.Tensor]:
@@ -140,7 +151,7 @@ def load_trainable_state(model, state: dict[str, torch.Tensor]) -> None:
 
 
 def set_train_mode(model, frozen_modules: list[str]) -> None:
-    """model.train() salvo los módulos congelados (encoder visual, X/Y-Encoder), que quedan en eval."""
+    """model.train() salvo los módulos congelados (encoder visual, X-Encoder), que quedan en eval."""
     model.train()
     keys = set(frozen_modules)
     for name, m in model.named_modules():

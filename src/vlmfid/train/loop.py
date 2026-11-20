@@ -2,31 +2,32 @@
 
 Diseñado para el cluster compartido, con las mismas garantías que `scripts/infer.py`:
   * Reanudable: cada `train.save_every` pasos se guarda un checkpoint atómico (parámetros entrenables,
-    estado de AdamW y del schedule, RNG y paso). Relanzar el mismo comando continúa desde ahí, con el
-    mismo orden de datos (ver vlmfid.train.data).
+    estado del optimizador y del schedule, RNG y paso). Relanzar el mismo comando continúa desde ahí, con
+    el mismo orden de datos (vlmfid.train.data).
   * Idempotente: si el run ya terminó, sale de inmediato (útil en colas).
   * Apagado limpio: SIGTERM/SIGINT terminan el paso en curso, guardan y salen con 143/130.
-  * OOM (GPU compartida): se descarta el paso, se parte el micro-lote a la mitad y se repite el paso con
-    las mismas muestras. La normalización por tokens (o muestras) del lote efectivo hace que el gradiente
-    no cambie. VL-JEPA con negatives=batch no se parte (cambiaría los negativos de InfoNCE); con
-    negatives=bank sí.
+  * OOM en los VLM: se descarta el paso, se parte el micro-lote a la mitad y se repite con las mismas
+    muestras; la normalización por tokens del lote efectivo deja el gradiente igual. VL-JEPA no se parte
+    (InfoNCE depende del lote completo).
 
-Reformulación (docs/ETAPA2B_REFORMULACION.md): el texto objetivo sale de `target.format` (original o
-canónico), train se usa completo (sin límite; solo `data.holdout` puede excluir combinaciones
-forma × posición) y VL-JEPA puede usar el banco completo de objetivos como negativos.
+Selección del checkpoint en val (docs/metodologia.md §2.3):
+    VLM      `attr_mean` (o el atributo de `train.selection_metric`) del texto generado, máximo
+    VL-JEPA  InfoNCE bidireccional en val, mínima (P7)
+Test no se lee aquí: la evaluación final es `scripts/final_test.py`, una sola vez.
 
-El objetivo de VL-JEPA vive en `vlmfid.train.jepa.JEPAObjective` (tabla de embeddings objetivo, pérdidas
-InfoNCE, banco factorizado, lado de texto entrenable): el bucle solo le pide una pérdida.
+Corridas cortas (`train.max_steps`, humo y barrido de LR): cortan el entrenamiento Y el schedule, que se
+calcula sobre `max_steps` (el calentamiento y el coseno se completan dentro de la corrida corta).
 
 runs/<exp_id>/
     config.yaml, env.jsonl, status.json     como en inferencia (vlmfid.tracking.RunTracker)
     train_log.jsonl                         una línea cada `log_every` pasos
     val_log.jsonl                           una línea por evaluación (paso 0, cada eval_every, último)
-    val_predictions/step_XXXXX.jsonl        respuestas en val de cada evaluación
+    val_predictions/step_XXXXX.jsonl        respuestas en val de cada evaluación (solo VLM)
     adapter_best/                           adaptador PEFT del mejor paso en val  -> model.adapter_path
     adapter_last/                           adaptador del último paso
+    best.json                               mejor paso y sus métricas
     checkpoint/                             estado para reanudar (se puede borrar al terminar)
-    summary.json                            resumen final: mejor paso, métricas, parámetros, horas de GPU
+    summary.json                            resumen final: mejor paso, entrenables, tiempos
 """
 
 from __future__ import annotations
@@ -48,17 +49,17 @@ from torch.utils.data import DataLoader
 
 from ..config import to_yaml
 from ..data.manifest import ImageRecordDataset, data_root, load_manifest
-from ..data.targets import apply_holdout, is_held_out, target_fn
+from ..eval.attributes import json_mode_for
 from ..models import build_describer
-from ..paths import CACHE, RUNS
+from ..paths import RUNS
 from ..prompts import render
 from ..tracking import RunTracker
 from .collate import GenerativeFeaturizer
 from .config import strip_resume_safe
 from .data import EpochSampler, steps_per_epoch
 from .evaluate import generate_and_score
-from .lora import attach_lora, load_trainable_state, param_groups, set_train_mode, trainable_state
 from .jepa import JEPAObjective
+from .lora import attach_lora, load_trainable_state, param_groups, set_train_mode, trainable_state
 from .objectives import lm_loss
 
 _STOP = {"flag": False, "signum": None}
@@ -83,6 +84,15 @@ def lr_lambda_factory(total_steps: int, warmup_steps: int, schedule: str, min_ra
         prog = (step - warmup_steps) / max(1, total_steps - warmup_steps)
         return min_ratio + (1 - min_ratio) * 0.5 * (1 + math.cos(math.pi * min(1.0, prog)))
     return f
+
+
+def build_optimizer(groups: list[dict], t) -> torch.optim.Optimizer:
+    kw = {"betas": tuple(t.betas), "eps": float(t.eps), "weight_decay": float(t.weight_decay)}
+    if t.optimizer == "paged_adamw":
+        import bitsandbytes as bnb
+
+        return bnb.optim.PagedAdamW(groups, **kw)
+    return torch.optim.AdamW(groups, **kw)
 
 
 def _atomic_dir(final: Path, writer) -> None:
@@ -113,8 +123,8 @@ class Trainer:
         self.objective: JEPAObjective | None = None    # solo VL-JEPA; se crea en _setup
         self.prompt_text = render(cfg.prompt)
         self.micro = int(cfg.train.micro_batch_size)
-        self.target_fn = target_fn(str(cfg.target.format))
-        self.holdout = cfg.data.get("holdout")
+        self.json_mode = json_mode_for(cfg)
+        self.minimize = cfg.train.selection_metric == "val_loss"
 
     # ------------------------------------------------------------------ utilidades
     def amp(self):
@@ -122,7 +132,7 @@ class Trainer:
 
     def _frozen_modules(self) -> list[str]:
         if self.jepa:
-            return ["x_encoder", "y_encoder"]
+            return ["x_encoder"]
         conn = set(self.cfg.lora.get("connector_modules") or [])
         return [m for m in (self.cfg.model.get("vision_modules") or []) if m not in conn]
 
@@ -142,20 +152,12 @@ class Trainer:
             raise RuntimeError(f"La configuración difiere de la guardada en {old} y hay un checkpoint a medias. "
                                "Usa otro exp_id o borra runs/<exp_id> para empezar de cero.")
 
-    # --------------------------------------------------------------------- datos
     def _records(self):
-        """train: split completo, sin límite (con holdout, sin las combinaciones retiradas).
-        val: las mismas `val_limit` imágenes de siempre (también las retiradas, que se reportan aparte)."""
+        """train: split completo, sin límite. val: las mismas `val_limit` imágenes para los 4 modelos."""
         d = self.cfg.data
         train = load_manifest(d.train_split, d.dataset, None, d.subset_seed, variant=d.variant)
-        train = apply_holdout(train, self.holdout)
         val = load_manifest(d.val_split, d.dataset, d.get("val_limit"), d.subset_seed, variant=d.variant)
         return train, val
-
-    def _val_groups(self) -> dict:
-        if self.holdout != "compositional":
-            return {}
-        return {"seen": lambda r: not is_held_out(r), "unseen": is_held_out}
 
     # ------------------------------------------------------------------- forward
     def _to_device(self, inputs: dict) -> dict:
@@ -167,31 +169,21 @@ class Trainer:
                 out[k] = v
         return out
 
-    def _micro_loss(self, model, batch: dict, n_eff: int):
-        """(pérdida para backward ya normalizada por el lote efectivo, suma sin normalizar)."""
-        if self.jepa:
-            s = self.objective.bank_loss_sum(batch)
-            return s / n_eff, float(s.detach())
-        batch["inputs"] = self._to_device(batch["inputs"])
-        with self.amp():
-            loss, loss_sum, _ = lm_loss(model, batch, n_eff)
-        return loss, loss_sum
-
     def _step(self, samples: list, model) -> dict:
-        """Un paso de optimización sobre `samples` (= un lote efectivo). Devuelve estadísticas."""
-        if self.jepa and self.objective.whole_batch:
-            # negativos del lote o InfoNCE simétrica: la pérdida depende del lote completo (no se parte)
-            loss, logged = self.objective.batch_loss(self.featurizer.pad(samples))
+        """Un paso de optimización sobre `samples` (= un lote efectivo): solo forward y backward."""
+        if self.jepa:
+            loss, stats = self.objective.loss(self.featurizer.pad(samples))
             loss.backward()
-            return {"loss": logged, "tokens": len(samples)}
-        # VLM: normaliza por tokens objetivo; VL-JEPA con banco: por muestras
-        n_eff = len(samples) if self.jepa else sum(len(s["target"]) for s in samples)
+            return {"loss": float(loss.detach()), "tokens": len(samples), **stats}
+        n_eff = sum(len(s["target"]) for s in samples)             # tokens objetivo del lote efectivo
         while True:
             try:
                 total = 0.0
                 for i in range(0, len(samples), self.micro):
                     batch = self.featurizer.pad(samples[i:i + self.micro])
-                    loss, loss_sum = self._micro_loss(model, batch, n_eff)
+                    batch["inputs"] = self._to_device(batch["inputs"])
+                    with self.amp():
+                        loss, loss_sum, _ = lm_loss(model, batch, n_eff)
                     loss.backward()
                     total += loss_sum
                 return {"loss": total / n_eff, "tokens": n_eff}
@@ -203,54 +195,61 @@ class Trainer:
                 self.micro = max(1, self.micro // 2)
                 print(f"[train] OOM: micro-lote -> {self.micro}; se repite el paso con las mismas muestras", flush=True)
 
+    # ------------------------------------------------------------- evaluación
     @torch.no_grad()
-    def _val_loss(self, model, val_records) -> float:
-        # VL-JEPA con banco factorizado: el featurizer de val hace las cuatro consultas de cada imagen
-        loader = DataLoader(ImageRecordDataset(val_records, self.root), batch_size=self.micro if not self.jepa else
-                            int(self.cfg.train.effective_batch_size), num_workers=2,
-                            collate_fn=self.val_featurizer, shuffle=False, generator=torch.Generator())
+    def _val_loss_lm(self, model, val_records) -> float:
+        """Entropía cruzada por token en val (teacher forcing). Solo se registra; no elige el paso."""
+        loader = DataLoader(ImageRecordDataset(val_records, self.root), batch_size=self.micro, num_workers=2,
+                            collate_fn=self.featurizer, shuffle=False, generator=torch.Generator())
         tot, n = 0.0, 0
         for samples in loader:
-            if self.jepa and self.objective.bank_negatives:
-                # término directo contra el banco (también con la simétrica): I(ŝ; texto) ≥ log N − val_loss
-                tot += float(self.objective.bank_loss_sum(self.val_featurizer.pad(samples)))
-                n += len(samples)
-            elif self.jepa:
-                _, loss = self.objective.batch_loss(self.val_featurizer.pad(samples))
-                tot, n = tot + loss * len(samples), n + len(samples)
-            else:
-                batch = self.featurizer.pad(samples)
-                batch["inputs"] = self._to_device(batch["inputs"])
-                with self.amp():
-                    _, s, k = lm_loss(model, batch, 1)
-                tot, n = tot + s, n + k
+            batch = self.featurizer.pad(samples)
+            batch["inputs"] = self._to_device(batch["inputs"])
+            with self.amp():
+                _, s, k = lm_loss(model, batch, 1)
+            tot, n = tot + s, n + k
         return tot / max(n, 1)
 
-    # ------------------------------------------------------------- evaluación
+    @torch.no_grad()
+    def _val_jepa(self, val_records) -> dict:
+        """InfoNCE bidireccional en val: mismos lotes (orden fijo, tamaño del lote efectivo) en cada evaluación."""
+        bs = int(self.cfg.train.effective_batch_size)
+        loader = DataLoader(ImageRecordDataset(val_records, self.root), batch_size=bs, num_workers=2,
+                            collate_fn=self.featurizer, shuffle=False, generator=torch.Generator())
+        agg: dict[str, float] = {}
+        n = 0
+        for samples in loader:
+            loss, stats = self.objective.loss(self.featurizer.pad(samples))
+            b = len(samples)
+            for k, v in ({"val_loss": float(loss)} | stats).items():
+                agg[k] = agg.get(k, 0.0) + float(v) * (b if not k.startswith("dup_") else 1)
+            n += b
+        return {k: (v / n if not k.startswith("dup_") else v) for k, v in agg.items()} | {"n": n}
+
     def evaluate(self, model, val_records, step: int, state: dict) -> dict:
         t0 = time.time()
         model.eval()
-        val_loss = self._val_loss(model, val_records)
         if self.jepa:
-            self.objective.before_eval()       # banco de recuperación con la proyección de texto actual
-        bs = int(self.cfg.model.get("batch_size", 16))
-        metrics, preds = generate_and_score(self.describer, val_records, self.root, self.prompt_text, bs, self.amp,
-                                            target_fn=self.target_fn, groups=self._val_groups())
+            metrics, preds = self._val_jepa(val_records), None
+        else:
+            val_loss = self._val_loss_lm(model, val_records)
+            bs = int(self.cfg.model.get("batch_size", 16))
+            metrics, preds = generate_and_score(self.describer, val_records, self.root, self.prompt_text, bs,
+                                                self.amp, self.json_mode)
+            metrics = {"val_loss": val_loss} | metrics
         set_train_mode(model, self._frozen_modules())
-        pred_dir = self.dir / "val_predictions"
-        pred_dir.mkdir(exist_ok=True)
-        with (pred_dir / f"step_{step:05d}.jsonl").open("w", encoding="utf-8") as f:
-            for p in preds:
-                f.write(json.dumps(p, ensure_ascii=False) + "\n")
+        if preds is not None:
+            pred_dir = self.dir / "val_predictions"
+            pred_dir.mkdir(exist_ok=True)
+            with (pred_dir / f"step_{step:05d}.jsonl").open("w", encoding="utf-8") as f:
+                for p in preds:
+                    f.write(json.dumps(p, ensure_ascii=False) + "\n")
 
         metric = self.cfg.train.selection_metric
-        # con holdout, el checkpoint se elige solo con las combinaciones vistas: las retiradas no se miran
-        key = metric if not self._val_groups() else f"seen_{metric}"
-        value = val_loss if metric == "val_loss" else metrics[key]
+        value = float(metrics[metric])
         best = state.get("best")
-        better = best is None or (value < best["value"] if metric == "val_loss" else value > best["value"])
-        row = {"step": step, "val_loss": round(val_loss, 5), **{k: (round(v, 5) if isinstance(v, float) else v)
-                                                              for k, v in metrics.items()},
+        better = best is None or (value < best["value"] if self.minimize else value > best["value"])
+        row = {"step": step, **{k: (round(v, 5) if isinstance(v, float) else v) for k, v in metrics.items()},
                "selection_metric": metric, "is_best": better, "eval_seconds": round(time.time() - t0, 1)}
         if better:
             state["best"] = {"step": step, "value": value, "metrics": row}
@@ -258,11 +257,15 @@ class Trainer:
             (self.dir / "best.json").write_text(json.dumps(state["best"], indent=2, ensure_ascii=False))
         state["last_eval_step"] = step
         _append_jsonl(self.dir / "val_log.jsonl", row)
-        unseen = (f" no_vistas[forma+pos]={metrics['unseen_shape_pos']:.3f}" if "unseen_shape_pos" in metrics else "")
-        print(f"[val] paso {step}: macro={metrics['macro']:.4f} forma+pos={metrics['shape_pos']:.4f} "
-              f"forma={metrics['shape']:.3f} pos={metrics['pos']:.3f} color={metrics['color']:.3f} "
-              f"color±1={metrics['color_adj']:.3f} nombre={metrics['name']:.3f} val_loss={val_loss:.4f}{unseen}"
-              f"{'  *mejor*' if better else ''}  ({row['eval_seconds']} s) | {preds[0]['prediction'][:80]!r}",
+        if self.jepa:
+            detail = (f"infonce={metrics['val_loss']:.4f} (p→t {metrics['loss_p2t']:.4f}, t→p {metrics['loss_t2p']:.4f}) "
+                      f"top1 p→t={metrics['acc_p2t']:.3f} t→p={metrics['acc_t2p']:.3f}")
+        else:
+            detail = (f"attr_mean={metrics['attr_mean']:.4f} forma={metrics['shape']:.3f} x={metrics['x']:.3f} "
+                      f"y={metrics['y']:.3f} color={metrics['color']:.3f} val_loss={metrics['val_loss']:.4f} "
+                      f"cortadas={metrics['truncated']:.3f}")
+        sample = f" | {preds[0]['prediction'][:80]!r}" if preds else ""
+        print(f"[val] paso {step}: {detail}{'  *mejor*' if better else ''}  ({row['eval_seconds']} s){sample}",
               flush=True)
         return row
 
@@ -305,10 +308,14 @@ class Trainer:
         self.root = data_root(cfg.data.variant, cfg.data.get("root"))
         n_steps_epoch = steps_per_epoch(len(train_records), int(t.effective_batch_size), bool(t.drop_last))
         total_steps = n_steps_epoch * int(t.epochs)
-        warmup = round(float(t.warmup_ratio) * total_steps)
+        max_steps = t.get("max_steps")
+        schedule_steps = min(total_steps, int(max_steps)) if max_steps else total_steps
+        warmup = round(float(t.warmup_ratio) * schedule_steps)
         print(to_yaml(cfg))
         print(f"[train] exp_id={cfg.exp_id}  train={len(train_records)}  val={len(val_records)}  "
-              f"pasos/época={n_steps_epoch}  pasos={total_steps}  calentamiento={warmup}", flush=True)
+              f"pasos/época={n_steps_epoch}  pasos={schedule_steps}"
+              + (f" (corrida corta de {total_steps})" if schedule_steps < total_steps else "")
+              + f"  calentamiento={warmup}", flush=True)
 
         tracker = RunTracker(self.dir, cfg)
         tracker.start()
@@ -320,23 +327,27 @@ class Trainer:
         except Exception as e:      # sin esto el run queda en "running" para siempre en status.json
             tracker.finish("failed", error=f"{type(e).__name__}: {e}", step=0)
             raise
-        tracker.update(model_info=info, total_steps=total_steps)
+        tracker.update(model_info=info, total_steps=schedule_steps)
         print(f"[train] modelo listo: {json.dumps(info, default=str)}", flush=True)
 
-        self.optimizer = torch.optim.AdamW(param_groups(model, cfg), betas=tuple(t.betas), eps=float(t.eps),
-                                           weight_decay=float(t.weight_decay))
+        groups = param_groups(model, cfg)
+        print("[train] grupos de LR: " + ", ".join(f"{g['name']}={g['lr']:.2e} "
+                                                   f"({sum(p.numel() for p in g['params']):,} parámetros)"
+                                                   for g in groups), flush=True)
+        self.optimizer = build_optimizer(groups, t)
         self.scheduler = torch.optim.lr_scheduler.LambdaLR(
-            self.optimizer, lr_lambda_factory(total_steps, warmup, str(t.schedule), float(t.min_lr_ratio)))
+            self.optimizer, lr_lambda_factory(schedule_steps, warmup, str(t.schedule), float(t.min_lr_ratio)))
 
         state = {"global_step": 0, "best": None, "last_eval_step": None, "train_seconds": 0.0,
                  "eval_seconds": 0.0, "micro_batch_size": self.micro, "samples_seen": 0}
         if (self.dir / "checkpoint").exists():
             state = self.load_checkpoint(model)
-            self.micro = min(self.micro, int(state.get("micro_batch_size") or self.micro))
+            if not self.jepa:
+                self.micro = min(self.micro, int(state.get("micro_batch_size") or self.micro))
             print(f"[train] reanudando desde el paso {state['global_step']} "
                   f"(mejor: {state['best'] and state['best']['step']})", flush=True)
         set_train_mode(model, self._frozen_modules())
-        return self._train_loop(model, state, train_records, val_records, n_steps_epoch, total_steps,
+        return self._train_loop(model, state, train_records, val_records, n_steps_epoch, schedule_steps,
                                 lora_info, tracker, summary_path)
 
     def _setup(self, train_records, val_records):
@@ -348,27 +359,19 @@ class Trainer:
             self.describer.load()
         lora_info = attach_lora(self.describer, cfg)
         model = self.describer.model
-        info = self.describer.info() | lora_info | {"load_seconds": round(time.time() - t_load, 1)}
-
-        info |= {"target_format": str(cfg.target.format), "holdout": self.holdout, "n_train": len(train_records),
-                 "n_val": len(val_records)}
+        info = self.describer.info() | lora_info | {"load_seconds": round(time.time() - t_load, 1),
+                                                    "n_train": len(train_records), "n_val": len(val_records)}
         if self.jepa:
-            bank_fmt = self.describer._bank_format()
-            if bank_fmt != cfg.target.format:
-                raise RuntimeError(f"El banco de recuperación de VL-JEPA está en formato '{bank_fmt}' y el objetivo en "
-                                   f"'{cfg.target.format}': val mediría textos de otro formato.")
-            self.objective = JEPAObjective(cfg, self.describer, self.device, self.amp, CACHE)
-            self.featurizer, self.val_featurizer = self.objective.featurizers(self.prompt_text, self.target_fn)
-            self.objective.build_targets([self.target_fn(r) for r in train_records + val_records])
-            info |= {"query_tokens": self.featurizer.query_tokens, "query_truncated": self.featurizer.query_truncated,
-                     **self.objective.info()}
+            self.objective = JEPAObjective(cfg, self.describer, self.device, self.amp)
+            self.featurizer = self.objective.featurizer(self.prompt_text)
+            # falla temprano si algún caption excede max_caption_len (todos los distintos de train y val)
+            self.featurizer.caption_ids(sorted({r["caption"] for r in train_records + val_records}))
+            info |= {"query_tokens": self.featurizer.query_tokens, **self.objective.info()}
         else:
-            self.featurizer = GenerativeFeaturizer(self.describer, self.prompt_text, int(t.max_target_tokens),
-                                                   self.target_fn)
-            self.val_featurizer = self.featurizer
+            self.featurizer = GenerativeFeaturizer(self.describer, self.prompt_text, int(t.max_target_tokens))
             info |= {"turn_end": self.featurizer.turn_end}
-            # falla temprano si algún objetivo excede max_target_tokens (todos los textos distintos de train y val)
-            for txt in {self.target_fn(r) for r in train_records + val_records}:
+            # falla temprano si algún objetivo excede max_target_tokens (todos los captions distintos)
+            for txt in {r["caption"] for r in train_records + val_records}:
                 self.featurizer.target_ids(txt)
         return model, info, lora_info
 
@@ -380,17 +383,16 @@ class Trainer:
             self.evaluate(model, val_records, 0, state)
             state["eval_seconds"] += time.time() - t0
 
-        max_steps = t.get("max_steps")
         accum = int(t.effective_batch_size) // int(t.micro_batch_size)
         status, t_run = "completed", time.time()
-        log_loss, log_tok, log_n, t_log = 0.0, 0, 0, time.time()
+        win: dict[str, float] = {}
+        log_tok, log_n, t_log = 0, 0, time.time()
+        trainable = [p for p in model.parameters() if p.requires_grad]
         try:
-            while state["global_step"] < total_steps and not (max_steps and state["global_step"] >= max_steps):
+            while state["global_step"] < total_steps:
                 epoch, step_in_epoch = divmod(state["global_step"], n_steps_epoch)
                 sampler = EpochSampler(len(train_records), int(t.effective_batch_size), int(cfg.seed), epoch,
                                        step_in_epoch, bool(t.drop_last))
-                if hasattr(self.featurizer, "epoch"):
-                    self.featurizer.epoch = epoch       # VL-JEPA factorizado: rotación de consultas por época
                 loader = DataLoader(ImageRecordDataset(train_records, self.root), batch_size=int(t.micro_batch_size),
                                     sampler=sampler, num_workers=int(cfg.data.num_workers),
                                     collate_fn=self.featurizer, persistent_workers=False,
@@ -404,8 +406,7 @@ class Trainer:
                     samples = [s for mb in itertools.islice(it, accum) for s in mb]
                     t_step = time.time()
                     stats = self._step(samples, model)
-                    gnorm = torch.nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad],
-                                                           float(t.max_grad_norm))
+                    gnorm = torch.nn.utils.clip_grad_norm_(trainable, float(t.max_grad_norm))
                     self.optimizer.step()
                     self.scheduler.step()
                     self.optimizer.zero_grad(set_to_none=True)
@@ -413,8 +414,10 @@ class Trainer:
                     state["samples_seen"] = state.get("samples_seen", 0) + len(samples)
                     state["train_seconds"] += time.time() - t_step
                     step = state["global_step"]
-                    log_loss += stats["loss"] * stats["tokens"]
-                    log_tok += stats["tokens"]
+                    w = stats.pop("tokens")
+                    for k, v in stats.items():                    # promedio ponderado en la ventana de log
+                        win[k] = win.get(k, 0.0) + float(v) * (1 if k.startswith("dup_") else w)
+                    log_tok += w
                     log_n += len(samples)
 
                     if step % int(t.log_every) == 0 or step == total_steps:
@@ -422,17 +425,18 @@ class Trainer:
                         rate = log_n / max(el, 1e-6)
                         mem = torch.cuda.max_memory_allocated() / 2**30 if torch.cuda.is_available() else 0.0
                         lrs = {g["name"]: g["lr"] for g in self.optimizer.param_groups}
-                        row = {"step": step, "epoch": epoch, "loss": round(log_loss / max(log_tok, 1), 5),
-                               "grad_norm": round(float(gnorm), 4), **{f"lr_{k}": v for k, v in lrs.items()},
-                               "samples_per_s": round(rate, 2), "micro_batch": self.micro, "peak_mem_gb": round(mem, 2)}
+                        means = {k: round(v if k.startswith("dup_") else v / max(log_tok, 1), 5) for k, v in win.items()}
+                        row = {"step": step, "epoch": epoch, **means, "grad_norm": round(float(gnorm), 4),
+                               **{f"lr_{k}": v for k, v in lrs.items()}, "samples_per_s": round(rate, 2),
+                               "micro_batch": self.micro, "peak_mem_gb": round(mem, 2)}
                         _append_jsonl(self.dir / "train_log.jsonl", row)
                         eta = (total_steps - step) * int(t.effective_batch_size) / max(rate, 1e-6)
                         print(f"[train] {step}/{total_steps}  loss={row['loss']:.4f}  |g|={row['grad_norm']:.3f}  "
                               f"lr={lrs['lora']:.2e}  {rate:.1f} img/s  ETA {_fmt(eta)}  pico {mem:.1f} GB", flush=True)
                         tracker.update(step=step, total_steps=total_steps, loss=row["loss"], img_per_s=row["samples_per_s"])
-                        log_loss, log_tok, log_n, t_log = 0.0, 0, 0, time.time()
+                        win, log_tok, log_n, t_log = {}, 0, 0, time.time()
 
-                    is_last = step == total_steps or (max_steps and step >= max_steps)
+                    is_last = step == total_steps
                     if step % int(t.eval_every) == 0 or is_last:
                         t0 = time.time()
                         self.evaluate(model, val_records, step, state)
@@ -460,14 +464,13 @@ class Trainer:
 
         _atomic_dir(self.dir / "adapter_last", lambda d: model.save_pretrained(d))
         gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
-        if self.jepa:
-            self.objective.before_eval()
         summary = {
-            "exp_id": cfg.exp_id, "model": cfg.model.name, "prompt": cfg.prompt.id, "steps": state["global_step"],
-            "target_format": str(cfg.target.format), "holdout": self.holdout, "n_train": len(train_records),
-            "epochs": int(t.epochs), "quant": cfg.model.quant, "seed": int(cfg.seed),
-            "total_steps_schedule": total_steps, "samples_seen": state.get("samples_seen", 0),
-            "best": state["best"], "adapter_best": str(self.dir / "adapter_best"),
+            "exp_id": cfg.exp_id, "model": cfg.model.name, "prompt": cfg.prompt.id, "quant": cfg.model.quant,
+            "seed": int(cfg.seed), "steps": state["global_step"], "steps_schedule": total_steps,
+            "short_run": bool(t.get("max_steps")), "epochs": int(t.epochs), "n_train": len(train_records),
+            "samples_seen": state.get("samples_seen", 0), "effective_batch_size": int(t.effective_batch_size),
+            "lr": float(t.lr), "selection_metric": cfg.train.selection_metric, "best": state["best"],
+            "adapter_best": str(self.dir / "adapter_best"), "hparams_confirmed": bool(t.hparams_confirmed),
             "train_hours": round(state["train_seconds"] / 3600, 3), "eval_hours": round(state["eval_seconds"] / 3600, 3),
             "gpu": gpu, "micro_batch_final": self.micro, **lora_info,
             "wall_hours_this_attempt": round((time.time() - t_run) / 3600, 3),

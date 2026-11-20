@@ -1,29 +1,21 @@
-"""Funciones de pérdida de la etapa 2.
+"""Funciones de pérdida de la etapa 2 (docs/metodologia.md §2.3).
 
-VLM autorregresivo — entropía cruzada de los tokens del caption (el prompt y la imagen no aportan
-pérdida), normalizada por el número de tokens objetivo de TODO el lote efectivo:
+VLM autorregresivo — entropía cruzada solo sobre los tokens de la respuesta ([2] ec. 3, Tabla 2),
+normalizada por el número de tokens objetivo de TODO el lote efectivo:
 
     L = (1 / N_lote) · Σ_{micro-lotes} Σ_{tokens objetivo} −log p(y_t | y_<t, imagen, prompt)
 
-Con esa normalización el gradiente acumulado es idéntico sea cual sea el micro-lote (8, 16 o 32): la
-única diferencia entre modelos queda en los pesos, no en cómo se partió el lote para caber en memoria.
-(Promediar la media de cada micro-lote, en cambio, pondera distinto los captions cortos y largos.)
+Con esa normalización el gradiente acumulado es idéntico sea cual sea el micro-lote: la única diferencia
+entre modelos queda en los pesos, no en cómo se partió el lote para caber en memoria.
 
-VL-JEPA — InfoNCE bidireccional entre ŝ_Y (predictor) y s_Y (Y-Encoder), como el preentrenamiento
-del checkpoint (`openvljepa.losses.bidirectional_infonce`), con una corrección necesaria en M3DI:
-hay solo 10 936 captions distintos entre 125 000 imágenes, así que dos muestras de un lote pueden
-tener exactamente el mismo caption. InfoNCE estándar trataría a la otra como negativo y empujaría a
-separar dos embeddings que deben coincidir. Se excluyen esos pares del denominador (falsos negativos).
+VL-JEPA — InfoNCE bidireccional del lote entre Ŝ_Y (Predictor) y S_Y (Y-Encoder) en el espacio
+compartido, como `openvljepa.losses.bidirectional_infonce` y [5] §2:
 
-VL-JEPA con `objective.negatives: bank` (reformulación) — los negativos no son las otras 63 muestras del
-lote, sino TODOS los textos objetivo distintos (504 captions canónicos o ~11 000 originales):
+    L = ½ [ CE(⟨ŝ_i, s_j⟩/τ, i) + CE(⟨s_j, ŝ_i⟩/τ, j) ],   ambos lados normalizados a norma 1
 
-    L = (1 / B_efectivo) · Σ_i −log softmax_j( ⟨ŝ_i, s_j⟩ / τ )[c_i],     j ∈ textos objetivo únicos
-
-Es una clasificación sobre el mismo banco con que se decodifica por recuperación en inferencia. Cada
-muestra aporta un término independiente del resto del lote, así que se puede acumular gradiente en
-micro-lotes (como en los VLM) y no hace falta la máscara de duplicados: un caption repetido es la misma
-clase. Solo es dirección predictor -> texto: la dirección inversa no tiene sentido con un banco fijo.
+Los negativos son las demás muestras del lote. Dos filas con el mismo caption son un falso negativo;
+D4 decide no enmascararlos con lote físico ≤ 128 y reportar la tasa (`duplicate_stats`). La máscara
+queda disponible (`objective.mask_duplicate_captions`) para lotes mayores.
 """
 
 from __future__ import annotations
@@ -51,63 +43,43 @@ def lm_loss(model, batch: dict, n_tokens_effective: int) -> tuple[torch.Tensor, 
 
 def duplicate_mask(captions: list[str], device) -> torch.Tensor:
     """M[i, j] = True si i != j y el caption de i es idéntico al de j."""
-    idx = {}
+    idx: dict[str, int] = {}
     codes = torch.tensor([idx.setdefault(c, len(idx)) for c in captions], device=device)
     same = codes[:, None] == codes[None, :]
     return same & ~torch.eye(len(captions), dtype=torch.bool, device=device)
 
 
+def duplicate_stats(captions: list[str]) -> dict:
+    """Pares de captions idénticos en el lote y fracción de muestras afectadas (D4, se reporta)."""
+    counts: dict[str, int] = {}
+    for c in captions:
+        counts[c] = counts.get(c, 0) + 1
+    pairs = sum(n * (n - 1) // 2 for n in counts.values())
+    affected = sum(n for n in counts.values() if n > 1)
+    return {"dup_pairs": pairs, "dup_samples": affected}
+
+
+def infonce_logits(pred: torch.Tensor, target: torch.Tensor, temperature: float) -> torch.Tensor:
+    """⟨ŝ_i, s_j⟩ / τ con ambos lados normalizados: (B, B), en fp32."""
+    return F.normalize(pred.float(), dim=-1) @ F.normalize(target.float(), dim=-1).T / temperature
+
+
 def infonce_loss(pred: torch.Tensor, target: torch.Tensor, temperature: float,
-                 captions: list[str] | None = None) -> torch.Tensor:
-    """InfoNCE bidireccional (promedio de predictor->texto y texto->predictor)."""
-    p = F.normalize(pred.float(), dim=-1)
-    t = F.normalize(target.float(), dim=-1)
-    logits = p @ t.T / temperature
+                 captions: list[str] | None = None) -> tuple[torch.Tensor, dict]:
+    """InfoNCE bidireccional (promedio de Predictor -> texto y texto -> Predictor).
+
+    Devuelve (pérdida, estadísticas sin gradiente): las dos direcciones por separado y la exactitud
+    top-1 de recuperación dentro del lote en cada dirección. Con `captions`, los pares con el mismo
+    caption se excluyen del denominador (máscara de falsos negativos).
+    """
+    logits = infonce_logits(pred, target, temperature)
     if captions is not None:
         logits = logits.masked_fill(duplicate_mask(captions, logits.device), float("-inf"))
     labels = torch.arange(logits.shape[0], device=logits.device)
-    return (F.cross_entropy(logits, labels) + F.cross_entropy(logits.T, labels)) / 2
-
-
-def bank_logits(pred: torch.Tensor, bank: torch.Tensor, temperature: float) -> torch.Tensor:
-    """⟨ŝ_i, s_j⟩ / τ con ambos lados normalizados: (B, N)."""
-    return F.normalize(pred.float(), dim=-1) @ F.normalize(bank.float(), dim=-1).T / temperature
-
-
-def bank_infonce_loss(pred: torch.Tensor, bank: torch.Tensor, target_idx: torch.Tensor,
-                      temperature: float) -> torch.Tensor:
-    """Suma (no media) de −log p(texto correcto | ŝ) con softmax sobre todo el banco de objetivos."""
-    return F.cross_entropy(bank_logits(pred, bank, temperature), target_idx, reduction="sum")
-
-
-def reverse_bank_infonce_loss(logits: torch.Tensor, target_idx: torch.Tensor) -> torch.Tensor:
-    """Dirección texto -> predictor de InfoNCE cuando los textos salen de un banco cerrado.
-
-    En el paper cada texto del lote tiene una sola predicción positiva (la de su par) y el softmax corre
-    sobre las predicciones del lote. Con un banco cerrado varias muestras del lote comparten el mismo
-    texto, así que el positivo es el CONJUNTO de predicciones con ese texto (forma multi-positiva, como
-    la contrastiva supervisada de Khosla et al., 2020):
-
-        L_j = −log [ Σ_{i: c_i = j} exp(⟨ŝ_i, s_j⟩/τ)  /  Σ_{i en el lote} exp(⟨ŝ_i, s_j⟩/τ) ]
-
-    promediada sobre los textos j presentes en el lote. Con textos todos distintos coincide con la
-    dirección inversa del paper. `logits`: (B, N) de `bank_logits`.
-    """
-    pos = F.one_hot(target_idx, logits.shape[1]).bool()                 # (B, N)
-    present = pos.any(dim=0)
-    col, posm = logits[:, present], pos[:, present]
-    num = torch.logsumexp(col.masked_fill(~posm, float("-inf")), dim=0)
-    return (torch.logsumexp(col, dim=0) - num).mean()
-
-
-def symmetric_bank_infonce_loss(pred: torch.Tensor, bank: torch.Tensor, target_idx: torch.Tensor,
-                                temperature: float) -> tuple[torch.Tensor, torch.Tensor]:
-    """InfoNCE bidireccional contra un banco cerrado: (pérdida media, término directo medio sin grad).
-
-    directo   predictor -> texto: softmax sobre TODO el banco (negativos exactos, no una muestra del lote)
-    inverso   texto -> predictor: softmax sobre las predicciones del lote, multi-positivo
-    Pérdida = (directo + inverso) / 2, como `openvljepa.losses.bidirectional_infonce`.
-    """
-    logits = bank_logits(pred, bank, temperature)
-    fwd = F.cross_entropy(logits, target_idx)
-    return (fwd + reverse_bank_infonce_loss(logits, target_idx)) / 2, fwd.detach()
+    p2t = F.cross_entropy(logits, labels)
+    t2p = F.cross_entropy(logits.T, labels)
+    with torch.no_grad():
+        stats = {"loss_p2t": float(p2t), "loss_t2p": float(t2p),
+                 "acc_p2t": float((logits.argmax(1) == labels).float().mean()),
+                 "acc_t2p": float((logits.argmax(0) == labels).float().mean())}
+    return (p2t + t2p) / 2, stats

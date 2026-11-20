@@ -1,0 +1,25 @@
+# Paso 2.0 — BARRIDO CORTO DE LR en val (decisión del usuario 16-11-2026; docs/metodologia.md §4).
+# Mismo procedimiento para los 4 modelos: cada LR entrena 150 pasos × 128 = 19 200 imágenes de train (15 %, las
+# primeras de la permutación común) con el schedule completo DENTRO de la corrida corta, y se evalúa en las 500 de val.
+# Regla: el valor en el ÚLTIMO paso (150), no best.json: el mejor puede ser el paso 0 (zero-shot), igual para todos.
+#   VLM      mayor attr_mean
+#   VL-JEPA  menor InfoNCE en val (P7)
+# El ganador de cada modelo va a configs/train/models/<modelo>.yaml (train.lr). El control bf16 usa el mismo LR que
+# NF4, sin barrido propio (como P10). Grilla A CONFIRMAR: {1e-4, 2e-4, 5e-4} alrededor de 2e-4 de [8] Tabla 9.
+# NO LANZAR antes de revisar la prueba de humo (stage2_smoke.txt).
+#   SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_sweep scripts/run_queue.sh configs/queues/stage2_sweep.txt
+#   (o repartir por modelo entre las dos GPU, como en ydecoder_msrvtt.txt)
+# Comparar (última evaluación de cada run):
+#   for d in runs/train_*_m150; do tail -n 1 $d/val_log.jsonl | python -c "import json,sys; r=json.load(sys.stdin); m=r['selection_metric']; print('$d'.split('/')[-1], m, round(r[m],4))"; done
+model=vljepa     train.lr=1e-4 train.max_steps=150 train.eval_every=50
+model=vljepa     train.lr=2e-4 train.max_steps=150 train.eval_every=50
+model=vljepa     train.lr=5e-4 train.max_steps=150 train.eval_every=50
+model=qwen35     train.lr=1e-4 train.max_steps=150 train.eval_every=50
+model=qwen35     train.lr=2e-4 train.max_steps=150 train.eval_every=50
+model=qwen35     train.lr=5e-4 train.max_steps=150 train.eval_every=50
+model=internvl3  train.lr=1e-4 train.max_steps=150 train.eval_every=50
+model=internvl3  train.lr=2e-4 train.max_steps=150 train.eval_every=50
+model=internvl3  train.lr=5e-4 train.max_steps=150 train.eval_every=50
+model=llava_ov   train.lr=1e-4 train.max_steps=150 train.eval_every=50
+model=llava_ov   train.lr=2e-4 train.max_steps=150 train.eval_every=50
+model=llava_ov   train.lr=5e-4 train.max_steps=150 train.eval_every=50

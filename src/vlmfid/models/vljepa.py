@@ -302,8 +302,12 @@ class VLJEPADescriber(Describer):
                 for j, t in enumerate(texts)]
 
     def lora_target_modules(self) -> str:
-        # Etapa 2 (fase 5): falta agregar las capas lineales del Y-Encoder (opción A del paper).
-        return r"predictor\.layers\.\d+\..*(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)$"
+        """Etapa 2, opción A del paper (docs/metodologia.md §2.3, D3): LoRA en todas las lineales de las
+        8 capas del Predictor (Llama) y de las capas del transformer del Y-Encoder (EmbeddingGemma, Gemma3).
+        El X-Encoder no calza (sus claves empiezan por `x_encoder.`), ni las proyecciones, que se
+        entrenan completas como conector. PEFT compara el patrón con `re.fullmatch` sobre la clave."""
+        return (r"(predictor\.layers|y_encoder\.model\.layers)\.\d+\."
+                r".*(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)$")
 
     def info(self) -> dict:
         out = super().info()

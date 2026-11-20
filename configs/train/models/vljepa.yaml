@@ -1,22 +1,22 @@
-# VL-JEPA (open-vljepa, MSRVTT Stage B) — etapa 2. Solo claves permitidas (ver configs/train/budget.yaml).
+# VL-JEPA (open-vljepa, MSRVTT Stage B) — etapa 2, opción A del paper (docs/metodologia.md §2.3, C7/D3).
+# Solo claves permitidas (vlmfid.train.config.ALLOWED_MODEL_KEYS).
 #
-# Prompt: p1_attributes, como los otros tres (reformulación, docs/ETAPA2B_REFORMULACION.md). La regla
-# "mejor zero-shot" elegía p4m_multiexample (Índice macro 0,2910), pero en VL-JEPA los seis prompts
-# quedaron entre 0,285 y 0,291, dentro del ruido, y p4m (≈80-90 tokens de Llama-3) se truncaba a
-# max_query_len = 64. p1 cabe entero y deja el prompt igual en los 4 modelos.
-prompt: p1_attributes
+#   X-Encoder   congelado, NF4                                  [5] §3.1
+#   Predictor   LoRA en las 8 capas (LR base)                   [5] §3.1 (ajuste completo -> LoRA, D3)
+#   Y-Encoder   LoRA en EmbeddingGemma con LR × 0.05            [5] §3.1, Tabla 7b
+#   proyecciones vis_proj, out_proj, y_encoder.projector completas, LR del conector (P9: también la del Y-Encoder)
+#   pérdida     InfoNCE bidireccional del lote, sin máscara de duplicados (D4)
 
 train:
-  # Con negatives=bank cada muestra aporta un término independiente del lote, así que se podría acumular
-  # gradiente; se deja 64 porque cabe en memoria (VL-JEPA es el modelo más liviano en entrenamiento).
-  micro_batch_size: 64
+  # InfoNCE toma los negativos del lote: el micro-lote DEBE ser el lote efectivo (compose_train lo exige).
+  micro_batch_size: 128
+  # P7 (decisión del usuario, 16-11-2026): durante el ajuste no hay Y-Decoder válido (el Y-Encoder cambia),
+  # así que el paso se elige por la InfoNCE en val (mínima). Diferencia declarada frente a los VLM.
+  selection_metric: val_loss
+  # lr: <ganador del barrido>   (configs/queues/stage2_sweep.txt)
 
 lora:
-  connector_modules: [vis_proj]   # predictor.vis_proj: Linear 1024 -> 2048 (V-JEPA 2 -> Llama)
+  connector_modules: [predictor.vis_proj, predictor.out_proj, y_encoder.projector]
 
 objective:
   kind: infonce
-  # Negativos = TODOS los textos objetivo únicos (504 canónicos), no las otras 63 muestras del lote: es
-  # clasificar sobre el mismo banco con que se decodifica por recuperación en inferencia. Con un lote
-  # de 64 y 504 clases, casi todos los negativos del lote difieren en varios atributos a la vez.
-  negatives: bank
