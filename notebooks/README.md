@@ -12,4 +12,6 @@ Análisis que requieren interpretación e interacción. Reglas:
 | `01_eda_m3di.ipynb` | distribución de factores, vocabulario por valor de atributo (insumo del extractor) |
 | `02_resultados_etapa1.ipynb` | etapa 1 en VAL: líneas base, modelo × prompt, selección de prompt con bootstrap pareado, omisión vs error, confusiones, color, control bf16 (McNemar), texto vs fidelidad, piloto vs val completo, Y-Decoder genérico, VL-JEPA (zero-shot, intermedia, diagnóstico de cuantización, pérdida de información) y tabla resumen. Requiere `scripts/score.py` corrido sobre los runs |
 
+| `03_resultados_etapa2.ipynb` | etapa 2 en VAL: humo (entrenables, memoria pico → P8), grilla LR × r × conector (ganador por modelo con `summarize_train.sweep_winners`, sensibilidad, robustez por bootstrap pareado), curvas del ajuste completo, zero-shot `p1_attributes` frente a ajustado (bootstrap y McNemar), omisiones y confusiones, control bf16 tras el ajuste, VL-JEPA (Y-Decoder de la etapa 2, pérdida de información etapa 1 vs 2), tabla resumen y, solo lectura, la tabla final de test. Las secciones sin runs se saltan |
+
 Los notebooks anteriores a la reconstrucción están en `_para_borrar/notebooks/`.

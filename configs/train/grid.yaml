@@ -10,6 +10,8 @@
 #
 # Regla de selección (igual que el barrido de LR): la métrica en el ÚLTIMO paso evaluado, no la mejor:
 #   VLM      mayor attr_mean            VL-JEPA  menor InfoNCE en val (P7)
+# Sin parada temprana (G2, docs/metodologia.md §6.1, 20-11-2026): toda combinación corre los 150 pasos; las
+# evaluaciones intermedias solo se registran. Se descartó successive halving (presupuestos distintos por combinación).
 # El ganador de cada modelo va a configs/train/models/<modelo>.yaml (train.lr, lora.r, train.connector_lr_mult).
 #
 # Costo: 3 × 2 × 2 = 12 combinaciones por modelo, 48 corridas, 48 × 150 × 128 ≈ 922 000 imágenes (≈ 7 épocas de

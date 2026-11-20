@@ -1,20 +1,24 @@
-# Estado de la sesión — 16-11-2026 (actualizado al cierre)
+# Estado de la sesión — 20-11-2026
 
 > Documento de traspaso: dónde quedó el trabajo, qué está corriendo y qué sigue. Para retomar, leer
 > este archivo primero. Los resultados medidos están en `docs/resultados_etapa1.md`; el protocolo, en
-> `docs/metodologia.md`.
+> `docs/metodologia.md`; los comandos del cluster, paso a paso, en `docs/pasos_cluster.md`.
 
 ## 1. Dónde estamos
 
-**Fase 4 (etapa 1), casi terminada; la etapa 2 ya está escrita (sin ejecutar).**
+**Fase 4 (etapa 1), casi terminada; la etapa 2 está escrita completa (código, colas, grilla y notebook), sin ejecutar.**
 
-- Barrido del Y-Decoder genérico **terminado** (`ydec_msrvtt`, `DONE(0)`): **k = 8** (CIDEr en MSR-VTT
-  `test_1k`: k=1 1.321, k=4 1.384, k=8 1.439; adelante en las 7 evaluaciones). Techo en M3DI ≈ 0.12.
-- Siguiente en el cluster: k = 8 hasta 3 épocas, NF4 (GPU 0) y bf16 (GPU 1): `configs/queues/ydecoder_msrvtt.txt` §2.
-- Etapa 2 escrita con la propuesta de hiperparámetros (`configs/train/budget.yaml`), candado
-  `train.hparams_confirmed: false` y colas `stage2_{smoke,sweep,train,infoloss}.txt`. Detalle en
-  `docs/plan_reconstruccion.md` §6.0b. Nada de la etapa 2 se ha ejecutado, ni sus tests.
-- Cambios sin commitear: todo lo anterior (el usuario hace commit y push).
+- Barrido del Y-Decoder genérico **terminado**: **k = 8** (CIDEr en MSR-VTT `test_1k`: k=1 1.321, k=4 1.384,
+  k=8 1.439). Techo en M3DI ≈ 0.12.
+- En el cluster (último estado conocido, 19-11): `ydec_k8_nf4` (k = 8, 3 épocas, NF4) corriendo en la GPU 1; el bf16
+  pendiente porque la GPU 0 estaba ocupada por un proceso ajeno. Verificar con `scripts/jobs.sh status` al retomar.
+- Etapa 2 lista para el humo (B2) y la grilla (B4): código (`scripts/train.py`, `src/vlmfid/train/`), propuesta de
+  hiperparámetros con candado (`configs/train/budget.yaml`, `train.hparams_confirmed: false`), grilla
+  (`configs/train/grid.yaml` → `stage2_grid{,_g0,_g1}.txt`), colas `stage2_{smoke,train,val,infoloss}.txt` y resumen
+  (`scripts/summarize_train.py`). Nada de la etapa 2 se ha ejecutado, ni sus tests.
+- Notebooks de análisis: `02_resultados_etapa1.ipynb` (etapa 1) y **`03_resultados_etapa2.ipynb`** (etapa 2, nuevo el
+  20-11; se salta solo las secciones cuyos runs aún no existen). Ninguno se ha ejecutado.
+- Commiteado hasta `4cd820b` (grilla). Sin commitear: el notebook 03, `notebooks/README.md` y este archivo.
 
 ## 2. Lo cerrado en la etapa 1
 
@@ -59,6 +63,9 @@ intermedia** y las **sondas** de §2.5.
   LoRA r {16, 64} (α = 16 fijo) × multiplicador del conector {1, 5}; 48 corridas de 150 pasos, solo NF4, **ganador por
   modelo** (diferencia de protocolo que se declara). `configs/train/grid.yaml` → `scripts/make_grid.py` →
   `configs/queues/stage2_grid{,_g0,_g1}.txt`; resultado con `scripts/summarize_train.py --winners`. Sin ejecutar.
+- **G2 (20-11-2026): sin parada temprana**, ni en la grilla (150 pasos completos, gana el último paso evaluado) ni
+  en el ajuste completo (época entera; solo selección de checkpoint `adapter_best`). Se descartó *successive halving*.
+  Limitación declarada: la grilla compara tras un schedule corto completo, no a mitad de una época.
 - Pendiente del usuario: confirmar la propuesta (filas "Propuesta" de `metodologia.md` §4), P8 tras el humo,
   épocas del Y-Decoder ajustado a M3DI (intermedio y etapa 2), y autorizar la actualización de CLAUDE.md (P4).
 - **Verificado en el cluster (19-11-2026): el tokenizador de Llama-3.2 se carga con `padding_side = "left"`**
@@ -82,63 +89,54 @@ intermedia** y las **sondas** de §2.5.
 
 | # | Paso | Dónde | Depende de |
 |---|---|---|---|
-| 1 | Commit + push; `git pull` en el cluster | usuario | — |
-| 2 | ~~Verificar el lado de relleno~~ hecho (19-11): era `left`, corregido; inspección de VL-JEPA repetida | cluster | 1 |
-| 3 | Genérico k = 8 hasta 3 épocas, NF4 y bf16 (`ydecoder_msrvtt.txt` §2). NF4 lanzado el 19-11 en GPU 1 (`ydec_k8_nf4`); bf16 pendiente (GPU 0 ocupada por un proceso ajeno) | cluster | 1 |
-| 3b | Diagnóstico de cuantización de VL-JEPA: tests nuevos, humo y `diag_quant_vljepa.txt` (tras `ydec_k8_nf4`: `git pull` solo sin cola corriendo) | cluster | 3 |
-| 4 | `pytest tests/test_train_units.py tests/test_train_e2e.py` y luego `stage2_smoke.txt` (puede ir en paralelo con 3 si hay GPU) | cluster | 1 |
-| 5 | VL-JEPA en val con el genérico (piloto 200 × 6 prompts → val completo → prompt) | cluster | 2, 3 |
-| 6 | Decidir épocas del decodificador intermedio y entrenarlo; VL-JEPA con él; control bf16 | usuario → cluster | 3 |
-| 7 | Pérdida de información de la etapa 1 (`stage1_infoloss`, humo primero) | cluster | 3 |
-| 8 | Revisar humo de la etapa 2 → P8 → grilla (`stage2_grid.txt`, `docs/pasos_cluster.md` B4) → confirmar hiperparámetros | Claude + usuario | 4 |
-| 9 | Actualizar `resultados_etapa1.md` y **aprobación del cierre de la etapa 1** | laptop | 5–7 |
-| 10 | `stage2_train.txt` → Y-Decoder de la etapa 2 (`ydecoder_msrvtt.txt` §4) → `stage2_infoloss.txt` | cluster | 8, 9 |
+| 1 | Commit + push del notebook 03 y docs; `git pull` en el cluster **solo sin cola corriendo** | usuario | — |
+| 2 | ~~Verificar el lado de relleno~~ hecho (19-11): era `left`, corregido; inspección de VL-JEPA repetida | cluster | — |
+| 3 | Genérico k = 8 hasta 3 épocas, NF4 y bf16 (`ydecoder_msrvtt.txt` §2; A1, A3). NF4 lanzado el 19-11 en GPU 1 (`ydec_k8_nf4`); bf16 pendiente | cluster | — |
+| 3b | Diagnóstico de cuantización de VL-JEPA: tests nuevos, humo y `diag_quant_vljepa.txt` (A2) | cluster | 3 |
+| 4 | `pytest tests/test_train_units.py tests/test_train_e2e.py tests/test_make_grid.py tests/test_summarize_train.py` y luego `stage2_smoke.txt` (B1–B2; en paralelo con 3 si hay GPU) | cluster | 1 |
+| 5 | VL-JEPA en val con el genérico (piloto 200 × 6 prompts → val completo → prompt; A4–A5) | cluster | 3 |
+| 6 | Decidir épocas del decodificador intermedio y entrenarlo; VL-JEPA con él; control bf16 (A6) | usuario → cluster | 3 |
+| 7 | Pérdida de información de la etapa 1 (`stage1_infoloss`, humo primero; A7) | cluster | 3 |
+| 8 | Revisar humo (notebook 03 §1) → P8 → grilla (`stage2_grid*.txt`, B4; notebook 03 §2–3) → ganador por modelo en `configs/train/models/*.yaml` → confirmar P5 y `hparams_confirmed: true` | Claude + usuario | 4 |
+| 9 | Correr el notebook 02, actualizar `resultados_etapa1.md` y **aprobación del cierre de la etapa 1** (A8) | cluster + laptop | 5–7 |
+| 10 | `stage2_train.txt` → Y-Decoder de la etapa 2 (`ydecoder_msrvtt.txt` §4) → `stage2_val.txt` → `stage2_infoloss.txt` (B5–B8; notebook 03 §4–8) | cluster | 8, 9 |
+| 11 | Llenar `configs/final_test.yaml` y correr `scripts/final_test.py` una sola vez (Parte C) | cluster | 10 |
+
+**Decisiones del usuario pendientes** (`docs/pasos_cluster.md` B0): P8 (lote 128 o 64, tras el humo), P5 (propuesta de
+`metodologia.md` §4, tras la grilla), épocas del Y-Decoder ajustado a M3DI (antes de A6) y P4 (actualizar CLAUDE.md §3:
+prompt de la etapa 2, controles bf16, Y-Decoder, P7 y P9 la contradicen hoy).
 
 ## 5. Comandos para retomar
 
-**Lado de relleno de los tokenizadores de VL-JEPA (cluster, un segundo):**
+Los comandos completos de cada paso están en `docs/pasos_cluster.md`. Los más inmediatos:
+
+**Estado del cluster al retomar:**
 ```bash
 cd /mnt/home2/t7-vLLM/Multimodal_LLM
-uv run --no-sync python -c "from transformers import AutoTokenizer as A; [print(n, type(t).__name__, t.padding_side) for n in ('unsloth/Llama-3.2-1B','google/embeddinggemma-300m') for t in [A.from_pretrained(n)]]"
+scripts/jobs.sh status
+scripts/jobs.sh gpu
+grep -E "\[ydec\]\[val\]|\[ydec\] listo" logs/ydec_k8_nf4/job.log | tail -5
 ```
 
-**Y-Decoder genérico k = 8, 3 épocas (cluster):**
+**Y-Decoder genérico bf16 (A3), cuando haya una GPU libre:**
 ```bash
-grep '^model' configs/queues/ydecoder_msrvtt.txt | head -1 > /tmp/ydec_k8_nf4.txt
 grep '^model' configs/queues/ydecoder_msrvtt.txt | tail -1 > /tmp/ydec_k8_bf16.txt
-SCRIPT=scripts/train_ydecoder.py GPU=0 scripts/launch.sh ydec_k8_nf4 scripts/run_queue.sh /tmp/ydec_k8_nf4.txt
-SCRIPT=scripts/train_ydecoder.py GPU=1 scripts/launch.sh ydec_k8_bf16 scripts/run_queue.sh /tmp/ydec_k8_bf16.txt
+SCRIPT=scripts/train_ydecoder.py GPU=0 scripts/launch.sh ydec_k8_bf16 scripts/run_queue.sh /tmp/ydec_k8_bf16.txt
 ```
 
-**Tests y humo de la etapa 2 (cluster; requiere una GPU libre):**
+**Tests y humo de la etapa 2 (B1–B2; requiere una GPU libre y `git pull` hecho sin colas corriendo):**
 ```bash
-uv run --no-sync pytest tests/test_train_units.py tests/test_train_e2e.py -q
+uv run --no-sync pytest tests/test_train_units.py tests/test_train_e2e.py tests/test_make_grid.py tests/test_summarize_train.py -q
 SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_smoke scripts/run_queue.sh configs/queues/stage2_smoke.txt
+uv run --no-sync python scripts/summarize_train.py runs/train_*_m6
 ```
 
-**Ver cómo va el barrido del Y-Decoder (cerrado; referencia):**
-```bash
-cd /mnt/home2/t7-vLLM/Multimodal_LLM
-scripts/jobs.sh status | grep ydec_msrvtt              # RUNNING / DONE(0)
-cat logs/ydec_msrvtt/queue_status.tsv                  # una línea por k terminado (faltan si < 3)
-grep -E "\[ydec\]\[val\]|\[ydec\] listo|fuente=" logs/ydec_msrvtt/job.log | cut -c1-170
-```
+**Notebooks (cluster, VS Code Remote-SSH, kernel `vlmfid`):** `notebooks/02_resultados_etapa1.ipynb` y
+`notebooks/03_resultados_etapa2.ipynb`. Solo leen `runs/`; correrlos de nuevo a medida que terminan las colas.
 
-**Cuando diga `DONE(0)`, juntar los resultados (cluster):**
-```bash
-mkdir -p /tmp/para_claude && rm -f /tmp/para_claude/*
-for d in runs/ydec_vljepa*_msrvtt_k*_e1; do n=$(basename $d); cp $d/summary.json /tmp/para_claude/${n}_summary.json; cp $d/val_log.jsonl /tmp/para_claude/${n}_val_log.jsonl; head -n 30 $d/val_ceiling.jsonl > /tmp/para_claude/${n}_val_ceiling.jsonl; head -n 30 $d/m3di_ceiling.jsonl > /tmp/para_claude/${n}_m3di_ceiling.jsonl; done
-cp logs/ydec_msrvtt/queue_status.tsv /tmp/para_claude/
-ls -la /tmp/para_claude                                 # 13 archivos
-```
-
-**Copiarlos al laptop (terminal UCRT64):**
-```bash
-scp -r t7-vLLM@172.17.28.130:/tmp/para_claude /c/Users/bruno/AppData/Local/Temp/claude/bef8a9dbb391d17f/1b849f48-11bd-40d2-9502-128a7d217a5f/scratchpad/
-```
-Esa carpeta es temporal y de esta sesión: si al retomar la sesión es otra, pedir a Claude la ruta de su
-carpeta de trabajo y usarla en el `scp`. `/tmp` del cluster también puede limpiarse; si falta algo,
-repetir el bloque anterior.
+**Traer resultados al laptop:** ver el anexo de `docs/pasos_cluster.md`. El destino del `scp` es la carpeta de
+trabajo de la sesión de Claude, que cambia en cada sesión: pedirle la ruta antes de copiar. `/tmp` del cluster
+también puede limpiarse.
 
 ## 6. Cómo se trabaja (recordatorios)
 
@@ -163,8 +161,15 @@ repetir el bloque anterior.
 | `docs/metodologia.md` §2.4, §4, §6 | Y-Decoder, tabla de adaptaciones, decisiones tomadas y abiertas |
 | `docs/plan_reconstruccion.md` §5–§6 | puntos abiertos P1–P11 y estado por paso |
 | `configs/ydecoder.yaml` | decodificador: `text_source`, bloque `msrvtt`, *k* = 8, épocas |
-| `configs/queues/ydecoder_msrvtt.txt` | barrido de *k* (en curso) y, comentados, ganador, bf16 e intermedio |
+| `docs/pasos_cluster.md` | guía ejecutable: A1–A8 (cierre de la etapa 1), B0–B8 (etapa 2), C (test) |
+| `configs/queues/ydecoder_msrvtt.txt` | barrido de *k* (cerrado), ganador k = 8 NF4/bf16 y, comentados, intermedio y etapa 2 |
 | `configs/queues/stage1_vljepa_val.txt` | VL-JEPA en val, ya apunta al genérico k = 8, 3 épocas |
 | `configs/queues/stage1_infoloss.txt` | pérdida de información de la etapa 1 (genérico k = 8) |
-| `configs/train/budget.yaml`, `configs/queues/stage2_*.txt` | etapa 2: propuesta de hiperparámetros y colas |
+| `configs/queues/diag_quant_vljepa.txt` | diagnóstico de cuantización de VL-JEPA por componente |
+| `configs/train/budget.yaml` | etapa 2: presupuesto común y propuesta de hiperparámetros (candado `hparams_confirmed`) |
+| `configs/train/models/*.yaml` | por modelo: micro-lote, conector; aquí va el ganador de la grilla |
+| `configs/train/grid.yaml`, `scripts/make_grid.py` | grilla LR × r × conector → `configs/queues/stage2_grid{,_g0,_g1}.txt` |
+| `configs/queues/stage2_{smoke,train,val,infoloss}.txt` | colas de la etapa 2 (val e infoloss con marcadores `<…>` a llenar) |
+| `scripts/summarize_train.py` | resumen de humo, grilla (`--winners`) y ajuste completo |
+| `notebooks/02_resultados_etapa1.ipynb`, `notebooks/03_resultados_etapa2.ipynb` | análisis de la etapa 1 y de la etapa 2 (solo leen `runs/`) |
 | `configs/final_test.yaml` | plan de test (17 condiciones); se llena con lo elegido en val |
