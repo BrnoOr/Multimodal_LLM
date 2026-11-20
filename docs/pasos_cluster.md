@@ -225,7 +225,7 @@ las tablas de §3, §7 y §12 del notebook y `runs/_tablas/etapa1_val.csv`. Clau
 |---|---|---|---|
 | P8 | Lote efectivo común: 128 (propuesta, [5] §4.5) o 64 si VL-JEPA no cabe | `configs/train/budget.yaml` | tras B2 (memoria medida) |
 | P5 | ~~Confirmar la propuesta~~ **CONFIRMADA (20-11-2026, P5′)**: AdamW, coseno + 3 %, weight decay 0, `max_grad_norm` 0.3, α 16, dropout 0.1, τ 0.07. Solo queda revisar `max_grad_norm` con la norma del humo (B2) antes de B4 | `configs/train/budget.yaml` | hecho |
-| YQ | Cuantización del Y-Encoder de VL-JEPA: NF4 o excepción bf16 (`docs/resultados_etapa1.md` §7.4) | `docs/metodologia.md` §6.2 | antes de la grilla de VL-JEPA (B4b) |
+| YQ | ~~Cuantización del Y-Encoder~~ **DECIDIDA (20-11-2026): NF4, declarado** (opción a; `docs/metodologia.md` §6.1) | — | hecho |
 | Grilla | Combinación ganadora por modelo (LR, r, conector; B4) | `configs/train/models/<modelo>.yaml` (`train.lr`, `lora.r`, `train.connector_lr_mult`) | tras B4 |
 | Épocas | Épocas del Y-Decoder ajustado a M3DI (mismo valor que A6) | `configs/ydecoder.yaml` | antes de A6 |
 | P4 | Autorizar la actualización de CLAUDE.md §3 (prompt de la etapa 2, controles bf16, Y-Decoder, P7) | `CLAUDE.md` | cuando quieras |
@@ -234,6 +234,9 @@ Mientras `train.hparams_confirmed` sea `false`, `scripts/train.py` solo acepta c
 el humo (B2) y la grilla (B4) se pueden correr ya; el ajuste completo (B5), no.
 
 ### B0b. Verificación YQ: cuantización del Y-Encoder (`scripts/diag_yencoder_quant.py`)
+
+**Decidido (20-11): NF4** tras los dos humos. La corrida completa queda solo para tener las cifras del informe con
+1 024 captions; no bloquea nada.
 
 Pregunta: la caída de S_Y en NF4 (coseno 0.876 contra bf16, `docs/resultados_etapa1.md` §7.4), ¿es un error de
 nuestra cuantización manual o una sensibilidad real de EmbeddingGemma a NF4? Mismos pesos (el Y-Encoder del
@@ -262,7 +265,7 @@ grep -E "^\[diagyq\]|^  " logs/diag_yq/job.log | tail -15
 |---|---|
 | `nf4_manual` ≈ 0.88 y `nf4_hf` ≈ 0.99 | Error de la cuantización manual: se corrige el código; YQ se resuelve sin excepción |
 | `nf4_manual` ≈ `nf4_hf` ≈ 0.88 | Sensibilidad real del modelo a NF4: YQ es una decisión de protocolo (NF4 declarado o excepción bf16) — **resultado del humo** |
-| `nf4_skip_last` ≈ 0.99 | Basta con dejar el último bloque del Y-Encoder en bf16: una excepción acotada, como `lm_head` (P11) |
+| `nf4_skip_last` ≈ 0.99 | Basta con dejar el último bloque del Y-Encoder en bf16 — **no ocurrió** (humo 2: 0.891) |
 | `nf4_hf_nodq` mucho mejor que `nf4_hf` | Lo causa la doble cuantización |
 | `estructura` alta (≥ 0.95) aunque el coseno baje | NF4 desplaza los vectores pero conserva las distancias relativas entre captions: pesa a favor de mantener NF4 |
 | El coseno por capa cae de golpe en una capa con `max|h|` muy grande | Activaciones atípicas: el origen típico de la sensibilidad a 4 bits |
@@ -332,7 +335,8 @@ la grilla (falla si alguien editó una de las dos):
 uv run --no-sync python scripts/make_grid.py --check
 ```
 
-**Dos tandas (G3, 20-11-2026):** primero los 3 VLM (36 corridas); VL-JEPA (12) cuando se decida YQ.
+**Dos tandas (G3, 20-11-2026):** primero los 3 VLM (36 corridas); luego VL-JEPA (12). YQ ya está decidido (NF4),
+así que B4b no espera nada más que la GPU.
 
 **Antes de lanzar, revisar `max_grad_norm` (P5′)** con la norma del gradiente del humo (antes del recorte):
 
@@ -356,9 +360,9 @@ SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2_grid_vlm scripts/run_queue.sh
 `wc -l` debe dar **36**. Si se liberan las dos GPU, repartir por modelo (p. ej. Qwen3.5 en una, InternVL3 y LLaVA-OV
 en otra) con `grep 'model=qwen35'` etc.
 
-#### B4b. Grilla de VL-JEPA (12 corridas), tras decidir YQ
+#### B4b. Grilla de VL-JEPA (12 corridas)
 
-Si YQ cambia la cuantización del Y-Encoder, Claude ajusta el código y la cola antes de esto.
+Con el Y-Encoder en NF4 (YQ): la cola no cambia.
 
 ```bash
 grep '^model=vljepa ' configs/queues/stage2_grid.txt > /tmp/grid_vljepa.txt

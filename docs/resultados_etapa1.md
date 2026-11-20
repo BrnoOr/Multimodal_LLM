@@ -311,13 +311,20 @@ crece con la profundidad hasta ≈ 9 × 10⁴ a la entrada del último bloque (d
 
 - **No es un error de la cuantización manual:** la carga estándar de `transformers` da el mismo resultado,
   hasta la tercera cifra. La doble cuantización no influye.
-- **Es una sensibilidad real de este modelo a NF4, localizada en el último bloque.** Hipótesis, no verificada:
-  activaciones atípicas de gran magnitud ("massive activations"), que hacen que pequeños errores relativos de
-  los pesos en 4 bits desplacen la salida. Se pone a prueba con la condición `nf4_skip_last` (NF4 salvo el
-  último bloque) en la corrida completa.
+- **Es una sensibilidad real de este modelo a NF4, y no está localizada en el último bloque.** Primero pareció
+  localizada, pero se refutó con el humo 2 (64 captions, 20-11): con el último bloque en bf16 (`nf4_skip_last`,
+  161 de 168 lineales en 4 bits), el coseno de S_Y solo sube de 0.877 a 0.891 (p10 0.844; estructura 0.943;
+  R@1 0.609), y en la última posición de 0.862 a 0.881. Lectura corregida: el coseno por capa antes de la norma
+  final está dominado por unas pocas dimensiones de magnitud enorme (máx. |h| ≈ 9 × 10⁴), que NF4 conserva bien.
+  Eso esconde el error en las demás dimensiones, que se acumula a lo largo de los bloques y queda a la vista
+  cuando la norma final reescala cada token. **No hay una excepción parcial obvia.** Las opciones son el
+  Y-Encoder completo en NF4 o completo en bf16.
 - NF4 conserva buena parte de la estructura relativa entre captions (Spearman 0.95), pero no toda: con 64
   captions, solo el 62.5 % de los S_Y en NF4 recupera su propio caption en bf16. Son cifras del humo (n = 64);
   la corrida completa (1 024) las reemplaza.
+
+**Decisión (YQ, usuario, 20-11-2026):** el Y-Encoder sigue en NF4 en la etapa 2, y así se declara
+(`docs/metodologia.md` §6.1). El costo de NF4 lo mide el control bf16 de la etapa 2.
 
 ## 7c. Y-Decoder genérico (MSR-VTT)
 

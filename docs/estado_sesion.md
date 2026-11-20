@@ -105,14 +105,13 @@ intermedia** y las **sondas** de §2.5.
 | 5 | Correr el notebook 02 completo y actualizar `resultados_etapa1.md` con VL-JEPA (A8) | cluster + laptop | 2, 3 |
 | 6 | Tests de entrenamiento y humo de la etapa 2 (B1–B2) | cluster | 3 |
 | 7 | ~~P5~~ confirmado (P5′); revisar `max_grad_norm` con el humo; P8 tras el humo; grilla de los **VLM** (B4a, 36 corridas) → ganadores | usuario + Claude → cluster | 6 |
-| 8 | **YQ:** verificación `scripts/diag_yencoder_quant.py` (B0b: tests, humo, completa; minutos de GPU) → decisión NF4 o excepción bf16 → grilla de **VL-JEPA** (B4b, 12 corridas) | cluster → usuario → cluster | GPU libre |
+| 8 | ~~YQ~~ **decidido: Y-Encoder en NF4** (20-11). Pendiente solo la corrida completa de `diag_yencoder_quant.py` (cifras del informe) | cluster | — |
 | 9 | `stage2_train.txt` → Y-Decoder de la etapa 2 (`ydecoder_msrvtt.txt` §4) → `stage2_val.txt` → `stage2_infoloss.txt` (B5–B8; notebook 03) | cluster | 7, 8 |
 | 10 | Llenar `configs/final_test.yaml` y correr `scripts/final_test.py` una sola vez (Parte C) | cluster | 9 |
 
-**Decisiones del usuario pendientes:** P8 (lote 128 o 64, tras el humo); YQ (cuantización del Y-Encoder, antes de la
-grilla de VL-JEPA); épocas del Y-Decoder ajustado a M3DI (para B6); de dónde parte el Y-Decoder del control bf16 de la
+**Decisiones del usuario pendientes:** P8 (lote 128 o 64, tras el humo); épocas del Y-Decoder ajustado a M3DI (para B6); de dónde parte el Y-Decoder del control bf16 de la
 etapa 2, ya que no hay genérico bf16 (P10, por CE1); P4 (actualizar CLAUDE.md §3: prompt de la etapa 2, controles bf16,
-Y-Decoder, P7, P9 y el cierre CE1). **P5 confirmado** el 20-11 (P5′); grilla en dos tandas (G3).
+Y-Decoder, P7, P9 y el cierre CE1). **Tomadas el 20-11:** P5 (P5′), grilla en dos tandas (G3), Y-Encoder en NF4 (YQ).
 
 ## 5. Comandos para retomar
 
