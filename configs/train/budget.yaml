@@ -66,13 +66,14 @@ train:
                                 #   coseno [5] §3.2. Alternativa: constant [8, Ap. B.2]
   warmup_ratio: 0.03            # [2, Ap.]; ≈ 59 de 1 954 pasos
   min_lr_ratio: 0.0
-  max_grad_norm: 0.3            # CONFIRMADO (P5′). [8, Ap. B.2]. Revisar grad_norm del humo antes de la grilla
+  max_grad_norm: 0.3            # CONFIRMADO (P5′ y H1, tras el humo). [8, Ap. B.2]. Recorta en todos los pasos (medianas
+                                #   1.6–5.0): con Adam normaliza la norma por paso, no reduce el LR
   max_target_tokens: 64         # cota de seguridad: el caption más largo tiene 31 tokens; si alguno excede, falla
   gradient_checkpointing: true
   x_encoder_chunk: 32           # VL-JEPA: el X-Encoder (congelado, sin gradiente) se pasa en trozos de este tamaño;
                                 #   no cambia la pérdida, solo la memoria pico
   eval_every: 200               # pasos entre evaluaciones en val (+ paso 0 y el último) -> ~10 por época
-                                #   (era 100 con lote 128; se duplica con P8 = 64 para conservar ~10 evaluaciones)
+                                #   (era 100 con lote 128; 200 con P8 = 64, confirmado por el usuario, H1)
   eval_at_start: true           # paso 0 = modelo base con el adaptador en cero (control de paridad con la etapa 1)
   save_every: 100               # pasos entre checkpoints de reanudación
   log_every: 10

@@ -286,7 +286,8 @@ CUDA_VISIBLE_DEVICES=1 uv run --no-sync pytest tests/test_train_units.py tests/t
 ### B2. Prueba de humo (6 pasos × lote efectivo, los 4 modelos, NF4 y bf16)
 
 **Hecho el 20-11 con lote 128:** los 3 VLM pasaron (NF4 y bf16) y VL-JEPA dio OOM en las dos precisiones → P8 = 64.
-Falta repetir solo las 2 líneas de VL-JEPA con lote 64 (ver B3).
+VL-JEPA con lote 64 hecho (job `s2_smoke_vj`): 15.7 GB NF4, 21.1 GB bf16. **B2 cerrado**
+(`docs/resultados_etapa2.md` §1).
 
 Repartida en las dos GPU si están libres (NF4 en una, bf16 en otra); si no, toda la cola en una:
 
@@ -321,7 +322,7 @@ grep -hE "\[train\] modelo listo|\[train\] grupos de LR|query_tokens" logs/s2_sm
 
 **Mandar a Claude:** la tabla de `summarize_train` y el `grep`. **DECISIÓN P8** con el pico de memoria de VL-JEPA.
 
-### B3. Humo de VL-JEPA con lote 64 (P8)
+### B3. Humo de VL-JEPA con lote 64 (P8) — HECHO (20-11)
 
 P8 = 64 ya está en `configs/train/budget.yaml` y `configs/train/models/vljepa.yaml`. La grilla no se regenera: sus
 líneas no llevan el lote. Tras `git pull`, repetir solo VL-JEPA:
@@ -349,13 +350,7 @@ uv run --no-sync python scripts/make_grid.py --check
 **Dos tandas (G3, 20-11-2026):** primero los 3 VLM (36 corridas); luego VL-JEPA (12). YQ ya está decidido (NF4),
 así que B4b no espera nada más que la GPU.
 
-**Antes de lanzar, revisar `max_grad_norm` (P5′)** con la norma del gradiente del humo (antes del recorte):
-
-```bash
-for f in runs/train_*_m6/train_log.jsonl; do echo "== $f"; python3 -c "import json,statistics as s; g=[json.loads(l)['grad_norm'] for l in open('$f')]; print('mediana', round(s.median(g),3), 'max', round(max(g),3), 'n', len(g))"; done
-```
-
-**Mandar a Claude** la salida. Si en algún modelo la mediana es varias veces 0.3, se conversa antes de B4a.
+**`max_grad_norm` revisado (H1, 20-11):** se mantiene 0.3. Nada más bloquea B4a.
 
 #### B4a. Grilla de los VLM (36 corridas)
 

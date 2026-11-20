@@ -4,10 +4,22 @@
 > este archivo primero. Los resultados medidos están en `docs/resultados_etapa1.md`; el protocolo, en
 > `docs/metodologia.md`; los comandos del cluster, paso a paso, en `docs/pasos_cluster.md`.
 
+## 0. Al retomar (20-11-2026, noche)
+
+**Etapa 2, humo cerrado** (`docs/resultados_etapa2.md` §1): los 4 modelos entrenan y la pérdida baja. VL-JEPA con
+lote 64: 15.7 GB (NF4) y 21.1 GB (bf16). **Decisiones H1** (usuario, 20-11): `max_grad_norm` 0.3, `eval_every` 200,
+grilla de 150 pasos y YQ se mantiene (NF4).
+
+**Siguiente en el cluster:** grilla de los 3 VLM (B4a, 36 corridas, GPU 1; `docs/pasos_cluster.md`). Después,
+grilla de VL-JEPA (B4b, 12 corridas).
+
+**Pendientes del usuario:** P10 (Y-Decoder genérico bf16 para el control de la etapa 2; propuesto, sin aprobar);
+P4 (CLAUDE.md). Sin GPU: notebook 02 (§11c-bis).
+
 ## 1. Dónde estamos
 
-**Etapa 1 cerrada sin más entrenamientos (CE1, 20-11-2026)**; solo falta la inferencia de VL-JEPA en val. **La etapa 2
-está escrita completa** (código, colas, grilla y notebook), sin ejecutar.
+**Etapa 1 cerrada (CE1, 20-11-2026)**, incluida la inferencia de VL-JEPA en val. **Etapa 2:** humo hecho (los 4);
+sigue la grilla.
 
 - **Cierre de la etapa 1 (CE1, `metodologia.md` §6.1):** se cierra con los 3 VLM, el Y-Decoder genérico NF4 (k = 8,
   3 épocas, CIDEr 1.827, techo M3DI ≈ 0.12) y el diagnóstico de cuantización. Se agrega solo inferencia: VL-JEPA
@@ -109,7 +121,7 @@ intermedia** y las **sondas** de §2.5.
 | 9 | `stage2_train.txt` → Y-Decoder de la etapa 2 (`ydecoder_msrvtt.txt` §4) → `stage2_val.txt` → `stage2_infoloss.txt` (B5–B8; notebook 03) | cluster | 7, 8 |
 | 10 | Llenar `configs/final_test.yaml` y correr `scripts/final_test.py` una sola vez (Parte C) | cluster | 9 |
 
-**Decisiones del usuario pendientes:** revisión de `max_grad_norm` con las normas del humo; de dónde parte el Y-Decoder del control bf16 de la
+**Decisiones del usuario pendientes:** de dónde parte el Y-Decoder del control bf16 de la
 etapa 2, ya que no hay genérico bf16 (P10, por CE1); P4 (actualizar CLAUDE.md §3: prompt de la etapa 2, controles bf16,
 Y-Decoder, P7, P9 y el cierre CE1). **Tomadas el 20-11:** P5 (P5′), grilla en dos tandas (G3), Y-Encoder en NF4 (YQ), lote 64 (P8, por OOM de
 VL-JEPA con 128), Y-Decoder M3DI con 20 épocas (YD).
@@ -166,6 +178,7 @@ también puede limpiarse.
 | Archivo | Para qué |
 |---|---|
 | `docs/resultados_etapa1.md` | todo lo medido en la etapa 1, con procedencia |
+| `docs/resultados_etapa2.md` | lo medido en la etapa 2 (humo; grilla y ajuste cuando existan) |
 | `docs/metodologia.md` §2.4, §4, §6 | Y-Decoder, tabla de adaptaciones, decisiones tomadas y abiertas |
 | `docs/plan_reconstruccion.md` §5–§6 | puntos abiertos P1–P11 y estado por paso |
 | `configs/ydecoder.yaml` | decodificador: `text_source`, bloque `msrvtt`, *k* = 8, épocas |
