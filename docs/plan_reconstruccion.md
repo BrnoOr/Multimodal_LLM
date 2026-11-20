@@ -162,15 +162,25 @@ y ajustado bf16, en test. Tablas y figuras del informe en notebooks nuevos que i
 | P2 | Agregado para seleccionar (A4): media de forma, x, y y color. | Por defecto, revisable. |
 | P3 | Alcance de la decisión "prompt 1": se interpretó como `p1_attributes` en los 4 modelos para la etapa 2, manteniendo varios prompts en la etapa 1. Si significaba usar solo `p1` también en la etapa 1, el plan se simplifica, pero se pierde la pregunta del enunciado sobre sensibilidad al prompt. | A confirmar. |
 | P4 | Actualizar CLAUDE.md §3 con las decisiones que lo contradicen (prompt de la etapa 2; controles bf16; Y-Decoder). | Requiere autorización: es el archivo de instrucciones del proyecto. |
-| P5 | Hiperparámetros de M §4 (paso 2.0). | Se acuerda al llegar a la etapa 2. |
+| P5 | Hiperparámetros de M §4 (paso 2.0). | **Propuesta citada en `configs/train/budget.yaml` (16-11-2026)**; LR por barrido corto en val (`stage2_sweep.txt`). Corrida completa bloqueada (`train.hparams_confirmed`) hasta que el usuario confirme. |
 | P6 | Java en el cluster para `pycocoevalcap`. | Se comprueba en el paso 1.0. |
-| P7 | Selección de checkpoint en VL-JEPA (paso 2.2). La exactitud por atributo necesita el Y-Decoder, y el de la etapa 2 solo puede entrenarse después del ajuste, porque el Y-Encoder cambia (M §2.3): durante el entrenamiento no hay texto que puntuar. | **Abierta, bloquea el paso 2.2.** Propuesta: elegir el paso con la exactitud por atributo del caption de val más cercano a `Ŝ_Y`, codificado con el Y-Encoder del momento (protocolo de candidatos de [5] §4.1, usado solo para seleccionar), declarado como diferencia frente a los VLM. Alternativas: pérdida InfoNCE en val, o un decodificador por checkpoint candidato. |
-| P8 | Lote efectivo común (parte de P5). VL-JEPA necesita que su lote físico sea igual al efectivo (M §2.3). | Propuesta: 128 si cabe en 24 GB, por [5] §4.5 y D4; si no, 64. Se mide en la prueba de humo del paso 2.1. |
-| P9 | ¿La cabeza `y_encoder.projector` lleva también LR ×0.05? M §2.3 no lo aclara. | Abierta; releer [5] §3.1 antes de fijarlo. |
+| P7 | Selección de checkpoint en VL-JEPA (paso 2.2). | **Resuelto (usuario, 16-11-2026):** InfoNCE bidireccional en val (mínima), en lotes fijos. Diferencia declarada frente a los VLM (M §6.1). |
+| P8 | Lote efectivo común (parte de P5). VL-JEPA necesita que su lote físico sea igual al efectivo (M §2.3). | Propuesta: 128 ([5] §4.5); 64 si no cabe. **Se mide en `stage2_smoke.txt`** (pico de memoria de VL-JEPA, NF4 y bf16). |
+| P9 | ¿La cabeza `y_encoder.projector` lleva también LR ×0.05? | **Resuelto (usuario, 16-11-2026):** no; va con el conector a LR completo. open-vljepa la entrena a ×0.05: diferencia declarada (M §4). |
 | P10 | Condiciones bf16 de VL-JEPA: `configs/final_test.yaml` pide un Y-Decoder por condición, es decir 4 (zero-shot y ajustado, NF4 y bf16). **Resuelto (usuario, 16-11-2026):** sí, VL-JEPA y Llama del decodificador en bf16, con el *k* del barrido NF4 (M §6.1). La carga del decodificador verifica adaptador y cuantización. |
 | P11 | `quant_skip_modules` de los tres VLM excluye `lm_head` de NF4, aunque es un módulo congelado (M §2.1). | Reporte del paso 1.0 revisado (`docs/resultados_etapa1.md` §7.3): atado a `embed_tokens` en LLaVA-OV y Qwen3.5, independiente en InternVL3. **Resuelto (usuario, 16-11-2026):** `lm_head` en bf16 en los tres VLM, excepción uniforme declarada (M §6.1). No hay que repetir corridas. |
 
 ## 6. Estado
+
+### 6.0b Etapa 2 escrita (16-11-2026, sin ejecutar)
+
+| Pieza | Estado |
+|---|---|
+| `src/vlmfid/train/` (config, collate, objectives, jepa, lora, evaluate, loop) y `scripts/train.py` | reescritos con el protocolo de M §2.3: caption original, `p1_attributes`, LoRA en todas las lineales + conector, VL-JEPA opción A (LoRA en Predictor e Y-Encoder ×0.05, proyecciones completas, InfoNCE bidireccional del lote), selección `attr_mean` / InfoNCE (P7), sin test. Versiones anteriores en `_para_borrar/`. |
+| `configs/train/` | propuesta de hiperparámetros con fuente; candado `train.hparams_confirmed` |
+| Colas | `stage2_smoke`, `stage2_sweep` (LR), `stage2_train` (NF4 + bf16), `stage2_infoloss`; Y-Decoder de la etapa 2 en `ydecoder_msrvtt.txt` §4 |
+| Tests | `tests/test_train_units.py`, `tests/test_train_e2e.py` reescritos (incluye la equivalencia de la consulta sin relleno); **no ejecutados** (se corren en el cluster) |
+| Falta | correr tests y humo; P8; barrido; confirmar hiperparámetros; épocas del Y-Decoder ajustado; actualizar CLAUDE.md §3 (P4: prompt de la etapa 2, controles bf16, Y-Decoder y ahora P7) |
 
 ### 6.0 Actualización del 16-11-2026
 

@@ -638,23 +638,26 @@ Los valores "nuestro" marcados **PENDIENTE** no se fijan: no hay justificación 
 | Parámetro | Valor en el paper (modelo) | Valor nuestro | Justificación |
 |---|---|---|---|
 | Cuantización del modelo base | NF4 + double quantization, cómputo bf16 (LLaMA 7B–65B) [8, Ap. B.2] | igual | Protocolo; no depende de la escala. Exigido por el enunciado. |
-| Optimizador paginado | Paged AdamW; crítico solo en 33B/65B [8, §4] | PENDIENTE | Con 0.5–1B en 24 GB el estado del optimizador es pequeño. Decidir si se mantiene por fidelidad a [8] o se usa AdamW estándar. |
+| Optimizador paginado | Paged AdamW; crítico solo en 33B/65B [8, §4] | **Propuesta:** AdamW estándar (`train.optimizer`; `paged_adamw` disponible) | Con 0.5–1B en 24 GB el estado del optimizador es pequeño y [8] solo lo justifica en 33B/65B. A confirmar. |
 | Módulos con LoRA | todas las capas lineales del modelo base [8, §4]; solo `W_q`, `W_v` en [7] | todas las lineales de los bloques del LLM (del predictor en VL-JEPA) | Protocolo de [8]. Los nombres de módulo se verifican por modelo; Qwen3.5 tiene capas Gated DeltaNet. |
-| LoRA r | 64 (LLaMA 7B–65B) [8, Ap. B.2] | PENDIENTE | [8] Ap. A.2: r no afecta si LoRA va en todas las capas, pero la evidencia es de 7B. Con d = 896, r = 64 es una fracción mucho mayor de la dimensión. |
-| LoRA α | 16 (LLaMA 7B–65B) [8, Ap. B.2] | PENDIENTE | Ligado a r y al LR ([8] Ap. A.2: α es proporcional al LR). |
-| LoRA dropout | 0.1 hasta 13B; 0.05 en 33B/65B [8, Ap. B.2] | PENDIENTE | Dependiente de escala según el propio paper. |
-| LR de LoRA | 2e-4 (7B/13B), 1e-4 (33B/65B) [8, Tabla 9] | PENDIENTE | Dependiente de escala; barrido corto en val o model card. |
-| LR del conector | 1e-3 con solo el proyector, 1e-5 con modelo completo (LLaVA-OV 0.5B) [2408.03326, Tabla 1]; 2e-3 (LLaVA Vicuna) [2, §5] | PENDIENTE | Los papers no cubren "conector + LoRA". Decidir si comparte LR con LoRA o usa grupo propio. |
-| Esquema de LR | constante [8, Ap. B.2]; coseno con warmup 3 % [2, Ap.] | PENDIENTE | Dos fuentes válidas y distintas. |
-| Warmup | 3 % (LLaVA) [2, Ap.] | PENDIENTE | Ídem. |
-| Max grad norm | 0.3 [8, Ap. B.2] | PENDIENTE | — |
-| Adam β₂ / weight decay | β₂ = 0.999 [8]; sin weight decay [2, Ap.] | PENDIENTE | — |
-| Lote efectivo | 16 (QLoRA 7B) [8]; 32 (LLaVA ft.) [2]; 512 (LLaVA-OV 0.5B) [2408.03326]; 3 072 (VL-JEPA SFT) [5] | PENDIENTE, único para los 4 modelos | CLAUDE.md §3. Ver C9 para VL-JEPA. |
+| LoRA r | 64 (LLaMA 7B–65B) [8, Ap. B.2] | **Propuesta:** 64, sin barrido | [8] Ap. A.2: r no afecta si LoRA va en todas las capas, pero la evidencia es de 7B. Con d = 896, r = 64 es una fracción mucho mayor de la dimensión. Mismo valor que el Y-Decoder. A confirmar. |
+| LoRA α | 16 (LLaMA 7B–65B) [8, Ap. B.2] | **Propuesta:** 16 | Ligado a r y al LR ([8] Ap. A.2: α es proporcional al LR); el barrido de LR absorbe la escala. A confirmar. |
+| LoRA dropout | 0.1 hasta 13B; 0.05 en 33B/65B [8, Ap. B.2] | **Propuesta:** 0.1 | El valor de [8] para los modelos más pequeños que cubre. A confirmar. |
+| LR de LoRA | 2e-4 (7B/13B), 1e-4 (33B/65B) [8, Tabla 9] | **Barrido corto en val** (decisión del usuario, 16-11-2026): {1e-4, 2e-4, 5e-4}, 150 pasos × 128 por LR, mismo procedimiento en los 4 modelos; gana el mejor valor en el último paso (`attr_mean` en los VLM, InfoNCE en VL-JEPA). El LR puede diferir entre modelos; el control bf16 usa el de NF4 | `configs/queues/stage2_sweep.txt`. La grilla es propuesta propia alrededor de [8]; a confirmar. |
+| LR del conector | 1e-3 con solo el proyector, 1e-5 con modelo completo (LLaVA-OV 0.5B) [2408.03326, Tabla 1]; 2e-3 (LLaVA Vicuna) [2, §5] | **Propuesta:** el mismo LR que LoRA (`train.connector_lr_mult` = 1.0) | Los papers de los VLM no cubren "conector + LoRA". open-vljepa entrena `vis_proj` y `out_proj` con el LR base del Predictor (`scripts/train.py::build_optimizer` del submódulo). A confirmar. |
+| Esquema de LR | constante [8, Ap. B.2]; coseno con warmup 3 % [2, Ap.]; coseno en el SFT de VL-JEPA [5, §3.2] | **Propuesta:** coseno | Dos fuentes válidas y distintas; el coseno lo usan [2] y [5]. En el barrido el coseno se completa dentro de la corrida corta. A confirmar. |
+| Warmup | 3 % (LLaVA) [2, Ap.] | **Propuesta:** 3 % (≈ 29 de 977 pasos) | Ídem. A confirmar. |
+| Max grad norm | 0.3 [8, Ap. B.2]; 1.0 en open-vljepa | **Propuesta:** 0.3 | El de [8], que es el método (QLoRA). A confirmar. |
+| Adam β₂ / weight decay | β₂ = 0.999 [8]; sin weight decay [2, Ap.]; 0.01 en open-vljepa | **Propuesta:** β = (0.9, 0.999), weight decay 0 | [8] y [2]. A confirmar. |
+| Lote efectivo | 16 (QLoRA 7B) [8]; 32 (LLaVA ft.) [2]; 512 (LLaVA-OV 0.5B) [2408.03326]; 3 072 (VL-JEPA SFT) [5]; 128 en la comparación controlada [5, §4.5]; 64 en el checkpoint de open-vljepa | **Propuesta (P8):** 128, único para los 4 modelos; 64 si VL-JEPA no cabe en 24 GB con lote físico 128 (se mide en `stage2_smoke.txt`) | CLAUDE.md §3 y [5] §4.5. Ver C9 para VL-JEPA. A confirmar tras la prueba de humo. |
 | Épocas | 3 (LLaVA ft.), 1 por etapa (LLaVA-OV), 83k pasos (VL-JEPA SFT) | 1 época de train | CLAUDE.md §3. |
 | Módulos entrenados (VLM) | proyector + LLM completo, visión congelada (LLaVA) [2, §4.2]; modelo completo (LLaVA-OV, InternVL3) | LoRA en LLM + conector; visión congelada | CLAUDE.md §3 y enunciado (LoRA sobre modelo cuantizado). Coincide con [2] en congelar la visión. |
 | Módulos entrenados (VL-JEPA) | predictor completo (490M) + Y-Encoder con LR ×0.05; X-Encoder congelado [5, §3.1] | opción A del paper con LoRA: LoRA en Predictor e Y-Encoder (×0.05) + proyecciones lineales; X-Encoder congelado | El paper fija qué componentes aprenden; LoRA y NF4 los exige el enunciado. Ver §2.3. |
 | Multiplicador de LR del Y-Encoder | ×0.05 (modelo de 1.6B) [5, §3.1, Tabla 7b] | ×0.05 | Es una razón entre LRs, no un valor absoluto; el paper muestra que 0.05–0.10 es el óptimo. |
 | Pérdida de VL-JEPA | InfoNCE bidireccional [5, §2] | igual | Protocolo. |
+| LR de `y_encoder.projector` (P9) | ×0.05 "to all text encoder parameters" y, aparte, "linear projection head is applied to both Predictor and Y-Encoder" [5, §3.1]; open-vljepa le aplica ×0.05 (todo `y_encoder` en un grupo) | LR del conector (completo) | Decisión del usuario (16-11-2026): ×0.05 va al encoder (EmbeddingGemma) y la cabeza es otro componente (también Tabla 7e la trata aparte). Difiere de la reimplementación; se declara. Una clave: `train.connector_lr_mult` la gobierna junto con las demás proyecciones. |
+| Selección del checkpoint de VL-JEPA (P7) | sin fuente: el paper no ajusta con selección en val | InfoNCE bidireccional en las 500 de val (mínima), mismos lotes en cada evaluación | Decisión del usuario (16-11-2026). Sin Y-Decoder válido durante el ajuste no hay texto que puntuar; diferencia declarada frente a los VLM, que se eligen por `attr_mean`. |
+| Longitud de la consulta en el ajuste (VL-JEPA) | 512 [5, §3.1] | sin relleno (largo propio de `p1_attributes`) | Equivalente a rellenar hasta 512: el Predictor enmascara el relleno en la atención y el promedio, y el relleno a la derecha no mueve las posiciones de los tokens reales (se exige `padding_side=right`; `tests/test_train_e2e.py` compara ambos). Necesario para que el lote de 128 quepa en memoria. |
 | Y-Decoder: arquitectura | no especificado [5]; solo *lightweight* | prefijo sobre Llama-3.2-1B, NF4 + LoRA | Decisión del usuario (§2.4). Sin fuente en el paper. |
 | Y-Decoder: LoRA y optimización | r = 64, α = 16, dropout 0.1, LR 2e-4, lote 16, LR constante, max grad norm 0.3 (LLaMA 7B/13B) [8, Ap. B.2] | los mismos, como punto de partida | Acordado con el usuario: valores de QLoRA como inicio, no justificados para 1B. Revisables tras el barrido. |
 | Y-Decoder genérico: corpus, selección, vectores de prefijo y épocas | sin fuente | MSR-VTT `train_7k`; CIDEr en `test_1k`; barrido de *k* ∈ {1, 4, 8} con 1 época y el ganador hasta 3 épocas, eligiendo el mejor paso | Decisión del usuario, 16-11-2026 (§2.4). Nada del decodificador zero-shot se elige con M3DI. El mismo *k* y las mismas épocas en el control bf16 (P10). |
@@ -662,7 +665,7 @@ Los valores "nuestro" marcados **PENDIENTE** no se fijan: no hay justificación 
 | Y-Decoder: entrada | sin fuente | embedding normalizado a norma 1 | InfoNCE no supervisa la norma de `Ŝ_Y`; sin normalizar, una diferencia de norma con `S_Y` sacaría al decodificador de distribución. Diseño propio. |
 | Cuantización del encoder visual | no aplica: los papers de los VLM no cuantizan; [8] cuantiza el modelo base completo | NF4, igual en los 4 modelos | Enunciado y comparabilidad. Ver §2.1. |
 | Sonda de información | MLP de 1 capa oculta (discretos), kernel ridge (continuos) [1, §5.2]; sin hiperparámetros | igual; grilla elegida en un 20 % retenido: capa oculta ∈ {64, 256, 1024}, weight decay ∈ {1e-4, 1e-2}; núcleo RBF con ancho ∈ {0.25, 1, 4} × heurística de la mediana y α ∈ {1e-3, 1e-1, 10} | Protocolo de [1]. La grilla es propuesta propia (D8), igual en todos los puntos de medición; debe declararse en el informe. |
-| Temperatura InfoNCE | no indicada en [5]; 0.07 en `open-vljepa` | PENDIENTE (candidato: la del checkpoint) | Mantener la del checkpoint evita desajustar el espacio preentrenado. |
+| Temperatura InfoNCE | no indicada en [5]; 0.07 en `open-vljepa` (`configs/stage_b_retrain.yaml`) | **Propuesta:** 0.07, fija | La del checkpoint: evita desajustar el espacio preentrenado. A confirmar. |
 | Resolución (LLaVA-OV) | 384 px + AnyRes hasta 729×10 tokens [2408.03326, Ap. C.1] | preprocesado por defecto del checkpoint; PENDIENTE si se limita AnyRes | Las imágenes de M3DI son pequeñas (224 px [repo, sin verificar]); el model card manda [CLAUDE.md §2]. |
 | Resolución (InternVL3) | teselas de 448 px, 256 tokens por tesela [2504.10479, §2.1] | preprocesado por defecto; PENDIENTE el máximo de teselas | Ídem. |
 | Resolución (Qwen3.5) | sin fuente en la carpeta | PENDIENTE (model card) | — |
@@ -833,12 +836,16 @@ forma explícita y testeada.
 | — | ~~Y-Decoder: *k* = 4 y 10 épocas para todos los decodificadores~~. Reemplazada por la fila siguiente. | usuario, 16-11-2026 |
 | C5′ | Y-Decoder de la etapa 1 **genérico**: entrenado solo con captions de MSR-VTT `train_7k`, mejor paso por CIDEr en `test_1k`, *k* barrido en MSR-VTT. Los ajustados a M3DI (condición intermedia y etapa 2) continúan desde él. Se agrega la condición intermedia (VL-JEPA preentrenado + lector ajustado a M3DI) también al plan de test (`configs/final_test.yaml`). | usuario, 16-11-2026 |
 | — | Lectura de las condiciones bf16 frente al enunciado: son controles, no resultados principales (§2.1, *Control sin cuantizar*). | usuario, 16-11-2026 |
+| — | Y-Decoder genérico: *k* = 8. Mejor CIDEr en MSR-VTT `test_1k` con 1 época (k=1 1.321, k=4 1.384, k=8 1.439), adelante en las 7 evaluaciones con el mismo orden de datos; techo en M3DI ≈ 0.12 en los tres, no interviene. El ganador se entrena hasta 3 épocas, NF4 y bf16. | Claude, regla acordada (16-11-2026) |
+| P7 | Selección del checkpoint de VL-JEPA en la etapa 2: InfoNCE bidireccional en val (mínima), en lotes fijos del tamaño del lote efectivo. Diferencia declarada frente a los VLM (`attr_mean`). Contradice la letra de CLAUDE.md §3 ("mejor en val según exactitud por atributo") para VL-JEPA: pendiente de actualizar CLAUDE.md (P4). | usuario, 16-11-2026 |
+| P9 | `y_encoder.projector` con el LR del conector (completo), no ×0.05. Lectura de [5] §3.1; open-vljepa la entrena a ×0.05 y la diferencia se declara (§4). | usuario, 16-11-2026 |
+| P5 | Hiperparámetros de la etapa 2: propuesta citada en `configs/train/budget.yaml` (§4, "Propuesta") y LR por barrido corto en val (`stage2_sweep.txt`). La corrida completa queda bloqueada (`train.hparams_confirmed: false`) hasta que el usuario confirme los valores. | usuario, 16-11-2026 |
 
 ### 6.2 Abiertas
 
 | # | Decisión | Propuesta de este documento | Bloquea |
 |---|---|---|---|
-| §4 | Valores PENDIENTE de la tabla de adaptaciones (r, α, dropout, LR, esquema, lote efectivo, longitudes) y los del Y-Decoder. | Barrido corto en val o model cards, a acordar. | etapa 2 |
+| §4 | Confirmar la propuesta de hiperparámetros de la etapa 2 (filas "Propuesta" de §4) y P8 tras la prueba de humo; LR por barrido. Épocas del Y-Decoder ajustado a M3DI (intermedio y etapa 2). | §4 y `configs/train/budget.yaml` | corrida completa de la etapa 2 |
 | §7 | Agregar a `docs/papers/` las referencias externas y verificarlas antes de citarlas. | — | informe |
 
 ---
