@@ -3,11 +3,11 @@
 # score.py que la etapa 1: la comparación zero-shot vs ajustado usa la misma evaluación (CLAUDE.md §3).
 # Prompt p1_attributes en los 4 (decisión del usuario). stage=finetuned -> exp_id finetuned_<model>_<quant>_p1_attributes_val.
 #
-# Reemplazar ANTES de lanzar (exp_id de stage2_train.txt; <LR> = el ganador del barrido, p. ej. 0.0002):
-#   <TRAIN_QWEN>      train_qwen35_08b_base_nf4_p1_attributes_r64_lr<LR>_e1         (y _bf16_ para el control)
-#   <TRAIN_INTERNVL>  train_internvl3_1b_nf4_p1_attributes_r64_lr<LR>_e1
-#   <TRAIN_LLAVA>     train_llava_ov_05b_nf4_p1_attributes_r64_lr<LR>_e1
-#   <TRAIN_VLJEPA>    train_vljepa_open_msrvtt_nf4_p1_attributes_r64_lr<LR>_e1
+# Reemplazar ANTES de lanzar (exp_id de stage2_train.txt con la combinación ganadora de la grilla: r<R>_lr<LR>[_c<C>], p. ej. r64_lr0.0002):
+#   <TRAIN_QWEN>      train_qwen35_08b_base_nf4_p1_attributes_r<R>_lr<LR>[_c<C>]_e1         (y _bf16_ para el control)
+#   <TRAIN_INTERNVL>  train_internvl3_1b_nf4_p1_attributes_r<R>_lr<LR>[_c<C>]_e1
+#   <TRAIN_LLAVA>     train_llava_ov_05b_nf4_p1_attributes_r<R>_lr<LR>[_c<C>]_e1
+#   <TRAIN_VLJEPA>    train_vljepa_open_msrvtt_nf4_p1_attributes_r<R>_lr<LR>[_c<C>]_e1
 #   <YDEC_FT>         ydec_vljepa_open_msrvtt_nf4_ft_nf4_k8_r64_e<E>_cont   (configs/queues/ydecoder_msrvtt.txt §4)
 # Comprobar que no quedan marcadores:   grep -n '<' configs/queues/stage2_val.txt | grep -v '^.*#'
 #

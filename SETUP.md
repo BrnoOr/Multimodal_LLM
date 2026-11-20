@@ -72,7 +72,7 @@ Qwen3.5 requiere transformers ≥ 5.17. Sus capas Gated DeltaNet usan kernels r�
 3. Smoke test: `scripts/launch.sh smoke uv run --no-sync python scripts/smoke.py --set model.bank.max_captions=2000`.
 4. Extractor de atributos con tests (≈100 % sobre captions de referencia).
 5. Etapa 1: `configs/queues/stage1_pilot.txt` → `stage1_full.txt` (+ una cola con `model.quant=bf16`).
-6. Etapa 2: QLoRA con `configs/train/budget.yaml` común: `stage2_smoke` → `stage2_sweep` (LR) → `stage2_train` (NF4 y control bf16) → Y-Decoder sobre el VL-JEPA ajustado → `stage2_infoloss` (ver `docs/metodologia.md` §2.3). Requiere el extra `dev`.
+6. Etapa 2: QLoRA con `configs/train/budget.yaml` común: `stage2_smoke` → `stage2_grid` (LR × r × conector, `configs/train/grid.yaml`) → `stage2_train` (NF4 y control bf16) → Y-Decoder sobre el VL-JEPA ajustado → `stage2_infoloss` (ver `docs/metodologia.md` §2.3). Requiere el extra `dev`.
 
 ## 5. Problemas frecuentes
 

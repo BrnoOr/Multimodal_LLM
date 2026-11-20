@@ -55,6 +55,10 @@ intermedia** y las **sondas** de §2.5.
 - **P7:** VL-JEPA se selecciona por la InfoNCE en val (mínima). Contradice la letra de CLAUDE.md §3 para VL-JEPA → P4.
 - **P9:** `y_encoder.projector` con el LR del conector (completo). open-vljepa la entrena a ×0.05: se declara.
 - **P5:** código + propuesta citada; LR por barrido corto en val ({1e-4, 2e-4, 5e-4}, 150 pasos × 128).
+- **G1 (20-11-2026): grilla completa de hiperparámetros**, reemplaza al barrido de solo LR: LR {1e-4, 2e-4, 5e-4} ×
+  LoRA r {16, 64} (α = 16 fijo) × multiplicador del conector {1, 5}; 48 corridas de 150 pasos, solo NF4, **ganador por
+  modelo** (diferencia de protocolo que se declara). `configs/train/grid.yaml` → `scripts/make_grid.py` →
+  `configs/queues/stage2_grid{,_g0,_g1}.txt`; resultado con `scripts/summarize_train.py --winners`. Sin ejecutar.
 - Pendiente del usuario: confirmar la propuesta (filas "Propuesta" de `metodologia.md` §4), P8 tras el humo,
   épocas del Y-Decoder ajustado a M3DI (intermedio y etapa 2), y autorizar la actualización de CLAUDE.md (P4).
 - **Verificado en el cluster (19-11-2026): el tokenizador de Llama-3.2 se carga con `padding_side = "left"`**
@@ -86,7 +90,7 @@ intermedia** y las **sondas** de §2.5.
 | 5 | VL-JEPA en val con el genérico (piloto 200 × 6 prompts → val completo → prompt) | cluster | 2, 3 |
 | 6 | Decidir épocas del decodificador intermedio y entrenarlo; VL-JEPA con él; control bf16 | usuario → cluster | 3 |
 | 7 | Pérdida de información de la etapa 1 (`stage1_infoloss`, humo primero) | cluster | 3 |
-| 8 | Revisar humo de la etapa 2 → P8 → `stage2_sweep.txt` → confirmar hiperparámetros | Claude + usuario | 4 |
+| 8 | Revisar humo de la etapa 2 → P8 → grilla (`stage2_grid.txt`, `docs/pasos_cluster.md` B4) → confirmar hiperparámetros | Claude + usuario | 4 |
 | 9 | Actualizar `resultados_etapa1.md` y **aprobación del cierre de la etapa 1** | laptop | 5–7 |
 | 10 | `stage2_train.txt` → Y-Decoder de la etapa 2 (`ydecoder_msrvtt.txt` §4) → `stage2_infoloss.txt` | cluster | 8, 9 |
 

@@ -12,7 +12,7 @@ Datos: train completo (125 000 imágenes) para ajustar y val (500 fijas) para el
 con el `adapter_best` de cada modelo anotado en configs/final_test.yaml.
 
 Mientras `train.hparams_confirmed` sea false (configs/train/budget.yaml) solo se aceptan corridas cortas
-(`train.max_steps`): la prueba de humo y el barrido de LR (configs/queues/stage2_sweep.txt).
+(`train.max_steps`): la prueba de humo y la grilla de hiperparámetros (configs/queues/stage2_grid.txt).
 
 En el cluster, desacoplado de SSH:
     SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_smoke scripts/run_queue.sh configs/queues/stage2_smoke.txt

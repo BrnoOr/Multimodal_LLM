@@ -9,16 +9,18 @@
 La config del modelo es la de inferencia, sin copias: el modelo que se entrena se carga, cuantiza y
 preprocesa igual que en la etapa 1 y que en la evaluación final.
 
-El archivo por modelo solo puede tocar `ALLOWED_MODEL_KEYS`. `train.lr` está permitido porque el LR de
-LoRA se elige por modelo con el mismo barrido en val (decisión del usuario 16-11-2026); el resto del
-presupuesto (épocas, lote efectivo, esquema, r, α...) es común. Desde la línea de comandos se puede
-cambiar todo, y el cambio queda en config.yaml del run (y en el exp_id lo que lo distingue).
+El archivo por modelo solo puede tocar `ALLOWED_MODEL_KEYS`. Los tres ejes de la grilla de hiperparámetros
+(`train.lr`, `lora.r`, `train.connector_lr_mult`) están permitidos porque se eligen POR MODELO con la misma
+grilla completa en val (decisiones del usuario 16-11-2026 y 20-11-2026; configs/train/grid.yaml). El resto
+del presupuesto (épocas, lote efectivo, esquema, α, dropout...) es común. Desde la línea de comandos se
+puede cambiar todo, y el cambio queda en config.yaml del run (y en el exp_id lo que lo distingue).
 
 Candado de hiperparámetros: mientras `train.hparams_confirmed` sea false (los valores de budget.yaml son
 una propuesta, docs/metodologia.md §4), solo se aceptan corridas cortas con `train.max_steps`.
 
 exp_id por defecto:
-    train_<model.name>_<quant>_<prompt>_r<r>_lr<lr>_e<epochs>[_s<seed>][_m<max_steps>]
+    train_<model.name>_<quant>_<prompt>_r<r>_lr<lr>[_c<connector_lr_mult>]_e<epochs>[_s<seed>][_m<max_steps>]
+    (`_c` solo si el multiplicador del conector no es 1: los nombres anteriores no cambian)
 """
 
 from __future__ import annotations
@@ -32,8 +34,10 @@ from ..eval.attributes import METRICS
 from ..paths import CONFIGS
 
 TRAIN_CONFIGS = CONFIGS / "train"
-ALLOWED_MODEL_KEYS = {"train.micro_batch_size", "train.selection_metric", "train.lr", "lora.connector_modules",
-                      "objective.kind"}
+# Ejes de la grilla (configs/train/grid.yaml): se eligen por modelo, así que el archivo del modelo puede fijarlos.
+GRID_KEYS = ("train.lr", "lora.r", "train.connector_lr_mult")
+ALLOWED_MODEL_KEYS = {"train.micro_batch_size", "train.selection_metric", "lora.connector_modules",
+                      "objective.kind", *GRID_KEYS}
 SELECTION_METRICS = tuple(METRICS) + ("val_loss",)
 FAMILY_OBJECTIVE = {"hf": "lm", "qwen_vl": "lm", "vljepa": "infonce"}
 OPTIMIZERS = ("adamw", "paged_adamw")
@@ -80,7 +84,9 @@ def _fmt_lr(lr: float) -> str:
 
 def default_exp_id(cfg: DictConfig) -> str:
     t = cfg.train
-    return (f"train_{cfg.model.name}_{cfg.model.quant}_{cfg.prompt.id}_r{cfg.lora.r}_lr{_fmt_lr(t.lr)}_e{t.epochs}"
+    mult = float(t.connector_lr_mult)
+    return (f"train_{cfg.model.name}_{cfg.model.quant}_{cfg.prompt.id}_r{cfg.lora.r}_lr{_fmt_lr(t.lr)}"
+            + (f"_c{mult:g}" if mult != 1.0 else "") + f"_e{t.epochs}"
             + (f"_s{cfg.seed}" if int(cfg.seed) != 0 else "")
             + (f"_m{t.max_steps}" if t.get("max_steps") else ""))
 
@@ -115,6 +121,9 @@ def validate(cfg: DictConfig) -> None:
     missing = [k for k in REQUIRED if OmegaConf.select(cfg, k) in (None, "", "null")]
     if missing:
         raise ValueError(f"Hiperparámetros sin valor: {missing}. Cada uno necesita fuente (docs/metodologia.md §4).")
+    if int(cfg.lora.r) <= 0 or float(t.connector_lr_mult) <= 0 or float(t.lr) <= 0:
+        raise ValueError(f"lora.r={cfg.lora.r}, train.lr={t.lr} y train.connector_lr_mult={t.connector_lr_mult} "
+                         "deben ser positivos")
     if t.get("max_steps") in ("", "null"):
         t.max_steps = None
     if not bool(t.hparams_confirmed) and not t.get("max_steps"):

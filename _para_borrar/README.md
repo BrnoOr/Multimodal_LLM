@@ -15,6 +15,7 @@ bajo esta carpeta y el usuario decide cuándo eliminarlos. Motivo detallado en `
 | `src/vlmfid/eval/probe.py`, `src/vlmfid/eval/infoloss.py`, `scripts/probe.py`, `scripts/info_loss.py` (versión anterior), `tests/test_infoloss.py` | Sondas lineales y pérdida de información basadas en el banco y en categorías de color. Reemplazadas por `src/vlmfid/eval/probes.py` y el nuevo `scripts/info_loss.py` (docs/metodologia.md §2.5). |
 | `src/vlmfid/train/{config,collate,jepa,objectives,evaluate,loop,lora}.py`, `scripts/train.py`, `configs/train_anterior/`, `tests/test_train_{units,e2e}.py` (versiones anteriores) | Etapa 2 del protocolo anterior (objetivo canónico, split composicional, banco de VL-JEPA, métricas `macro`/`shape_pos`, test al final del entrenamiento). Reescritos en su lugar el 16-11-2026 según `docs/metodologia.md` §2.3. |
 | `src/vlmfid/data/targets.py`, `tests/test_targets.py`, `notebooks/06_eda_splits.ipynb` | Objetivo canónico y split composicional, que el protocolo actual no usa (el objetivo es el caption original). |
+| `configs/queues/stage2_sweep.txt` | Barrido de solo LR de la etapa 2. Reemplazado el 20-11-2026 por la grilla completa LR × r × multiplicador del conector (`configs/train/grid.yaml`, `configs/queues/stage2_grid.txt`), que incluye esas 12 corridas (r = 64, multiplicador 1). |
 
 ## Pendiente de mover o reescribir
 

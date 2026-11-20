@@ -1,4 +1,4 @@
-"""scripts/summarize_train.py: lectura de runs de la etapa 2 y regla del barrido de LR.
+"""scripts/summarize_train.py: lectura de runs de la etapa 2 y regla de la grilla.
 
 Construye carpetas de run sintéticas con los mismos archivos que escribe vlmfid.train.loop.
 """
@@ -15,12 +15,14 @@ import summarize_train as st  # noqa: E402
 
 
 def _run(tmp: Path, name: str, model: str, lr: float, metric: str, val: list[tuple[int, float]],
-         mem=(10.0, 12.5)) -> Path:
+         mem=(10.0, 12.5), r=64, mult=1.0, status="completed") -> Path:
     d = tmp / name
     d.mkdir()
-    OmegaConf.save(OmegaConf.create({"exp_id": name, "model": {"name": model, "quant": "nf4"},
-                                     "train": {"lr": lr, "selection_metric": metric, "max_steps": 150}}),
+    OmegaConf.save(OmegaConf.create({"exp_id": name, "model": {"name": model, "quant": "nf4"}, "lora": {"r": r},
+                                     "train": {"lr": lr, "selection_metric": metric, "max_steps": 150,
+                                               "connector_lr_mult": mult}}),
                    d / "config.yaml")
+    (d / "status.json").write_text(json.dumps({"status": status}))
     with (d / "train_log.jsonl").open("w") as f:
         f.write(json.dumps({"step": 10, "loss": 2.0, "peak_mem_gb": mem[0], "micro_batch": 16}) + "\n")
         f.write("{truncada\n")
@@ -63,3 +65,19 @@ def test_main_escribe_tabla(tmp_path, monkeypatch):
     b = _run(tmp_path, "b", "qwen", 2e-4, "attr_mean", [(0, 0.4), (150, 0.6)])
     assert st.main([str(a), str(b), "--table", "t", "--winners"]) == 0
     assert (tmp_path / "_tablas" / "t.csv").exists()
+
+
+def test_ganador_de_la_grilla_entre_r_y_conector(tmp_path):
+    rows = [st.summarize_run(_run(tmp_path, f"g{i}", "qwen", lr, "attr_mean", [(0, 0.4), (150, v)], r=r, mult=c))
+            for i, (lr, r, c, v) in enumerate([(1e-4, 16, 1.0, 0.50), (1e-4, 64, 5.0, 0.62),
+                                               (2e-4, 16, 5.0, 0.58), (2e-4, 64, 1.0, 0.61)])]
+    w = st.sweep_winners(rows)[("qwen", "nf4")]
+    assert (w["lr"], w["lora_r"], w["connector_lr_mult"]) == (1e-4, 64, 5.0)
+
+
+def test_run_cortado_no_compite(tmp_path):
+    # el run cortado en el paso 50 tiene mejor valor, pero no llegó al último paso de su modelo
+    rows = [st.summarize_run(_run(tmp_path, "full", "qwen", 1e-4, "attr_mean", [(0, 0.4), (150, 0.5)])),
+            st.summarize_run(_run(tmp_path, "cut", "qwen", 2e-4, "attr_mean", [(0, 0.4), (50, 0.9)],
+                                  status="interrupted"))]
+    assert st.sweep_winners(rows)[("qwen", "nf4")]["exp_id"] == "full"

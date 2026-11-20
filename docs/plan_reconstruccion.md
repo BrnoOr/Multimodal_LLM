@@ -162,7 +162,7 @@ y ajustado bf16, en test. Tablas y figuras del informe en notebooks nuevos que i
 | P2 | Agregado para seleccionar (A4): media de forma, x, y y color. | Por defecto, revisable. |
 | P3 | Alcance de la decisión "prompt 1": se interpretó como `p1_attributes` en los 4 modelos para la etapa 2, manteniendo varios prompts en la etapa 1. Si significaba usar solo `p1` también en la etapa 1, el plan se simplifica, pero se pierde la pregunta del enunciado sobre sensibilidad al prompt. | A confirmar. |
 | P4 | Actualizar CLAUDE.md §3 con las decisiones que lo contradicen (prompt de la etapa 2; controles bf16; Y-Decoder). | Requiere autorización: es el archivo de instrucciones del proyecto. |
-| P5 | Hiperparámetros de M §4 (paso 2.0). | **Propuesta citada en `configs/train/budget.yaml` (16-11-2026)**; LR por barrido corto en val (`stage2_sweep.txt`). Corrida completa bloqueada (`train.hparams_confirmed`) hasta que el usuario confirme. |
+| P5 | Hiperparámetros de M §4 (paso 2.0). | **Propuesta citada en `configs/train/budget.yaml` (16-11-2026)**; LR, r y conector por grilla completa en val (`configs/train/grid.yaml`, G1, 20-11-2026). Corrida completa bloqueada (`train.hparams_confirmed`) hasta que el usuario confirme. |
 | P6 | Java en el cluster para `pycocoevalcap`. | Se comprueba en el paso 1.0. |
 | P7 | Selección de checkpoint en VL-JEPA (paso 2.2). | **Resuelto (usuario, 16-11-2026):** InfoNCE bidireccional en val (mínima), en lotes fijos. Diferencia declarada frente a los VLM (M §6.1). |
 | P8 | Lote efectivo común (parte de P5). VL-JEPA necesita que su lote físico sea igual al efectivo (M §2.3). | Propuesta: 128 ([5] §4.5); 64 si no cabe. **Se mide en `stage2_smoke.txt`** (pico de memoria de VL-JEPA, NF4 y bf16). |
@@ -178,7 +178,7 @@ y ajustado bf16, en test. Tablas y figuras del informe en notebooks nuevos que i
 |---|---|
 | `src/vlmfid/train/` (config, collate, objectives, jepa, lora, evaluate, loop) y `scripts/train.py` | reescritos con el protocolo de M §2.3: caption original, `p1_attributes`, LoRA en todas las lineales + conector, VL-JEPA opción A (LoRA en Predictor e Y-Encoder ×0.05, proyecciones completas, InfoNCE bidireccional del lote), selección `attr_mean` / InfoNCE (P7), sin test. Versiones anteriores en `_para_borrar/`. |
 | `configs/train/` | propuesta de hiperparámetros con fuente; candado `train.hparams_confirmed` |
-| Colas | `stage2_smoke`, `stage2_sweep` (LR), `stage2_train` (NF4 + bf16), `stage2_infoloss`; Y-Decoder de la etapa 2 en `ydecoder_msrvtt.txt` §4 |
+| Colas | `stage2_smoke`, `stage2_grid` (LR × r × conector, generada desde `configs/train/grid.yaml`; reemplaza a `stage2_sweep`, 20-11-2026), `stage2_train` (NF4 + bf16), `stage2_infoloss`; Y-Decoder de la etapa 2 en `ydecoder_msrvtt.txt` §4 |
 | Tests | `tests/test_train_units.py`, `tests/test_train_e2e.py` reescritos (incluye la equivalencia de la consulta sin relleno); **no ejecutados** (se corren en el cluster) |
 | Agregado 19-11-2026 | `scripts/summarize_train.py` (+ test), cola `stage2_val.txt` (adapter_best en val completo, P1), guía `docs/pasos_cluster.md` |
 | Falta | correr tests y humo; P8; barrido; confirmar hiperparámetros; épocas del Y-Decoder ajustado; actualizar CLAUDE.md §3 (P4: prompt de la etapa 2, controles bf16, Y-Decoder y ahora P7) |

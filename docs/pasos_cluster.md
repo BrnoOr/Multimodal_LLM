@@ -203,13 +203,13 @@ las tablas de §3, §7 y §12 del notebook y `runs/_tablas/etapa1_val.csv`. Clau
 | # | Qué | Dónde | Cuándo |
 |---|---|---|---|
 | P8 | Lote efectivo común: 128 (propuesta, [5] §4.5) o 64 si VL-JEPA no cabe | `configs/train/budget.yaml` | tras B2 (memoria medida) |
-| P5 | Confirmar la propuesta: optimizador, esquema, warmup, `max_grad_norm`, LoRA r/α/dropout, LR del conector, weight decay (filas "Propuesta" de `docs/metodologia.md` §4) | `configs/train/budget.yaml` → `train.hparams_confirmed: true` | tras B4 |
-| LR | LR ganador por modelo (barrido, B4) | `configs/train/models/<modelo>.yaml` (`train.lr`) | tras B4 |
+| P5 | Confirmar la propuesta: optimizador, esquema, warmup, `max_grad_norm`, LoRA α/dropout, weight decay (filas "Propuesta" de `docs/metodologia.md` §4) | `configs/train/budget.yaml` → `train.hparams_confirmed: true` | tras B4 |
+| Grilla | Combinación ganadora por modelo (LR, r, conector; B4) | `configs/train/models/<modelo>.yaml` (`train.lr`, `lora.r`, `train.connector_lr_mult`) | tras B4 |
 | Épocas | Épocas del Y-Decoder ajustado a M3DI (mismo valor que A6) | `configs/ydecoder.yaml` | antes de A6 |
 | P4 | Autorizar la actualización de CLAUDE.md §3 (prompt de la etapa 2, controles bf16, Y-Decoder, P7) | `CLAUDE.md` | cuando quieras |
 
 Mientras `train.hparams_confirmed` sea `false`, `scripts/train.py` solo acepta corridas cortas (`train.max_steps`):
-el humo (B2) y el barrido (B4) se pueden correr ya; el ajuste completo (B5), no.
+el humo (B2) y la grilla (B4) se pueden correr ya; el ajuste completo (B5), no.
 
 ### B1. Tests del entrenamiento
 
@@ -259,30 +259,44 @@ grep -hE "\[train\] modelo listo|\[train\] grupos de LR|query_tokens" logs/s2_sm
 ### B3. Ajustar el lote si P8 = 64
 
 Solo si VL-JEPA no cabe con 128: Claude cambia `train.effective_batch_size` a 64 en `configs/train/budget.yaml`
-(para los cuatro, por comparabilidad) y ajusta el barrido. Push → `git pull` → repetir solo la línea de humo de
+(para los cuatro, por comparabilidad) y regenera la grilla (`scripts/make_grid.py`). Push → `git pull` → repetir solo la línea de humo de
 VL-JEPA para confirmar.
 
-### B4. Barrido corto de LR ({1e-4, 2e-4, 5e-4}, 150 pasos × lote, en val)
+### B4. Grilla de hiperparámetros (LR × r × conector, 150 pasos × lote, en val)
 
-12 corridas (3 LR × 4 modelos), solo NF4. Repartidas por modelo entre las dos GPU:
-
-```bash
-grep -E '^model=(vljepa|qwen35)' configs/queues/stage2_sweep.txt > /tmp/s2_sweep_g0.txt
-grep -E '^model=(internvl3|llava_ov)' configs/queues/stage2_sweep.txt > /tmp/s2_sweep_g1.txt
-wc -l /tmp/s2_sweep_g0.txt /tmp/s2_sweep_g1.txt
-SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_sweep_g0 scripts/run_queue.sh /tmp/s2_sweep_g0.txt
-SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2_sweep_g1 scripts/run_queue.sh /tmp/s2_sweep_g1.txt
-```
-
-Al terminar:
+Grilla completa, decidida el 20-11-2026 (`configs/train/grid.yaml`; `docs/metodologia.md` §6.1, G1):
+LR {1e-4, 2e-4, 5e-4} × LoRA r {16, 64} (α = 16 fijo) × multiplicador del LR del conector {1, 5} = 12 combinaciones
+por modelo, **48 corridas**, solo NF4. Ganador **por modelo**. Primero, verificar que la cola versionada coincide con
+la grilla (falla si alguien editó una de las dos):
 
 ```bash
-uv run --no-sync python scripts/summarize_train.py runs/train_*_m150 --table s2_sweep --winners
+uv run --no-sync python scripts/make_grid.py --check
 ```
 
-**Regla** (`configs/queues/stage2_sweep.txt`): gana el LR con mejor métrica en el **último** paso (mayor `attr_mean`
-en los VLM, menor InfoNCE en VL-JEPA), no el mejor paso. **Mandar a Claude:** la salida. Claude escribe el LR de cada
-modelo en `configs/train/models/<modelo>.yaml`, y con tu **confirmación de P5** pone `train.hparams_confirmed: true`.
+Repartida por modelo entre las dos GPU (`stage2_grid_g0.txt`: VL-JEPA e InternVL3; `stage2_grid_g1.txt`: Qwen3.5 y
+LLaVA-OV; 24 corridas cada una):
+
+```bash
+scripts/jobs.sh gpu
+SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_grid_g0 scripts/run_queue.sh configs/queues/stage2_grid_g0.txt
+SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2_grid_g1 scripts/run_queue.sh configs/queues/stage2_grid_g1.txt
+```
+
+(Una sola GPU: `SCRIPT=scripts/train.py GPU=1 scripts/launch.sh s2_grid scripts/run_queue.sh configs/queues/stage2_grid.txt`.)
+Duración: con los `img/s` del humo (B2), cada corrida procesa 150 × 128 = 19 200 imágenes más 4 evaluaciones en val.
+
+Seguimiento y resultado:
+
+```bash
+cat logs/s2_grid_g0/queue_status.tsv logs/s2_grid_g1/queue_status.tsv | awk '{print $2}' | sort | uniq -c
+uv run --no-sync python scripts/summarize_train.py runs/train_*_m150 --table s2_grid --winners
+```
+
+La primera línea cuenta los códigos de salida (todos deben ser `0`). **Regla** (`configs/train/grid.yaml`): por
+modelo, gana la combinación con mejor métrica en el **último** paso (mayor `attr_mean` en los VLM, menor InfoNCE en
+VL-JEPA), no el mejor paso; un run que no llegó al paso 150 no compite. **Mandar a Claude:** la salida y
+`runs/_tablas/s2_grid.csv`. Claude escribe `train.lr`, `lora.r` y `train.connector_lr_mult` de cada modelo en
+`configs/train/models/<modelo>.yaml`, y con tu **confirmación de P5** pone `train.hparams_confirmed: true`.
 Push → `git pull` en el cluster.
 
 ### B5. Ajuste completo (1 época, NF4 y control bf16)

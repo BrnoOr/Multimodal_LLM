@@ -1,0 +1,53 @@
+# GENERADO por scripts/make_grid.py desde configs/train/grid.yaml: no editar a mano.
+# Grilla completa de la etapa 2 (docs/metodologia.md §4): 12 combinaciones × 4 modelos = 48 corridas, nf4.
+# Regla: por modelo, la mejor métrica de selección en el ÚLTIMO paso evaluado (attr_mean máx. / InfoNCE mín.).
+#   SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_grid scripts/run_queue.sh configs/queues/stage2_grid.txt
+#   uv run --no-sync python scripts/summarize_train.py runs/train_*_m150 --table s2_grid --winners
+model=vljepa train.lr=0.0001 lora.r=16 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=vljepa train.lr=0.0001 lora.r=16 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=vljepa train.lr=0.0001 lora.r=64 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=vljepa train.lr=0.0001 lora.r=64 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=vljepa train.lr=0.0002 lora.r=16 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=vljepa train.lr=0.0002 lora.r=16 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=vljepa train.lr=0.0002 lora.r=64 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=vljepa train.lr=0.0002 lora.r=64 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=vljepa train.lr=0.0005 lora.r=16 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=vljepa train.lr=0.0005 lora.r=16 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=vljepa train.lr=0.0005 lora.r=64 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=vljepa train.lr=0.0005 lora.r=64 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=qwen35 train.lr=0.0001 lora.r=16 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=qwen35 train.lr=0.0001 lora.r=16 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=qwen35 train.lr=0.0001 lora.r=64 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=qwen35 train.lr=0.0001 lora.r=64 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=qwen35 train.lr=0.0002 lora.r=16 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=qwen35 train.lr=0.0002 lora.r=16 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=qwen35 train.lr=0.0002 lora.r=64 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=qwen35 train.lr=0.0002 lora.r=64 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=qwen35 train.lr=0.0005 lora.r=16 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=qwen35 train.lr=0.0005 lora.r=16 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=qwen35 train.lr=0.0005 lora.r=64 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=qwen35 train.lr=0.0005 lora.r=64 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=internvl3 train.lr=0.0001 lora.r=16 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=internvl3 train.lr=0.0001 lora.r=16 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=internvl3 train.lr=0.0001 lora.r=64 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=internvl3 train.lr=0.0001 lora.r=64 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=internvl3 train.lr=0.0002 lora.r=16 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=internvl3 train.lr=0.0002 lora.r=16 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=internvl3 train.lr=0.0002 lora.r=64 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=internvl3 train.lr=0.0002 lora.r=64 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=internvl3 train.lr=0.0005 lora.r=16 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=internvl3 train.lr=0.0005 lora.r=16 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=internvl3 train.lr=0.0005 lora.r=64 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=internvl3 train.lr=0.0005 lora.r=64 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=llava_ov train.lr=0.0001 lora.r=16 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=llava_ov train.lr=0.0001 lora.r=16 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=llava_ov train.lr=0.0001 lora.r=64 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=llava_ov train.lr=0.0001 lora.r=64 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=llava_ov train.lr=0.0002 lora.r=16 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=llava_ov train.lr=0.0002 lora.r=16 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=llava_ov train.lr=0.0002 lora.r=64 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=llava_ov train.lr=0.0002 lora.r=64 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=llava_ov train.lr=0.0005 lora.r=16 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=llava_ov train.lr=0.0005 lora.r=16 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50
+model=llava_ov train.lr=0.0005 lora.r=64 train.connector_lr_mult=1 train.max_steps=150 train.eval_every=50
+model=llava_ov train.lr=0.0005 lora.r=64 train.connector_lr_mult=5 train.max_steps=150 train.eval_every=50

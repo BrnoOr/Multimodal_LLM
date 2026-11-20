@@ -1,24 +1,27 @@
-"""Resumen de corridas de la etapa 2 (humo, barrido de LR y ajuste completo), sin GPU.
+"""Resumen de corridas de la etapa 2 (humo, grilla de hiperparámetros y ajuste completo), sin GPU.
 
     uv run --no-sync python scripts/summarize_train.py runs/train_*_m6        # humo: P8 y entrenables
-    uv run --no-sync python scripts/summarize_train.py runs/train_*_m150 --table s2_sweep   # barrido de LR
+    uv run --no-sync python scripts/summarize_train.py runs/train_*_m150 --table s2_grid --winners   # grilla
     uv run --no-sync python scripts/summarize_train.py runs/train_*_e1 --table s2_train     # ajuste completo
 
 Lee de cada run (los escribe vlmfid.train.loop): config.yaml, train_log.jsonl, val_log.jsonl,
 best.json y summary.json. Imprime una fila por run y, si hay varios, escribe runs/_tablas/<tabla>.csv.
 
 Columnas:
-    model, quant, lr, steps            identificación
+    model, quant, lr, lora_r,          identificación y ejes de la grilla (configs/train/grid.yaml)
+    connector_lr_mult, steps
     loss_first, loss_last              pérdida de entrenamiento en el primer y el último registro
     peak_mem_gb                        pico de memoria (máximo de train_log): decide P8 (lote 128 en 24 GB)
     sel_metric, sel_mode               attr_mean (máx., VLM) o val_loss (mín., VL-JEPA; P7)
     val_step0                          métrica de selección en el paso 0 (adaptador en cero = zero-shot)
-    val_last                           la del ÚLTIMO paso evaluado: regla del barrido de LR
+    val_last                           la del ÚLTIMO paso evaluado: regla de la grilla
     best_step, best_value              mejor paso en val: regla del ajuste completo (adapter_best)
     trainable_*, lora_layers_*         conteos de entrenables (summary.json; comparar con stage2_smoke.txt)
 
-Regla del barrido (configs/queues/stage2_sweep.txt): por modelo, gana el LR con mejor `val_last`
-(mayor attr_mean en los VLM, menor InfoNCE en VL-JEPA). `--winners` lo imprime.
+Regla de la grilla (configs/train/grid.yaml): por modelo, gana la combinación (LR, r, multiplicador del
+conector) con mejor `val_last` (mayor attr_mean en los VLM, menor InfoNCE en VL-JEPA). Solo compiten los runs
+que llegaron al mismo último paso que el resto de su modelo. `--winners` imprime el ganador con las tres claves
+que van a configs/train/models/<modelo>.yaml.
 """
 
 from __future__ import annotations
@@ -59,7 +62,8 @@ def summarize_run(run_dir: Path) -> dict:
     status = json.loads((run_dir / "status.json").read_text(encoding="utf-8")) \
         if (run_dir / "status.json").exists() else {}
     out = {"exp_id": str(cfg.exp_id), "model": str(cfg.model.name), "quant": str(cfg.model.quant),
-           "lr": float(cfg.train.lr), "max_steps": cfg.train.get("max_steps"),
+           "lr": float(cfg.train.lr), "lora_r": int(cfg.lora.r),
+           "connector_lr_mult": float(cfg.train.connector_lr_mult), "max_steps": cfg.train.get("max_steps"),
            "status": status.get("status"), "steps": tr[-1]["step"] if tr else 0,
            "loss_first": tr[0].get("loss") if tr else None, "loss_last": tr[-1].get("loss") if tr else None,
            "peak_mem_gb": max((r.get("peak_mem_gb", 0.0) for r in tr), default=None),
@@ -79,10 +83,18 @@ def summarize_run(run_dir: Path) -> dict:
 
 
 def sweep_winners(rows: list[dict]) -> dict[tuple[str, str], dict]:
-    """Por (modelo, quant): el run con mejor `val_last` (regla del barrido)."""
+    """Por (modelo, quant): el run con mejor `val_last` entre todas sus combinaciones (regla de la grilla).
+
+    Solo compiten los runs evaluados en el mismo último paso que el más avanzado de su modelo: un run
+    cortado a medias no se compara con uno completo."""
+    last: dict[tuple[str, str], int] = {}
+    for r in rows:
+        if r["val_last_step"] is not None:
+            key = (r["model"], r["quant"])
+            last[key] = max(last.get(key, 0), r["val_last_step"])
     out: dict[tuple[str, str], dict] = {}
     for r in rows:
-        if r["val_last"] is None:
+        if r["val_last"] is None or r["val_last_step"] != last[(r["model"], r["quant"])]:
             continue
         key = (r["model"], r["quant"])
         cur = out.get(key)
@@ -110,8 +122,8 @@ def main(argv=None) -> int:
     if not rows:
         print("[resumen] ningún run", file=sys.stderr)
         return 1
-    rows.sort(key=lambda r: (r["model"], r["quant"], r["lr"]))
-    cols = ["model", "quant", "lr", "status", "steps", "loss_first", "loss_last", "peak_mem_gb", "sel_metric",
+    rows.sort(key=lambda r: (r["model"], r["quant"], r["lr"], r["lora_r"], r["connector_lr_mult"]))
+    cols = ["model", "quant", "lr", "lora_r", "connector_lr_mult", "status", "steps", "loss_first", "loss_last", "peak_mem_gb", "sel_metric",
             "val_step0", "val_last", "best_step", "best_value"]
 
     def fmt(v):
@@ -130,9 +142,14 @@ def main(argv=None) -> int:
             w.writerows(rows)
         print(f"[resumen] tabla en {out}")
     if a.winners:
-        print("\n[resumen] ganador del barrido (último paso evaluado):")
+        print("\n[resumen] ganador por modelo (último paso evaluado) -> configs/train/models/<modelo>.yaml:")
         for (m, q), r in sorted(sweep_winners(rows).items()):
-            print(f"  {m:<22} {q:<5} lr={r['lr']:g}  {r['sel_metric']}={r['val_last']:.4f}  ({r['exp_id']})")
+            print(f"  {m:<22} {q:<5} train.lr={r['lr']:g}  lora.r={r['lora_r']}  "
+                  f"train.connector_lr_mult={r['connector_lr_mult']:g}  {r['sel_metric']}={r['val_last']:.4f}  "
+                  f"({r['exp_id']})")
+        incomplete = [r["exp_id"] for r in rows if r["status"] != "completed"]
+        if incomplete:
+            print(f"[resumen] AVISO: {len(incomplete)} runs sin completar: {incomplete[:4]}", file=sys.stderr)
     return 0
 
 

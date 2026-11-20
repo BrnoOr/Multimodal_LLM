@@ -166,7 +166,7 @@ Las respuestas de `p3_json` se leen con `vlmfid.prompts.parse_json_response`, to
 
 ```bash
 SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_smoke scripts/run_queue.sh configs/queues/stage2_smoke.txt
-SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_sweep scripts/run_queue.sh configs/queues/stage2_sweep.txt
+SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_grid scripts/run_queue.sh configs/queues/stage2_grid.txt   # grilla LR × r × conector
 SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_train scripts/run_queue.sh configs/queues/stage2_train.txt
 ```
 

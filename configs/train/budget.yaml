@@ -15,7 +15,7 @@
 #   * selección: VLM por attr_mean en val; VL-JEPA por la InfoNCE en val (P7, decisión del usuario 16-11-2026)
 #
 # Hiperparámetros: PROPUESTA A CONFIRMAR (decisión del usuario 16-11-2026: código + propuesta citada, y
-# LR por barrido corto en val, configs/queues/stage2_sweep.txt). Mientras `train.hparams_confirmed` sea
+# grilla corta en val de LR × r × conector, configs/train/grid.yaml, 20-11-2026). Mientras `train.hparams_confirmed` sea
 # false, `compose_train` solo deja lanzar corridas cortas (con train.max_steps): humo y barrido.
 #
 # Uso: uv run --no-sync python scripts/train.py model=<llava_ov|internvl3|qwen35|vljepa> [clave=valor ...]
@@ -47,7 +47,7 @@ train:
   drop_last: false              # se usan las 125 000 imágenes; el último paso lleva el resto
   optimizer: adamw              # A CONFIRMAR. [8] usa paged AdamW, crítico solo en 33B/65B (§4); con 0.5-1B el
                                 #   estado del optimizador es chico. adamw | paged_adamw
-  # LR de LoRA. A CONFIRMAR POR BARRIDO (stage2_sweep.txt): {1e-4, 2e-4, 5e-4}. 2e-4 es el de [8] Tabla 9
+  # LR de LoRA. POR GRILLA (configs/train/grid.yaml), por modelo: {1e-4, 2e-4, 5e-4}. 2e-4 es el de [8] Tabla 9
   # para 7B/13B; 1e-4 el de 33B/65B. El ganador por modelo va a configs/train/models/<modelo>.yaml.
   lr: 2.0e-4
   # Conector y proyecciones de VL-JEPA, como múltiplo del LR de LoRA. A CONFIRMAR. 1.0: open-vljepa entrena

@@ -13,9 +13,11 @@ train:
   # P7 (decisión del usuario, 16-11-2026): durante el ajuste no hay Y-Decoder válido (el Y-Encoder cambia),
   # así que el paso se elige por la InfoNCE en val (mínima). Diferencia declarada frente a los VLM.
   selection_metric: val_loss
-  # lr: <ganador del barrido>   (configs/queues/stage2_sweep.txt)
+  # lr: <ganador de la grilla>   (configs/train/grid.yaml; scripts/summarize_train.py --winners)
+  # connector_lr_mult: <ganador de la grilla>
 
 lora:
+  # r: <ganador de la grilla>   (α = 16 queda común, budget.yaml)
   connector_modules: [predictor.vis_proj, predictor.out_proj, y_encoder.projector]
 
 objective:
