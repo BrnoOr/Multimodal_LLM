@@ -18,24 +18,26 @@
 
 limit: null        # null = test completo (10 000 imágenes)
 
+# Prompts zero-shot: elegidos en val por attr_mean (docs/resultados_etapa1.md §4 y §7d), anotados al cerrar la
+# etapa 1 (20-11-2026). El control bf16 usa el prompt elegido en NF4.
 entries:
   # ── LLaVA-OneVision-0.5B ──────────────────────────────────────────────────────────────────────
-  - {label: llava_ov_zs_nf4,   model: llava_ov,  quant: nf4,  prompt: null}
-  - {label: llava_ov_zs_bf16,  model: llava_ov,  quant: bf16, prompt: null}
+  - {label: llava_ov_zs_nf4,   model: llava_ov,  quant: nf4,  prompt: p3_json}
+  - {label: llava_ov_zs_bf16,  model: llava_ov,  quant: bf16, prompt: p3_json}
   - {label: llava_ov_ft_nf4,   model: llava_ov,  quant: nf4,  prompt: p1_attributes, needs_adapter: true, adapter_path: null}
   - {label: llava_ov_ft_bf16,  model: llava_ov,  quant: bf16, prompt: p1_attributes, needs_adapter: true, adapter_path: null}
   # ── InternVL3-1B ──────────────────────────────────────────────────────────────────────────────
-  - {label: internvl3_zs_nf4,  model: internvl3, quant: nf4,  prompt: null}
-  - {label: internvl3_zs_bf16, model: internvl3, quant: bf16, prompt: null}
+  - {label: internvl3_zs_nf4,  model: internvl3, quant: nf4,  prompt: p1_attributes}
+  - {label: internvl3_zs_bf16, model: internvl3, quant: bf16, prompt: p1_attributes}
   - {label: internvl3_ft_nf4,  model: internvl3, quant: nf4,  prompt: p1_attributes, needs_adapter: true, adapter_path: null}
   - {label: internvl3_ft_bf16, model: internvl3, quant: bf16, prompt: p1_attributes, needs_adapter: true, adapter_path: null}
   # ── Qwen3.5-0.8B-Base ─────────────────────────────────────────────────────────────────────────
-  - {label: qwen35_zs_nf4,     model: qwen35,    quant: nf4,  prompt: null}
-  - {label: qwen35_zs_bf16,    model: qwen35,    quant: bf16, prompt: null}
+  - {label: qwen35_zs_nf4,     model: qwen35,    quant: nf4,  prompt: p1_attributes}
+  - {label: qwen35_zs_bf16,    model: qwen35,    quant: bf16, prompt: p1_attributes}
   - {label: qwen35_ft_nf4,     model: qwen35,    quant: nf4,  prompt: p1_attributes, needs_adapter: true, adapter_path: null}
   - {label: qwen35_ft_bf16,    model: qwen35,    quant: bf16, prompt: p1_attributes, needs_adapter: true, adapter_path: null}
   # ── VL-JEPA (texto vía Y-Decoder) ─────────────────────────────────────────────────────────────
-  - {label: vljepa_zs_nf4,     model: vljepa,    quant: nf4,  prompt: null, needs_decoder: true, decoder_path: runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best}
+  - {label: vljepa_zs_nf4,     model: vljepa,    quant: nf4,  prompt: p4m_multiexample, needs_decoder: true, decoder_path: runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/decoder_best}
   # RETIRADAS por el cierre de la etapa 1 sin más entrenamientos (decisión del usuario, 20-11-2026; M §6.1, CE1):
   # sus decodificadores (genérico bf16, A3; intermedio, A6) no se entrenaron. Se declara en el informe.
   # - {label: vljepa_zs_bf16,    model: vljepa,    quant: bf16, prompt: null, needs_decoder: true, decoder_path: null}
