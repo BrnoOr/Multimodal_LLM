@@ -235,6 +235,33 @@ salida en precisión completa; fuente: documentación de la biblioteca, no un pa
   media, entre −0.087 y −0.156 por imagen, con el mismo signo en las cuatro. El relleno no la explicaba.
   Las demás mediciones de la etapa 1 no pasan por el Predictor (VLM, Y-Decoder y su techo).
 
+  **Diagnóstico por componente (A2, 20-11-2026; `scripts/diag_quant_vljepa.py`, job `diag_quant`).** Se mide en
+  1 024 imágenes de val, con `p1_attributes`, el mismo subconjunto en las cinco condiciones. InfoNCE en lotes fijos
+  de 128 (azar ≈ ln 128 = 4.85). Coseno por etapa contra bf16: E1 = X-Encoder, E2/E3 = Predictor, T1 = S_Y.
+
+  | Condición | cos(Ŝ_Y, S_Y) | Δ contra bf16 | R@1 p→t / t→p | InfoNCE | E1 | E2 | E3 | T1 |
+  |---|---|---|---|---|---|---|---|---|
+  | bf16 (referencia) | 0.682 | — | 0.002 / 0.001 | 5.024 | — | — | — | — |
+  | NF4 completo | 0.545 | −0.138 | 0.002 / 0.001 | 5.089 | 0.993 | 0.983 | 0.989 | **0.876** |
+  | NF4 solo X-Encoder | 0.681 | −0.001 | 0.002 / 0.007 | 5.022 | 0.993 | 0.986 | 0.990 | 1.000 |
+  | NF4 solo Predictor | 0.685 | +0.003 | 0.001 / 0.002 | 5.027 | 1.000 | 0.996 | 0.998 | 1.000 |
+  | NF4 solo Y-Encoder | 0.540 | **−0.142** | 0.002 / 0.001 | 5.126 | 1.000 | 1.000 | 1.000 | **0.876** |
+
+  - **La cuantización por componente está aislada.** Las etapas que no dependen del componente cuantizado dan
+    1.000 contra bf16. Los efectos son aditivos: la suma de las tres Δ (−0.141) ≈ la Δ de NF4 completo (−0.138).
+  - **El Y-Encoder explica toda la brecha** (−0.142 de −0.138). X-Encoder y Predictor en NF4 casi no cambian
+    nada (coseno contra bf16 ≥ 0.99). En cambio, S_Y del Y-Encoder (EmbeddingGemma-300m) en NF4 queda con
+    coseno 0.876 contra su versión bf16. Cumple el criterio propuesto para revisar la cuantización (≥ 70 % de la
+    caída y < 0.95 frente a ≥ 0.99), sea cual sea el umbral exacto.
+  - **Sin discriminación ni siquiera en bf16:** R@1 ≈ 1/1 024 y una InfoNCE por encima de ln 128 en las cinco
+    condiciones. Para el checkpoint MSR-VTT, Ŝ_Y no distingue entre imágenes de M3DI por recuperación. El
+    coseno de 0.68 con su propio S_Y no implica correspondencia si los captions de M3DI (plantillas casi
+    iguales) son igual de parecidos entre sí. Pendiente: medir la similitud con los captions de otras imágenes
+    para confirmarlo.
+  - Pendiente antes de decidir: (a) si la caída del Y-Encoder es un error de la cuantización manual o una
+    sensibilidad real del modelo a NF4 (comparar con la carga estándar de `transformers` + `BitsAndBytesConfig`);
+    (b) qué hacer con el Y-Encoder en el protocolo (decisión del usuario).
+
 ## 7b. Barrido del Y-Decoder con captions de M3DI (paso 1.3) — diseño SUPERADO
 
 > **Superado el 16-11-2026** (decisión del usuario, `docs/metodologia.md` §2.4): el decodificador de la
@@ -266,19 +293,85 @@ Job `ydec`, commit `0698e68`.
 - En las reconstrucciones revisadas los errores son de posición (p. ej. top-left → bottom-left) o de
   tono cercano (`bright blue` → `rich blue`); forma y plantilla salen bien casi siempre.
 
-## 8. Pendiente para cerrar la etapa 1
+## 7c. Y-Decoder genérico (MSR-VTT)
+
+Diseño C5′ (`docs/metodologia.md` §2.4): decodificador entrenado solo con captions de MSR-VTT `train_7k`; el paso
+se elige por CIDEr en MSR-VTT `test_1k` (500 captions). El techo en M3DI (`m3di_*`) **solo se reporta**. Todas
+las cifras son de **reconstrucción**: el decodificador lee el `S_Y` del caption verdadero, no la predicción de
+VL-JEPA a partir de la imagen. No son comparables con el CIDEr de captioning de imagen o video de la literatura.
+
+**Barrido de *k*** (1 época, VL-JEPA y Llama-3.2-1B en NF4; job `ydec_msrvtt`, 16-11-2026): CIDEr k = 1 1.321,
+k = 4 1.384, **k = 8 1.439**, con k = 8 adelante en las 7 evaluaciones. Techo en M3DI ≈ 0.12 en los tres.
+
+**Ganador k = 8, 3 épocas, NF4** (`runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3`; job `ydec_k8_nf4`,
+19-11-2026, `DONE(0)`; 22 143 pasos):
+
+| Paso | 0 | 4 000 | 7 000 | 10 000 | 14 000 | 17 000 | 19 000 | 21 000 | **22 000** | 22 143 (último) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| CIDEr (MSR-VTT) | 0.001 | 1.389 | 1.439 | 1.521 | 1.652 | 1.674 | 1.692 | 1.717 | **1.827** | 1.805 |
+| Bleu-4 | 0.000 | 0.116 | 0.128 | 0.130 | 0.134 | 0.138 | 0.128 | 0.128 | **0.149** | 0.148 |
+| ROUGE-L | 0.062 | 0.395 | 0.406 | 0.408 | 0.425 | 0.423 | 0.427 | 0.432 | **0.441** | 0.440 |
+| techo M3DI `attr_mean` | 0.000 | 0.110 | 0.120 | 0.121 | 0.113 | 0.116 | 0.124 | 0.127 | 0.120 | 0.119 |
+
+- **Mejor paso: 22 000** (CIDEr 1.827, frente a 1.439 con 1 época). El mejor paso cae casi al final y la
+  curva no se ha aplanado del todo: +0.11 entre los pasos 21 000 y 22 000. Parte de esa subida final es
+  esperable con el LR que decae al final del schedule. Entre evaluaciones consecutivas el CIDEr oscila
+  ±0.05–0.1, con 500 captions. No se entrenan más épocas: 3 era el presupuesto acordado.
+- **Techo en M3DI ≈ 0.12, estable desde el paso 4 000**: forma ≈ 0.45, x e y ≈ 0, color ≈ 0.01. El lector
+  genérico no escribe posiciones ni nombres de la paleta de M3DI, como se esperaba (lectura acordada,
+  `docs/estado_sesion.md` §3). La exactitud zero-shot de VL-JEPA queda acotada por ese techo.
+- Pendiente: el `summary.json` del run (parámetros entrenables y tiempo).
+
+## 7d. VL-JEPA zero-shot: piloto de 200 imágenes (A4, 20-11-2026)
+
+NF4, decodificador genérico (§7c), 6 prompts, 200 imágenes de val (`runs/_tablas/vljepa_piloto.csv`, job
+`s1_vljepa_piloto`). Alrededor de 37 s por prompt, incluida la carga del modelo.
+
+| Prompt | forma | x | y | color | attr_mean | Bleu-4 | ROUGE-L | CIDEr |
+|---|---|---|---|---|---|---|---|---|
+| p0_minimal | 0.005 | 0.000 | 0.005 | 0.015 | 0.006 | 0.000 | 0.160 | 0.015 |
+| p1_attributes | 0.005 | 0.000 | 0.000 | 0.015 | 0.005 | 0.000 | 0.168 | 0.015 |
+| p2_constrained | 0.005 | 0.000 | 0.000 | 0.010 | 0.004 | 0.000 | 0.172 | 0.011 |
+| p3_json | 0.010 | 0.000 | 0.000 | 0.010 | 0.005 | 0.000 | 0.168 | 0.011 |
+| p4_dataset_format | 0.005 | 0.000 | 0.000 | 0.020 | 0.006 | 0.000 | 0.168 | 0.014 |
+| p4m_multiexample | 0.005 | 0.000 | 0.000 | 0.010 | 0.004 | 0.000 | 0.170 | 0.013 |
+
+- **Exactitud ≈ 0, muy por debajo de la clase mayoritaria (0.222) y del techo del lector (≈ 0.12).** Casi todo
+  queda omitido: con `p1_attributes`, forma omitida en 199/200 y posición en 200/200. Las diferencias entre
+  prompts son de 1 o 2 aciertos en 200 imágenes: ruido.
+- **Revisión a mano (`peek`, 12 ejemplos):** el decodificador escribe captions de estilo MSR-VTT, p. ej. "a strange
+  creature with long ears is in the woods" o "a pink animated animal is shown in the woods at night". Nunca
+  nombra la forma de M3DI ni la posición. Lo que sí parece captar es la *gist*: objetos animados o de dibujo,
+  "creature", "animal". Es coherente con §7.4: Ŝ_Y no distingue entre imágenes por recuperación.
+- **Falsos positivos del extractor fuera de dominio:** lee como color algunas palabras que son nombres de la
+  paleta xkcd usados en otro sentido ("in the **desert**" → `desert`; `dark` × 6). No inflan la exactitud (color
+  0.015) y el extractor no se cambia (CLAUDE.md §6: una sola implementación para los 4 modelos). Se declara.
+- Detalle menor: `peek` informa `tokens: mediana=0` porque el conteo de tokens generados no se registra para
+  VL-JEPA. No afecta la puntuación.
+
+## 8. Cierre de la etapa 1 (CE1, decisión del usuario, 20-11-2026)
+
+La etapa 1 se cierra **sin más entrenamientos** (`docs/metodologia.md` §6.1, CE1). Lo único que se agrega es
+**inferencia**: VL-JEPA zero-shot en val con los 6 prompts y el decodificador genérico NF4 ya entrenado.
 
 | Paso | Estado |
 |---|---|
+| VLM zero-shot, 6 prompts, val completo, NF4 (§3–§4) | hecho |
 | Control bf16 de los VLM (prompt elegido, val completo) | hecho (§4b) |
-| Barrido del Y-Decoder con M3DI (`ydecoder_sweep`) | hecho, superado (§7b) |
-| Y-Decoder genérico: barrido de *k* en MSR-VTT (`ydecoder_msrvtt`) | por lanzar (prueba de humo primero) |
-| Y-Decoder genérico: ganador hasta 3 épocas, NF4 y bf16 (P10) | después del barrido |
-| Y-Decoder intermedio (genérico ajustado con M3DI) | épocas pendientes de decisión |
-| VL-JEPA zero-shot y condición intermedia en val | después de los decodificadores |
-| VL-JEPA zero-shot en val (piloto de 200 y completo) | espera el Y-Decoder |
-| Control bf16 de VL-JEPA | espera el decodificador genérico bf16 |
-| Pérdida de información (`stage1_infoloss`) | espera el Y-Decoder |
-| P11 (`lm_head`) | resuelto: bf16 en los tres VLM (§7.3) |
-| P10 (Y-Decoder del control bf16 de VL-JEPA) | resuelto: decodificador propio, todo en bf16 |
 | Correcciones del extractor (§6) | hecho: 21 runs puntuados de nuevo, tablas actualizadas |
+| Inspección de modelos (§7) | hecho |
+| Barrido del Y-Decoder con M3DI (`ydecoder_sweep`) | hecho, superado (§7b) |
+| Y-Decoder genérico: barrido de *k* en MSR-VTT y k = 8 hasta 3 épocas, NF4 | hecho (§7c) |
+| Diagnóstico de cuantización de VL-JEPA (A2) | hecho (§7.4); falta la verificación "propio frente a otros" (sin GPU) |
+| **VL-JEPA zero-shot en val, 6 prompts** (A4: piloto de 200 → val completo → prompt) | **en curso** (job `s1_vljepa_piloto`, 20-11) |
+| Y-Decoder genérico bf16 (A3) y control bf16 de VL-JEPA (A5) | **cancelado** (CE1) |
+| Condición intermedia (A6) | **cancelado** (CE1) |
+| Pérdida de información de la etapa 1 (A7) | **cancelado** (CE1); el comando queda en `stage1_infoloss.txt` (solo inferencia) |
+| P11 (`lm_head`) | resuelto: bf16 en los tres VLM (§7.3) |
+| P10 (Y-Decoder del control bf16 de VL-JEPA) | sin efecto en la etapa 1 (control cancelado); queda abierto para la etapa 2 |
+
+**Qué se declara en el informe sobre VL-JEPA en la etapa 1.** Se evalúa solo en NF4, sin control bf16 ni
+condición intermedia. Su exactitud zero-shot está acotada por el vocabulario del lector genérico (techo
+≈ 0.12, §7c). Además, el lector se entrenó con S_Y del Y-Encoder en NF4, que está desplazado respecto de bf16
+(coseno 0.876, §7.4). Por recuperación, el checkpoint no discrimina entre imágenes de M3DI, ni siquiera en bf16
+(§7.4).
