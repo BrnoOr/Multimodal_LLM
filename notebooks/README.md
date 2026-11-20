@@ -9,7 +9,7 @@ Análisis que requieren interpretación e interacción. Reglas:
 
 | Notebook | Propósito |
 |---|---|
-| `00_eda_m3di.ipynb` | distribución de factores, vocabulario por valor de atributo (insumo del extractor) |
-| `01_inspeccion_predicciones.ipynb` | comparación cualitativa entre runs, longitud de respuestas, prototipos de VL-JEPA |
-| `05_comparacion_test.ipynb` | test (10 000 imágenes): zero-shot (p1 y mejor prompt) frente a ajustado, entre modelos; ganancia, ranking, desglose por factor, aciertos por imagen, controles y caption generado vs original y canónico (BLEU-4, ROUGE-L, CIDEr-D) |
-| `06_eda_splits.ipynb` | EDA comparativo de train / val / test: integridad, fuga (escenas y captions), homogeneidad de atributos, combinaciones forma × posición y holdout composicional, dependencia matiz ↔ x, textos objetivo y líneas base de azar. Escribe en `reports/{figures,tables}/eda_splits/` |
+| `01_eda_m3di.ipynb` | distribución de factores, vocabulario por valor de atributo (insumo del extractor) |
+| `02_resultados_etapa1.ipynb` | etapa 1 en VAL: líneas base, modelo × prompt, selección de prompt con bootstrap pareado, omisión vs error, confusiones, color, control bf16 (McNemar), texto vs fidelidad, piloto vs val completo, Y-Decoder genérico, VL-JEPA (zero-shot, intermedia, diagnóstico de cuantización, pérdida de información) y tabla resumen. Requiere `scripts/score.py` corrido sobre los runs |
+
+Los notebooks anteriores a la reconstrucción están en `_para_borrar/notebooks/`.

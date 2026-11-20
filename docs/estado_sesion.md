@@ -71,6 +71,11 @@ intermedia** y las **sondas** de §2.5.
 
 ## 4. Pasos que siguen
 
+> **Guía ejecutable paso a paso (19-11-2026): `docs/pasos_cluster.md`** — comandos, verificación y qué mandar a
+> Claude para cerrar la etapa 1 (A1–A8), la etapa 2 (B0–B8) y test (C). Análisis de la etapa 1:
+> `notebooks/02_resultados_etapa1.ipynb`. Nuevos para la etapa 2: `scripts/summarize_train.py` (humo, P8,
+> barrido con `--winners`) y `configs/queues/stage2_val.txt` (adapter_best en val completo, P1).
+
 | # | Paso | Dónde | Depende de |
 |---|---|---|---|
 | 1 | Commit + push; `git pull` en el cluster | usuario | — |

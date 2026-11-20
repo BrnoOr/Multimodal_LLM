@@ -180,6 +180,7 @@ y ajustado bf16, en test. Tablas y figuras del informe en notebooks nuevos que i
 | `configs/train/` | propuesta de hiperparámetros con fuente; candado `train.hparams_confirmed` |
 | Colas | `stage2_smoke`, `stage2_sweep` (LR), `stage2_train` (NF4 + bf16), `stage2_infoloss`; Y-Decoder de la etapa 2 en `ydecoder_msrvtt.txt` §4 |
 | Tests | `tests/test_train_units.py`, `tests/test_train_e2e.py` reescritos (incluye la equivalencia de la consulta sin relleno); **no ejecutados** (se corren en el cluster) |
+| Agregado 19-11-2026 | `scripts/summarize_train.py` (+ test), cola `stage2_val.txt` (adapter_best en val completo, P1), guía `docs/pasos_cluster.md` |
 | Falta | correr tests y humo; P8; barrido; confirmar hiperparámetros; épocas del Y-Decoder ajustado; actualizar CLAUDE.md §3 (P4: prompt de la etapa 2, controles bf16, Y-Decoder y ahora P7) |
 
 ### 6.0 Actualización del 16-11-2026

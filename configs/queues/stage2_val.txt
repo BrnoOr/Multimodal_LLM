@@ -1,0 +1,24 @@
+# Paso 2.2b — modelos AJUSTADOS en VAL COMPLETO (10 000 imágenes) con su adapter_best (P1: el ajuste elige el
+# paso con 500 imágenes de val; el número que se reporta en val es el de las 10 000). Mismo infer.py y mismo
+# score.py que la etapa 1: la comparación zero-shot vs ajustado usa la misma evaluación (CLAUDE.md §3).
+# Prompt p1_attributes en los 4 (decisión del usuario). stage=finetuned -> exp_id finetuned_<model>_<quant>_p1_attributes_val.
+#
+# Reemplazar ANTES de lanzar (exp_id de stage2_train.txt; <LR> = el ganador del barrido, p. ej. 0.0002):
+#   <TRAIN_QWEN>      train_qwen35_08b_base_nf4_p1_attributes_r64_lr<LR>_e1         (y _bf16_ para el control)
+#   <TRAIN_INTERNVL>  train_internvl3_1b_nf4_p1_attributes_r64_lr<LR>_e1
+#   <TRAIN_LLAVA>     train_llava_ov_05b_nf4_p1_attributes_r64_lr<LR>_e1
+#   <TRAIN_VLJEPA>    train_vljepa_open_msrvtt_nf4_p1_attributes_r64_lr<LR>_e1
+#   <YDEC_FT>         ydec_vljepa_open_msrvtt_nf4_ft_nf4_k8_r64_e<E>_cont   (configs/queues/ydecoder_msrvtt.txt §4)
+# Comprobar que no quedan marcadores:   grep -n '<' configs/queues/stage2_val.txt | grep -v '^.*#'
+#
+#   GPU=0 scripts/launch.sh s2_val scripts/run_queue.sh configs/queues/stage2_val.txt
+#   uv run --no-sync python scripts/score.py runs/finetuned_*_val --table etapa2_val
+model=qwen35     stage=finetuned prompt=p1_attributes model.adapter_path=runs/<TRAIN_QWEN>/adapter_best
+model=internvl3  stage=finetuned prompt=p1_attributes model.adapter_path=runs/<TRAIN_INTERNVL>/adapter_best
+model=llava_ov   stage=finetuned prompt=p1_attributes model.adapter_path=runs/<TRAIN_LLAVA>/adapter_best
+model=vljepa     stage=finetuned prompt=p1_attributes infer.save_embeddings=true model.adapter_path=runs/<TRAIN_VLJEPA>/adapter_best model.decoder_path=runs/<YDEC_FT>/decoder_best
+# Control bf16 (D6): adaptador bf16 sobre base bf16; en VL-JEPA, también su decodificador bf16 (P10).
+model=qwen35     stage=finetuned prompt=p1_attributes model.quant=bf16 model.adapter_path=runs/<TRAIN_QWEN_BF16>/adapter_best
+model=internvl3  stage=finetuned prompt=p1_attributes model.quant=bf16 model.adapter_path=runs/<TRAIN_INTERNVL_BF16>/adapter_best
+model=llava_ov   stage=finetuned prompt=p1_attributes model.quant=bf16 model.adapter_path=runs/<TRAIN_LLAVA_BF16>/adapter_best
+model=vljepa     stage=finetuned prompt=p1_attributes model.quant=bf16 infer.save_embeddings=true model.adapter_path=runs/<TRAIN_VLJEPA_BF16>/adapter_best model.decoder_path=runs/<YDEC_FT_BF16>/decoder_best
