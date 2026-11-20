@@ -78,6 +78,8 @@ IMAGENET_STD = (0.229, 0.224, 0.225)
 LLAMA32_PAD = "<|finetune_right_pad_id|>"
 # Proyecciones que la etapa 2 entrena en precisión completa (nunca se cuantizan)
 PROJECTIONS = ("predictor.vis_proj", "predictor.out_proj", "y_encoder.projector")
+# Componentes congelados que van en NF4 (docs/metodologia.md §2.1, D5)
+QUANT_COMPONENTS = ("x_encoder", "predictor", "y_encoder")
 
 
 def _ensure_pad_token(tok):
@@ -145,11 +147,14 @@ class VLJEPADescriber(Describer):
         del ckpt
 
         model = model.to(dtype=torch.bfloat16).eval()
+        components = self.quant_components()
         if c.quant == "nf4":
-            # todo componente congelado en NF4; las proyecciones quedan fuera (ver PROJECTIONS)
-            n = {"x_encoder": swap_linear_to_nf4(model.x_encoder.model, self.device),
-                 "predictor": swap_linear_to_nf4(model.predictor.layers, self.device),
-                 "y_encoder": swap_linear_to_nf4(model.y_encoder.model, self.device)}
+            # todo componente congelado en NF4; las proyecciones quedan fuera (ver PROJECTIONS).
+            # `quant_components` restringe la cuantización a algunos componentes: SOLO para el
+            # diagnóstico de cuantización (scripts/diag_quant_vljepa.py), nunca en el protocolo.
+            targets = {"x_encoder": model.x_encoder.model, "predictor": model.predictor.layers,
+                       "y_encoder": model.y_encoder.model}
+            n = {k: swap_linear_to_nf4(targets[k], self.device) for k in components}
             print(f"[vljepa] NF4 aplicado a capas lineales: {n}", flush=True)
             if not all(n.values()):
                 raise RuntimeError(f"Algún componente quedó sin capas cuantizadas: {n}")
@@ -194,6 +199,28 @@ class VLJEPADescriber(Describer):
         ])
         if c.get("decoder_path"):
             self._load_decoder(resolve(c.decoder_path))
+
+    def quant_components(self) -> tuple[str, ...]:
+        """Componentes que van en NF4 cuando quant = nf4. Por defecto, los tres (protocolo, D5).
+
+        Un subconjunto solo se admite para el diagnóstico de cuantización: con él, `quant: nf4` ya no
+        describe el modelo, así que se prohíbe combinarlo con un Y-Decoder o un adaptador (sus
+        comprobaciones de correspondencia solo miran la cadena `quant`).
+        """
+        raw = self.cfg.get("quant_components")
+        if raw is None:
+            return QUANT_COMPONENTS
+        comps = tuple(str(x) for x in raw)
+        bad = [x for x in comps if x not in QUANT_COMPONENTS]
+        if bad or not comps or len(set(comps)) != len(comps):
+            raise ValueError(f"quant_components={list(comps)} inválido; subconjunto no vacío de {QUANT_COMPONENTS}")
+        if set(comps) != set(QUANT_COMPONENTS):
+            if self.cfg.quant != "nf4":
+                raise ValueError("quant_components parcial solo tiene sentido con quant = nf4")
+            if self.cfg.get("decoder_path") or self.cfg.get("adapter_path"):
+                raise ValueError("quant_components parcial es solo para el diagnóstico: sin decoder_path "
+                                 "ni adapter_path")
+        return tuple(x for x in QUANT_COMPONENTS if x in comps)
 
     def _load_decoder(self, path: Path) -> None:
         """Carga el Y-Decoder entrenado y comprueba que corresponde a ESTE Y-Encoder.
@@ -321,5 +348,6 @@ class VLJEPADescriber(Describer):
         out.update(self.quant_report)
         out.update({"ckpt": str(self.ckpt_path), "num_frames": self.num_frames,
                     "max_query_len": self.max_query_len, "max_caption_len": self.max_caption_len,
-                    "has_decoder": self.decoder is not None})
+                    "has_decoder": self.decoder is not None,
+                    "quant_components": list(self.quant_components()) if self.cfg.quant == "nf4" else []})
         return out

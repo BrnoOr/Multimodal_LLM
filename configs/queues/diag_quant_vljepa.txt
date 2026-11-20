@@ -1,0 +1,15 @@
+# Diagnóstico de cuantización de VL-JEPA (docs/resultados_etapa1.md §7.4; scripts/diag_quant_vljepa.py).
+# ¿Qué componente explica la brecha NF4 − bf16 en coseno(Ŝ_Y, S_Y)? Alineación (coseno), discriminación
+# (recall@k, InfoNCE en lotes fijos de 128) y error por etapa contra bf16. 1 024 imágenes de VAL, p1_attributes.
+# bf16 PRIMERO: es la referencia contra la que se comparan las demás.
+#
+# Humo antes (64 imágenes, ~1 min por línea):
+#   uv run --no-sync python scripts/diag_quant_vljepa.py model=vljepa model.quant=bf16 diag.n=64 diag.batch_size=32 diag.tag=humo
+#   uv run --no-sync python scripts/diag_quant_vljepa.py model=vljepa model.quant_components=[predictor] diag.n=64 diag.batch_size=32 diag.tag=humo
+#
+#   SCRIPT=scripts/diag_quant_vljepa.py GPU=1 scripts/launch.sh diag_quant scripts/run_queue.sh configs/queues/diag_quant_vljepa.txt
+model=vljepa model.quant=bf16
+model=vljepa
+model=vljepa model.quant_components=[x_encoder]
+model=vljepa model.quant_components=[predictor]
+model=vljepa model.quant_components=[y_encoder]

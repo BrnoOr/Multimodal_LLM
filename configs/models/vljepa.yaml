@@ -15,6 +15,9 @@ llama_name: unsloth/Llama-3.2-1B
 # NF4 en X-Encoder, capas del Predictor y transformer del Y-Encoder; las proyecciones lineales
 # (vis_proj, out_proj, y_encoder.projector) quedan en precisión completa. Control: quant: bf16.
 quant: nf4
+# Solo diagnóstico (scripts/diag_quant_vljepa.py): subconjunto de [x_encoder, predictor, y_encoder] en NF4.
+# null = los tres (protocolo). Parcial no admite decoder_path ni adapter_path.
+quant_components: null
 batch_size: 32
 num_frames: null        # null -> el del checkpoint (8): imagen tratada como video estático
 image_size: null        # null -> 256

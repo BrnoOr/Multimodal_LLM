@@ -64,7 +64,10 @@ intermedia** y las **sondas** de §2.5.
   brecha NF4 − bf16 se mantiene (−0.107). El Y-Decoder y su techo no pasan por el Predictor: no se repiten.
 - **Abierto:** la brecha NF4 − bf16 de VL-JEPA (≈ −0.1 en coseno, n = 4) persiste. Según §7.4, revisar la
   cuantización manual antes de atribuirla a NF4. Propuesta pendiente de aprobación: diagnóstico cuantizando
-  un componente a la vez (X-Encoder, Predictor, Y-Encoder).
+  un componente a la vez (X-Encoder, Predictor, Y-Encoder). **Aprobado y escrito (19-11):**
+  `scripts/diag_quant_vljepa.py`, cola `configs/queues/diag_quant_vljepa.txt` (bf16, NF4 completo y NF4 por
+  componente; 1 024 imágenes de val; coseno, recall@k, InfoNCE en lotes de 128 y coseno por etapa contra bf16).
+  Tests nuevos: `test_embedding_metrics.py`, `test_vljepa_quant_components.py`. Sin ejecutar.
 
 ## 4. Pasos que siguen
 
@@ -72,7 +75,8 @@ intermedia** y las **sondas** de §2.5.
 |---|---|---|---|
 | 1 | Commit + push; `git pull` en el cluster | usuario | — |
 | 2 | ~~Verificar el lado de relleno~~ hecho (19-11): era `left`, corregido; inspección de VL-JEPA repetida | cluster | 1 |
-| 3 | Genérico k = 8 hasta 3 épocas, NF4 y bf16 (`ydecoder_msrvtt.txt` §2) | cluster | 1 |
+| 3 | Genérico k = 8 hasta 3 épocas, NF4 y bf16 (`ydecoder_msrvtt.txt` §2). NF4 lanzado el 19-11 en GPU 1 (`ydec_k8_nf4`); bf16 pendiente (GPU 0 ocupada por un proceso ajeno) | cluster | 1 |
+| 3b | Diagnóstico de cuantización de VL-JEPA: tests nuevos, humo y `diag_quant_vljepa.txt` (tras `ydec_k8_nf4`: `git pull` solo sin cola corriendo) | cluster | 3 |
 | 4 | `pytest tests/test_train_units.py tests/test_train_e2e.py` y luego `stage2_smoke.txt` (puede ir en paralelo con 3 si hay GPU) | cluster | 1 |
 | 5 | VL-JEPA en val con el genérico (piloto 200 × 6 prompts → val completo → prompt) | cluster | 2, 3 |
 | 6 | Decidir épocas del decodificador intermedio y entrenarlo; VL-JEPA con él; control bf16 | usuario → cluster | 3 |
