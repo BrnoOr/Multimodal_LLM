@@ -1,4 +1,4 @@
-# Estado de la sesión — 20-11-2026
+# Estado de la sesión — 20-11-2026 (cierre de la etapa 1)
 
 > Documento de traspaso: dónde quedó el trabajo, qué está corriendo y qué sigue. Para retomar, leer
 > este archivo primero. Los resultados medidos están en `docs/resultados_etapa1.md`; el protocolo, en
@@ -6,19 +6,28 @@
 
 ## 1. Dónde estamos
 
-**Fase 4 (etapa 1), casi terminada; la etapa 2 está escrita completa (código, colas, grilla y notebook), sin ejecutar.**
+**Etapa 1 cerrada sin más entrenamientos (CE1, 20-11-2026)**; solo falta la inferencia de VL-JEPA en val. **La etapa 2
+está escrita completa** (código, colas, grilla y notebook), sin ejecutar.
 
-- Barrido del Y-Decoder genérico **terminado**: **k = 8** (CIDEr en MSR-VTT `test_1k`: k=1 1.321, k=4 1.384,
-  k=8 1.439). Techo en M3DI ≈ 0.12.
-- En el cluster (último estado conocido, 19-11): `ydec_k8_nf4` (k = 8, 3 épocas, NF4) corriendo en la GPU 1; el bf16
-  pendiente porque la GPU 0 estaba ocupada por un proceso ajeno. Verificar con `scripts/jobs.sh status` al retomar.
-- Etapa 2 lista para el humo (B2) y la grilla (B4): código (`scripts/train.py`, `src/vlmfid/train/`), propuesta de
-  hiperparámetros con candado (`configs/train/budget.yaml`, `train.hparams_confirmed: false`), grilla
-  (`configs/train/grid.yaml` → `stage2_grid{,_g0,_g1}.txt`), colas `stage2_{smoke,train,val,infoloss}.txt` y resumen
-  (`scripts/summarize_train.py`). Nada de la etapa 2 se ha ejecutado, ni sus tests.
-- Notebooks de análisis: `02_resultados_etapa1.ipynb` (etapa 1) y **`03_resultados_etapa2.ipynb`** (etapa 2, nuevo el
-  20-11; se salta solo las secciones cuyos runs aún no existen). Ninguno se ha ejecutado.
-- Commiteado hasta `4cd820b` (grilla). Sin commitear: el notebook 03, `notebooks/README.md` y este archivo.
+- **Cierre de la etapa 1 (CE1, `metodologia.md` §6.1):** se cierra con los 3 VLM, el Y-Decoder genérico NF4 (k = 8,
+  3 épocas, CIDEr 1.827, techo M3DI ≈ 0.12) y el diagnóstico de cuantización. Se agrega solo inferencia: VL-JEPA
+  zero-shot NF4 con los 6 prompts. **Cancelados:** Y-Decoder bf16 y control bf16 de VL-JEPA (A3, A5), condición
+  intermedia (A6) y pérdida de información de la etapa 1 (A7). `final_test.yaml` queda con 15 condiciones.
+- **En el cluster (20-11):** corre `s1_vljepa_piloto` en la GPU 1 (`stage1_vljepa_val.txt`: 6 prompts × 200
+  imágenes). Después: puntuar, revisar a mano y decidir si el val completo va con los 6 prompts o con los 2 mejores
+  (según el tiempo medido). La GPU 0 sigue ocupada por un proceso ajeno.
+- **Diagnóstico de cuantización (A2, hecho):** toda la brecha NF4 − bf16 de VL-JEPA viene del **Y-Encoder** (S_Y
+  contra bf16: coseno 0.876; X-Encoder y Predictor ≥ 0.99). Además, el checkpoint **no discrimina entre imágenes de
+  M3DI** ni siquiera en bf16 (R@1 ≈ azar). Detalle en `resultados_etapa1.md` §7.4. Falta la verificación "propio
+  frente a otros" (notebook 02 §11c-bis, sin GPU).
+- **Etapa 2:** lista para el humo (B2) y la grilla (B4). Nada se ha ejecutado, ni sus tests. Antes del ajuste
+  completo hay que decidir qué hacer con la cuantización del Y-Encoder (ver §4).
+- **Notebooks:** `02_resultados_etapa1.ipynb` (con la nota de cierre y §11c-bis) y `03_resultados_etapa2.ipynb`.
+  Ninguno se ha ejecutado.
+- **Sin commitear** (cierre CE1): notebooks 02 y 03, docs (`estado_sesion`, `metodologia`, `pasos_cluster`,
+  `resultados_etapa1`), `configs/final_test.yaml`, colas `ydecoder_msrvtt`, `stage1_vljepa_val`, `stage1_infoloss`
+  y `tests/test_final_test.py`. **No hacer `git pull`
+  mientras corra `s1_vljepa_piloto`.**
 
 ## 2. Lo cerrado en la etapa 1
 
@@ -89,22 +98,21 @@ intermedia** y las **sondas** de §2.5.
 
 | # | Paso | Dónde | Depende de |
 |---|---|---|---|
-| 1 | Commit + push del notebook 03 y docs; `git pull` en el cluster **solo sin cola corriendo** | usuario | — |
-| 2 | ~~Verificar el lado de relleno~~ hecho (19-11): era `left`, corregido; inspección de VL-JEPA repetida | cluster | — |
-| 3 | Genérico k = 8 hasta 3 épocas, NF4 y bf16 (`ydecoder_msrvtt.txt` §2; A1, A3). NF4 lanzado el 19-11 en GPU 1 (`ydec_k8_nf4`); bf16 pendiente | cluster | — |
-| 3b | Diagnóstico de cuantización de VL-JEPA: tests nuevos, humo y `diag_quant_vljepa.txt` (A2) | cluster | 3 |
-| 4 | `pytest tests/test_train_units.py tests/test_train_e2e.py tests/test_make_grid.py tests/test_summarize_train.py` y luego `stage2_smoke.txt` (B1–B2; en paralelo con 3 si hay GPU) | cluster | 1 |
-| 5 | VL-JEPA en val con el genérico (piloto 200 × 6 prompts → val completo → prompt; A4–A5) | cluster | 3 |
-| 6 | Decidir épocas del decodificador intermedio y entrenarlo; VL-JEPA con él; control bf16 (A6) | usuario → cluster | 3 |
-| 7 | Pérdida de información de la etapa 1 (`stage1_infoloss`, humo primero; A7) | cluster | 3 |
-| 8 | Revisar humo (notebook 03 §1) → P8 → grilla (`stage2_grid*.txt`, B4; notebook 03 §2–3) → ganador por modelo en `configs/train/models/*.yaml` → confirmar P5 y `hparams_confirmed: true` | Claude + usuario | 4 |
-| 9 | Correr el notebook 02, actualizar `resultados_etapa1.md` y **aprobación del cierre de la etapa 1** (A8) | cluster + laptop | 5–7 |
-| 10 | `stage2_train.txt` → Y-Decoder de la etapa 2 (`ydecoder_msrvtt.txt` §4) → `stage2_val.txt` → `stage2_infoloss.txt` (B5–B8; notebook 03 §4–8) | cluster | 8, 9 |
-| 11 | Llenar `configs/final_test.yaml` y correr `scripts/final_test.py` una sola vez (Parte C) | cluster | 10 |
+| 1 | VL-JEPA zero-shot, piloto 6 prompts × 200 (A4), **en curso** → `score.py` + `peek.py` → mandar a Claude | cluster | — |
+| 2 | VL-JEPA en val completo: 6 prompts o los 2 mejores del piloto (según el tiempo) → prompt por `attr_mean` → anotar en `final_test.yaml` (`vljepa_zs_nf4`) | cluster + usuario | 1 |
+| 3 | Commit + push de todo lo pendiente; `git pull` en el cluster **cuando no corra ninguna cola** | usuario | 1 (o 2) |
+| 4 | Verificación "propio frente a otros" (notebook 02 §11c-bis o el comando del 20-11, sin GPU) | cluster | — |
+| 5 | Correr el notebook 02 completo y actualizar `resultados_etapa1.md` con VL-JEPA (A8) | cluster + laptop | 2, 3 |
+| 6 | Tests de entrenamiento y humo de la etapa 2 (B1–B2) | cluster | 3 |
+| 7 | Decidir P5 **antes** de la grilla; P8 tras el humo; grilla (B4) → ganador por modelo | usuario + Claude → cluster | 6 |
+| 8 | Y-Encoder en NF4: verificación con la carga estándar de `transformers` (opcional) y decisión NF4 o excepción bf16 | usuario | antes de B5 |
+| 9 | `stage2_train.txt` → Y-Decoder de la etapa 2 (`ydecoder_msrvtt.txt` §4) → `stage2_val.txt` → `stage2_infoloss.txt` (B5–B8; notebook 03) | cluster | 7, 8 |
+| 10 | Llenar `configs/final_test.yaml` y correr `scripts/final_test.py` una sola vez (Parte C) | cluster | 9 |
 
-**Decisiones del usuario pendientes** (`docs/pasos_cluster.md` B0): P8 (lote 128 o 64, tras el humo), P5 (propuesta de
-`metodologia.md` §4, tras la grilla), épocas del Y-Decoder ajustado a M3DI (antes de A6) y P4 (actualizar CLAUDE.md §3:
-prompt de la etapa 2, controles bf16, Y-Decoder, P7 y P9 la contradicen hoy).
+**Decisiones del usuario pendientes:** P5 (propuesta de `metodologia.md` §4, **antes** de la grilla); P8 (lote 128 o
+64, tras el humo); épocas del Y-Decoder ajustado a M3DI (para B6); cuantización del Y-Encoder (NF4 o excepción bf16);
+de dónde parte el Y-Decoder del control bf16 de la etapa 2, ya que no hay genérico bf16 (P10, por CE1); P4 (actualizar
+CLAUDE.md §3: prompt de la etapa 2, controles bf16, Y-Decoder, P7, P9 y el cierre CE1).
 
 ## 5. Comandos para retomar
 

@@ -31,7 +31,13 @@
 
 ## Parte A — Cerrar la etapa 1
 
+> **Cierre CE1 (decisión del usuario, 20-11-2026; `docs/metodologia.md` §6.1):** la etapa 1 se cierra sin más
+> entrenamientos. Hechos: A1 y A2. En curso: A4 (solo inferencia). **Cancelados: A3, A5, A6 y A7.** Quedan aquí
+> como referencia, sin ejecutar.
+
 ### A1. Esperar el Y-Decoder genérico NF4 (k = 8, 3 épocas)
+
+**HECHO (20-11):** mejor paso 22 000, CIDEr 1.827 (`docs/resultados_etapa1.md` §7c).
 
 Lanzado el 19-11 en la GPU 1 (`ydec_k8_nf4`, ≈ 1 h 45 min).
 
@@ -50,6 +56,8 @@ python3 -m json.tool runs/ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3/su
 **Mandar a Claude:** las líneas `[ydec][val]` y el `summary.json`.
 
 ### A2. Actualizar el código y correr el diagnóstico de cuantización
+
+**HECHO (20-11):** la brecha viene del Y-Encoder (`docs/resultados_etapa1.md` §7.4).
 
 Con **nada corriendo**:
 
@@ -91,6 +99,8 @@ se sigue.
 
 ### A3. Y-Decoder genérico bf16 (control P10)
 
+**CANCELADO (CE1).**
+
 Necesita una GPU libre (≈ 1 h 45 min). Si la GPU 0 sigue ocupada por el proceso ajeno, va en la GPU 1 después de A2.
 
 ```bash
@@ -104,6 +114,9 @@ El `cat` debe mostrar `model=vljepa model.quant=bf16 decoder.quant=bf16 decoder.
 **Bien si:** existe `runs/ydec_vljepa_open_msrvtt_bf16_zs_bf16_msrvtt_k8_r64_e3/decoder_best`.
 
 ### A4. VL-JEPA zero-shot en val (piloto → val completo → prompt)
+
+**EN CURSO (20-11):** piloto lanzado como `s1_vljepa_piloto` en la GPU 1. Según el tiempo del piloto, el val completo
+va con los 6 prompts (como los VLM) o con los 2 mejores (diferencia que se declararía).
 
 Puede ir en paralelo con A3 si hay dos GPU libres. Piloto: 200 imágenes × 6 prompts.
 
@@ -137,6 +150,8 @@ uv run --no-sync python scripts/score.py runs/zeroshot_vljepa_open_msrvtt_nf4_*_
 
 ### A5. Control bf16 de VL-JEPA
 
+**CANCELADO (CE1):** requiere el decodificador de A3.
+
 Requiere A3 y el prompt de A4. Reemplazar `<PROMPT>` por el elegido:
 
 ```bash
@@ -149,6 +164,8 @@ uv run --no-sync python scripts/score.py runs/zeroshot_vljepa_open_msrvtt_*_${PR
 ```
 
 ### A6. Condición intermedia (decodificador genérico ajustado a M3DI)
+
+**CANCELADO (CE1).** La decisión de épocas del ajuste a M3DI sigue pendiente para B6.
 
 **DECISIÓN (pendiente):** épocas del decodificador ajustado a M3DI (`decoder.train.epochs`; hoy 10 en
 `configs/ydecoder.yaml`, sin fuente). Las mismas épocas se usan después en la etapa 2 (B6). Con la decisión,
@@ -171,6 +188,8 @@ uv run --no-sync python scripts/score.py runs/zeroshot_vljepa_open_msrvtt_nf4_${
 
 ### A7. Pérdida de información de la etapa 1
 
+**CANCELADO (CE1).** Es solo inferencia: si la etapa 2 necesita la comparación (B8), se puede correr entonces.
+
 Humo primero (2–5 min), luego la cola (10 000 de train para ajustar las sondas, 2 000 de val para medir):
 
 ```bash
@@ -182,6 +201,8 @@ SCRIPT=scripts/info_loss.py GPU=1 scripts/launch.sh infoloss scripts/run_queue.s
 **Mandar a Claude:** ese CSV.
 
 ### A8. Análisis y cierre de la etapa 1
+
+Tras A4. Las secciones 11b y 11d del notebook 02 quedan vacías (CE1); 11c-bis verifica "propio frente a otros".
 
 Re-puntuar todo con la versión actual del extractor y abrir el notebook `notebooks/02_resultados_etapa1.ipynb`
 (VS Code Remote-SSH, kernel `vlmfid`; ver `notebooks/README.md`):
@@ -203,7 +224,7 @@ las tablas de §3, §7 y §12 del notebook y `runs/_tablas/etapa1_val.csv`. Clau
 | # | Qué | Dónde | Cuándo |
 |---|---|---|---|
 | P8 | Lote efectivo común: 128 (propuesta, [5] §4.5) o 64 si VL-JEPA no cabe | `configs/train/budget.yaml` | tras B2 (memoria medida) |
-| P5 | Confirmar la propuesta: optimizador, esquema, warmup, `max_grad_norm`, LoRA α/dropout, weight decay (filas "Propuesta" de `docs/metodologia.md` §4) | `configs/train/budget.yaml` → `train.hparams_confirmed: true` | tras B4 |
+| P5 | Confirmar la propuesta: optimizador, esquema, warmup, `max_grad_norm`, LoRA α/dropout, weight decay (filas "Propuesta" de `docs/metodologia.md` §4) | `configs/train/budget.yaml` → `train.hparams_confirmed: true` | **antes de B4**: la grilla toma estos valores de `budget.yaml`; cambiarlos después la invalida. `hparams_confirmed: true` se pone tras B4, con el ganador anotado |
 | Grilla | Combinación ganadora por modelo (LR, r, conector; B4) | `configs/train/models/<modelo>.yaml` (`train.lr`, `lora.r`, `train.connector_lr_mult`) | tras B4 |
 | Épocas | Épocas del Y-Decoder ajustado a M3DI (mismo valor que A6) | `configs/ydecoder.yaml` | antes de A6 |
 | P4 | Autorizar la actualización de CLAUDE.md §3 (prompt de la etapa 2, controles bf16, Y-Decoder, P7) | `CLAUDE.md` | cuando quieras |
@@ -252,7 +273,7 @@ grep -hE "\[train\] modelo listo|\[train\] grupos de LR|query_tokens" logs/s2_sm
 | Grupos de LR de VL-JEPA | `lora_y_encoder` = 0.05 × `lora` |
 | `peak_mem_gb` de VL-JEPA (NF4 y bf16) | < 24 GB con micro-lote 128 → P8 = 128 |
 | `loss_last` < `loss_first` | en los 8 runs |
-| `val_step0` (adaptador en cero) | ≈ zero-shot de `p1_attributes` en las mismas 500 de val |
+| `val_step0` (adaptador en cero) | coherente con el zero-shot de `p1_attributes` (aproximado: el humo de los VLM evalúa solo 32 imágenes de val, no las 500 de la grilla) |
 
 **Mandar a Claude:** la tabla de `summarize_train` y el `grep`. **DECISIÓN P8** con el pico de memoria de VL-JEPA.
 
