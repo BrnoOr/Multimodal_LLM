@@ -221,12 +221,19 @@ salida en precisión completa; fuente: documentación de la biblioteca, no un pa
   `models/vljepa.py`. Se contrasta con el control bf16 de VL-JEPA en val; si la brecha se mantiene,
   revisar la cuantización antes de atribuirla a NF4.
 
-  **⚠️ Medición inválida (19-11-2026).** Estas similitudes se midieron con la consulta rellenada **a la
-  izquierda** hasta 512 tokens: en el cluster, el tokenizador de Llama-3.2 se carga con
-  `padding_side = "left"` y el Predictor numera las posiciones RoPE de corrido sobre [visuales; consulta],
-  así que la consulta real quedó desplazada respecto de las visuales. `models/vljepa.py` fija ahora el
-  relleno a la derecha. Hay que repetir la inspección de VL-JEPA antes de usar esta tabla. Las demás
-  mediciones de la etapa 1 no pasan por el Predictor (VLM, Y-Decoder y su techo) y no se ven afectadas.
+  **Remedición con relleno a la derecha (19-11-2026, commit `598e9bb`).** La tabla anterior se midió con
+  la consulta rellenada **a la izquierda** hasta 512 tokens (en el cluster, el tokenizador de Llama-3.2
+  se carga con `padding_side = "left"`, y el Predictor numera las posiciones RoPE de corrido sobre
+  [visuales; consulta]). Con el relleno corregido (`runs/inspect_vljepa_open_msrvtt_{nf4,bf16}/report.json`):
+
+  | | img 1 | img 2 | img 3 | img 4 | media |
+  |---|---|---|---|---|---|
+  | bf16 | 0.567 | 0.588 | 0.871 | 0.434 | 0.615 |
+  | NF4 | 0.480 | 0.501 | 0.774 | 0.278 | 0.508 |
+
+  Las similitudes cambian poco (≤ 0.03 por imagen) y la brecha NF4 − bf16 se mantiene: −0.107 en la
+  media, entre −0.087 y −0.156 por imagen, con el mismo signo en las cuatro. El relleno no la explicaba.
+  Las demás mediciones de la etapa 1 no pasan por el Predictor (VLM, Y-Decoder y su techo).
 
 ## 7b. Barrido del Y-Decoder con captions de M3DI (paso 1.3) — diseño SUPERADO
 

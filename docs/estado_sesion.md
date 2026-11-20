@@ -60,15 +60,18 @@ intermedia** y las **sondas** de §2.5.
 - **Verificado en el cluster (19-11-2026): el tokenizador de Llama-3.2 se carga con `padding_side = "left"`**
   (EmbeddingGemma, `right`). La inferencia rellenaba la consulta hasta 512 por la izquierda y corría las
   posiciones RoPE. Corregido: `models/vljepa.py` fija `right` en ambos al cargar. Única medición afectada: la
-  similitud coseno de la inspección (`resultados_etapa1.md` §7.4, marcada inválida) → repetir
-  `inspect_vljepa_{nf4,bf16}`. El Y-Decoder y su techo no pasan por el Predictor: no se repiten.
+  similitud coseno de la inspección (`resultados_etapa1.md` §7.4), **ya remedida**: cambia ≤ 0.03 y la
+  brecha NF4 − bf16 se mantiene (−0.107). El Y-Decoder y su techo no pasan por el Predictor: no se repiten.
+- **Abierto:** la brecha NF4 − bf16 de VL-JEPA (≈ −0.1 en coseno, n = 4) persiste. Según §7.4, revisar la
+  cuantización manual antes de atribuirla a NF4. Propuesta pendiente de aprobación: diagnóstico cuantizando
+  un componente a la vez (X-Encoder, Predictor, Y-Encoder).
 
 ## 4. Pasos que siguen
 
 | # | Paso | Dónde | Depende de |
 |---|---|---|---|
 | 1 | Commit + push; `git pull` en el cluster | usuario | — |
-| 2 | ~~Verificar el lado de relleno~~ hecho (19-11): era `left`, corregido. Repetir la inspección de VL-JEPA (NF4 y bf16) | cluster | 1 |
+| 2 | ~~Verificar el lado de relleno~~ hecho (19-11): era `left`, corregido; inspección de VL-JEPA repetida | cluster | 1 |
 | 3 | Genérico k = 8 hasta 3 épocas, NF4 y bf16 (`ydecoder_msrvtt.txt` §2) | cluster | 1 |
 | 4 | `pytest tests/test_train_units.py tests/test_train_e2e.py` y luego `stage2_smoke.txt` (puede ir en paralelo con 3 si hay GPU) | cluster | 1 |
 | 5 | VL-JEPA en val con el genérico (piloto 200 × 6 prompts → val completo → prompt) | cluster | 2, 3 |
