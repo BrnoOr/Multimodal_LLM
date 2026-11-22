@@ -11,7 +11,7 @@ anotados en `configs/train/models/`: InternVL3 lr 1e-4 · r16 · ×5 (0.7995); L
 Qwen3.5 lr 1e-4 · r16 · ×1 (0.7930, empate con r64 · ×5 resuelto por **G4**, parsimonia, usuario 22-11). Las
 diferencias entre combinaciones son del orden del ruido de 500 imágenes; todos saturan en ≈ 0.79.
 
-**Sigue en el cluster:** `git pull` (no corre nada) → grilla de VL-JEPA (B4b, 12 corridas, GPU 1). Con su
+**Las dos GPU libres (22-11):** GPU 1 → grilla de VL-JEPA; GPU 0 → B5 de los 3 VLM (NF4 y bf16, job `s2_train_vlm`, `hparams_confirmed=true` por línea de comando; `pasos_cluster.md` B5). **Plan anterior:** `git pull` (no corre nada) → grilla de VL-JEPA (B4b, 12 corridas, GPU 1). Con su
 ganador anotado: `hparams_confirmed: true` → B5. `hparams_confirmed` es global, por eso no se activa antes (VL-JEPA
 correría con los valores por defecto). La GPU 0 seguía ocupada por un proceso ajeno.
 

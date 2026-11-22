@@ -63,7 +63,7 @@ def test_control_bf16_y_variantes_en_el_exp_id():
 
 def test_rechaza_lo_que_rompe_el_protocolo():
     with pytest.raises(ValueError, match="lote físico"):
-        compose_train(["model=vljepa", "train.micro_batch_size=64", *SHORT])
+        compose_train(["model=vljepa", "train.micro_batch_size=32", *SHORT])   # ≠ lote efectivo 64 (P8)
     with pytest.raises(ValueError, match="val_loss"):
         compose_train(["model=vljepa", "train.selection_metric=attr_mean", *SHORT])
     with pytest.raises(ValueError, match="exactitud por atributo"):

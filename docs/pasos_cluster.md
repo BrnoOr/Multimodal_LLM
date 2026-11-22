@@ -398,6 +398,20 @@ Push → `git pull` en el cluster.
 
 ### B5. Ajuste completo (1 época, NF4 y control bf16)
 
+**Reparto con las dos GPU libres (22-11-2026):** la GPU 1 corre la grilla de VL-JEPA (B4b) y la GPU 0 adelanta B5
+de los 3 VLM, que ya tienen ganador. `hparams_confirmed` sigue en `false` en `budget.yaml` (es global y VL-JEPA aún
+no tiene ganador), así que estas líneas lo activan por la línea de comando; queda registrado en el `config.yaml` y el
+`summary.json` de cada run:
+
+```bash
+grep '^model' configs/queues/stage2_train.txt | grep -v '^model=vljepa' | sed 's/$/ train.hparams_confirmed=true/' > /tmp/s2_train_vlm.txt
+cat /tmp/s2_train_vlm.txt           # 6 líneas: Qwen3.5, InternVL3, LLaVA-OV en NF4 y luego en bf16
+SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_train_vlm scripts/run_queue.sh /tmp/s2_train_vlm.txt
+```
+
+VL-JEPA (NF4 y bf16) entra después de su grilla, en la GPU 1, con su ganador por la línea de comando
+(`train.lr=… lora.r=… train.connector_lr_mult=…`), para no hacer `git pull` con `s2_train_vlm` corriendo.
+
 1 954 pasos con lote 64 por run; la duración por modelo se estima con los `img/s` del humo (columna
 `samples_per_s` de `train_log.jsonl`). NF4 en la GPU 0 y bf16 en la GPU 1:
 
