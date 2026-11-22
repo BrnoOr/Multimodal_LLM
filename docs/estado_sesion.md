@@ -4,17 +4,19 @@
 > este archivo primero. Los resultados medidos están en `docs/resultados_etapa1.md`; el protocolo, en
 > `docs/metodologia.md`; los comandos del cluster, paso a paso, en `docs/pasos_cluster.md`.
 
-## 0. Al retomar (20-11-2026, noche)
+## 0. Al retomar (22-11-2026)
 
-**Etapa 2, humo cerrado** (`docs/resultados_etapa2.md` §1): los 4 modelos entrenan y la pérdida baja. VL-JEPA con
-lote 64: 15.7 GB (NF4) y 21.1 GB (bf16). **Decisiones H1** (usuario, 20-11): `max_grad_norm` 0.3, `eval_every` 200,
-grilla de 150 pasos y YQ se mantiene (NF4).
+**Grilla de los 3 VLM hecha** (job `s2_grid_vlm`, 36/36 completas; `docs/resultados_etapa2.md` §2). Ganadores
+anotados en `configs/train/models/`: InternVL3 lr 1e-4 · r16 · ×5 (0.7995); LLaVA-OV lr 2e-4 · r64 · ×5 (0.7935);
+Qwen3.5 lr 1e-4 · r16 · ×1 (0.7930, empate con r64 · ×5 resuelto por **G4**, parsimonia, usuario 22-11). Las
+diferencias entre combinaciones son del orden del ruido de 500 imágenes; todos saturan en ≈ 0.79.
 
-**Siguiente en el cluster:** grilla de los 3 VLM (B4a, 36 corridas, GPU 1; `docs/pasos_cluster.md`). Después,
-grilla de VL-JEPA (B4b, 12 corridas).
+**Sigue en el cluster:** `git pull` (no corre nada) → grilla de VL-JEPA (B4b, 12 corridas, GPU 1). Con su
+ganador anotado: `hparams_confirmed: true` → B5. `hparams_confirmed` es global, por eso no se activa antes (VL-JEPA
+correría con los valores por defecto). La GPU 0 seguía ocupada por un proceso ajeno.
 
 **Pendientes del usuario:** P10 (Y-Decoder genérico bf16 para el control de la etapa 2; propuesto, sin aprobar);
-P4 (CLAUDE.md). Sin GPU: notebook 02 (§11c-bis).
+P4 (CLAUDE.md). Sin GPU: notebooks 02 (§11c-bis) y 03 §2–3 (bootstrap de robustez de la grilla).
 
 ## 1. Dónde estamos
 

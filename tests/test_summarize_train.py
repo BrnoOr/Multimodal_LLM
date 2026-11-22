@@ -81,3 +81,21 @@ def test_run_cortado_no_compite(tmp_path):
             st.summarize_run(_run(tmp_path, "cut", "qwen", 2e-4, "attr_mean", [(0, 0.4), (50, 0.9)],
                                   status="interrupted"))]
     assert st.sweep_winners(rows)[("qwen", "nf4")]["exp_id"] == "full"
+
+
+def test_empate_gana_la_mas_parsimoniosa(tmp_path):
+    # Caso real de Qwen3.5 (grilla del 21-11-2026): r16·×1 y r64·×5 con el mismo attr_mean en el paso 150.
+    # Desempate (decisión del usuario, 22-11-2026): menor r, luego menor multiplicador del conector.
+    rows = [st.summarize_run(_run(tmp_path, f"g{i}", "qwen", lr, "attr_mean", [(0, 0.4), (150, v)], r=r, mult=c))
+            for i, (lr, r, c, v) in enumerate([(1e-4, 64, 5.0, 0.793), (1e-4, 16, 1.0, 0.793),
+                                               (1e-4, 16, 5.0, 0.792), (2e-4, 64, 1.0, 0.7925)])]
+    w = st.sweep_winners(rows)[("qwen", "nf4")]
+    assert (w["lora_r"], w["connector_lr_mult"]) == (16, 1.0)
+    assert w["tied_with"] == ["g0"] and w["tie_unresolved"] == []
+
+
+def test_empate_solo_en_lr_se_avisa(tmp_path):
+    rows = [st.summarize_run(_run(tmp_path, f"g{i}", "qwen", lr, "attr_mean", [(0, 0.4), (150, 0.6)], r=16, mult=1.0))
+            for i, lr in enumerate([2e-4, 1e-4])]
+    w = st.sweep_winners(rows)[("qwen", "nf4")]
+    assert w["tie_unresolved"] == [w["tied_with"][0]] and len(w["tied_with"]) == 1

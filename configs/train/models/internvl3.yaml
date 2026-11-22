@@ -3,9 +3,10 @@
 
 train:
   micro_batch_size: 16      # solo memoria; 256 tokens visuales por imagen (una tesela de 448 px)
-  # lr: <ganador de la grilla>   (configs/train/grid.yaml; scripts/summarize_train.py --winners)
-  # connector_lr_mult: <ganador de la grilla>
+  # GANADOR de la grilla (s2_grid_vlm, 21-11-2026; docs/resultados_etapa2.md §2): attr_mean 0.7995 en el paso 150; 2.ª r64·×5 0.7975
+  lr: 1.0e-4
+  connector_lr_mult: 5.0
 
 lora:
-  # r: <ganador de la grilla>   (α = 16 queda común, budget.yaml)
+  r: 16                     # ganador de la grilla (α = 16 queda común, budget.yaml)
   connector_modules: [multi_modal_projector]   # LayerNorm + MLP InternViT -> Qwen2.5 (model.multi_modal_projector)

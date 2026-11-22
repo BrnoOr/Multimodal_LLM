@@ -71,4 +71,4 @@ def test_exp_id_marca_el_conector_solo_si_no_es_1():
     c1 = compose_train(base + ["train.connector_lr_mult=1"])
     c5 = compose_train(base + ["train.connector_lr_mult=5", "lora.r=16"])
     assert "_c" not in c1.exp_id.split("_lr")[1]
-    assert c5.exp_id == f"train_{c5.model.name}_nf4_p1_attributes_r16_lr0.0002_c5_e1_m10"
+    assert c5.exp_id == f"train_{c5.model.name}_nf4_p1_attributes_r16_lr0.0001_c5_e1_m10"   # lr: ganador de Qwen3.5 (configs/train/models/qwen35.yaml)

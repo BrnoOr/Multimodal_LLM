@@ -20,7 +20,8 @@ Columnas:
 
 Regla de la grilla (configs/train/grid.yaml): por modelo, gana la combinación (LR, r, multiplicador del
 conector) con mejor `val_last` (mayor attr_mean en los VLM, menor InfoNCE en VL-JEPA). Solo compiten los runs
-que llegaron al mismo último paso que el resto de su modelo. `--winners` imprime el ganador con las tres claves
+que llegaron al mismo último paso que el resto de su modelo. Empate exacto (decisión del usuario, 22-11-2026):
+gana la más parsimoniosa, menor r y luego menor multiplicador. `--winners` imprime el ganador con las tres claves
 que van a configs/train/models/<modelo>.yaml.
 """
 
@@ -82,6 +83,10 @@ def summarize_run(run_dir: Path) -> dict:
     return out
 
 
+# attr_mean va en saltos de 1/(4·500) = 0.0005: dos valores a menos de 1e-9 son el mismo conteo de aciertos.
+TIE_TOL = 1e-9
+
+
 def sweep_winners(rows: list[dict]) -> dict[tuple[str, str], dict]:
     """Por (modelo, quant): el run con mejor `val_last` entre todas sus combinaciones (regla de la grilla).
 
@@ -92,16 +97,24 @@ def sweep_winners(rows: list[dict]) -> dict[tuple[str, str], dict]:
         if r["val_last_step"] is not None:
             key = (r["model"], r["quant"])
             last[key] = max(last.get(key, 0), r["val_last_step"])
-    out: dict[tuple[str, str], dict] = {}
+    groups: dict[tuple[str, str], list[dict]] = {}
     for r in rows:
         if r["val_last"] is None or r["val_last_step"] != last[(r["model"], r["quant"])]:
             continue
-        key = (r["model"], r["quant"])
-        cur = out.get(key)
-        better = cur is None or (r["val_last"] < cur["val_last"] if r["sel_mode"] == "min"
-                                 else r["val_last"] > cur["val_last"])
-        if better:
-            out[key] = r
+        groups.setdefault((r["model"], r["quant"]), []).append(r)
+    out: dict[tuple[str, str], dict] = {}
+    for key, cand in groups.items():
+        sign = 1.0 if cand[0]["sel_mode"] == "min" else -1.0
+        best = min(sign * r["val_last"] for r in cand)
+        tied = [r for r in cand if abs(sign * r["val_last"] - best) <= TIE_TOL]
+        # Desempate (decisión del usuario, 22-11-2026): la combinación más parsimoniosa, menor r y luego menor
+        # multiplicador del conector. Si aún quedan empatadas (solo difieren en LR) no hay regla: se avisa.
+        tied.sort(key=lambda r: (r["lora_r"], r["connector_lr_mult"], r["lr"]))
+        win = dict(tied[0])
+        win["tied_with"] = [r["exp_id"] for r in tied[1:]]
+        win["tie_unresolved"] = [r["exp_id"] for r in tied[1:]
+                                 if (r["lora_r"], r["connector_lr_mult"]) == (win["lora_r"], win["connector_lr_mult"])]
+        out[key] = win
     return out
 
 
@@ -147,6 +160,11 @@ def main(argv=None) -> int:
             print(f"  {m:<22} {q:<5} train.lr={r['lr']:g}  lora.r={r['lora_r']}  "
                   f"train.connector_lr_mult={r['connector_lr_mult']:g}  {r['sel_metric']}={r['val_last']:.4f}  "
                   f"({r['exp_id']})")
+            if r["tied_with"]:
+                print(f"      empate exacto con {r['tied_with']}: gana la de menor r y luego menor multiplicador")
+            if r["tie_unresolved"]:
+                print(f"[resumen] AVISO: empate solo en LR, sin regla de desempate: {r['tie_unresolved']}",
+                      file=sys.stderr)
         incomplete = [r["exp_id"] for r in rows if r["status"] != "completed"]
         if incomplete:
             print(f"[resumen] AVISO: {len(incomplete)} runs sin completar: {incomplete[:4]}", file=sys.stderr)

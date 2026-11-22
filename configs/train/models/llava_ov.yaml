@@ -6,9 +6,10 @@ train:
   # ≈1 500 tokens visuales por imagen (AnyRes): las secuencias más largas de los 4. Si hay OOM el bucle
   # lo parte solo y lo registra.
   micro_batch_size: 8
-  # lr: <ganador de la grilla>   (configs/train/grid.yaml; scripts/summarize_train.py --winners)
-  # connector_lr_mult: <ganador de la grilla>
+  # GANADOR de la grilla (s2_grid_vlm, 21-11-2026; docs/resultados_etapa2.md §2): attr_mean 0.7935 en el paso 150; 2.ª r16·×5 0.7915
+  lr: 2.0e-4
+  connector_lr_mult: 5.0
 
 lora:
-  # r: <ganador de la grilla>   (α = 16 queda común, budget.yaml)
+  r: 64                     # ganador de la grilla (α = 16 queda común, budget.yaml)
   connector_modules: [multi_modal_projector]   # MLP de 2 capas SigLIP -> Qwen2 (model.multi_modal_projector)

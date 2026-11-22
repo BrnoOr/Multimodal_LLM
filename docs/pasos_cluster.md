@@ -354,6 +354,8 @@ así que B4b no espera nada más que la GPU.
 
 #### B4a. Grilla de los VLM (36 corridas)
 
+**Hecho (21-11-2026):** 36/36 completas; ganadores en `configs/train/models/` (`resultados_etapa2.md` §2, G4).
+
 Una GPU (la 1):
 
 ```bash

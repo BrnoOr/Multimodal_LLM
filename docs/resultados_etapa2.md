@@ -4,7 +4,7 @@
 > decisiones: §6.1. Análisis: `notebooks/03_resultados_etapa2.ipynb`. Comparación válida: entre nuestros 4
 > modelos bajo el mismo protocolo, no contra cifras de los papers (modelos de 7B o más) [CLAUDE.md §2].
 >
-> Estado (20-11-2026): prueba de humo hecha; grilla de hiperparámetros por lanzar.
+> Estado (22-11-2026): humo hecho; grilla de los 3 VLM hecha y ganadores anotados; grilla de VL-JEPA por lanzar.
 
 ## 1. Prueba de humo (paso 2.0, 20-11-2026)
 
@@ -51,3 +51,55 @@ Con `max_grad_norm` 0.3, el recorte actúa en todos los pasos de los 4 modelos. 
 optimizador divide por la escala del gradiente: lo que hace es normalizar la norma de cada paso. Es el mismo
 régimen de QLoRA [8]. Con 1.0 el recorte también actuaría casi siempre, porque todas las medianas superan 1.
 Son normas de los primeros 6 pasos, que suelen ser las más altas.
+
+## 2. Grilla de hiperparámetros de los VLM (paso B4a, job `s2_grid_vlm`, 20/21-11-2026)
+
+36 corridas NF4 (3 modelos × LR {1e-4, 2e-4, 5e-4} × r {16, 64} × conector {×1, ×5}), 150 pasos con lote 64,
+evaluación en las 500 imágenes de val en los pasos 0, 50, 100 y 150 (`configs/train/grid.yaml`). Las 36 terminaron
+(`status: completed`). Tabla completa: `runs/_tablas/s2_grid.csv` (`scripts/summarize_train.py --table s2_grid`).
+Análisis: notebook 03 §2–3.
+
+`attr_mean` en el paso 150 (regla de la grilla; G2):
+
+| LR · r · conector | InternVL3-1B | LLaVA-OV-0.5B | Qwen3.5-0.8B-Base |
+|---|---|---|---|
+| 1e-4 · 16 · ×1 | 0.7925 | 0.7825 | **0.7930** |
+| 1e-4 · 16 · ×5 | **0.7995** | 0.7890 | 0.7920 |
+| 1e-4 · 64 · ×1 | 0.7885 | 0.7825 | 0.7915 |
+| 1e-4 · 64 · ×5 | 0.7975 | 0.7910 | 0.7930 |
+| 2e-4 · 16 · ×1 | 0.7855 | 0.7795 | 0.7910 |
+| 2e-4 · 16 · ×5 | 0.7920 | 0.7915 | 0.7860 |
+| 2e-4 · 64 · ×1 | 0.7875 | 0.7830 | 0.7890 |
+| 2e-4 · 64 · ×5 | 0.7950 | **0.7935** | 0.7825 |
+| 5e-4 · 16 · ×1 | 0.7945 | 0.7880 | 0.7850 |
+| 5e-4 · 16 · ×5 | 0.7935 | 0.7845 | 0.7785 |
+| 5e-4 · 64 · ×1 | 0.7945 | 0.7895 | 0.7855 |
+| 5e-4 · 64 · ×5 | 0.7905 | 0.7885 | 0.7765 |
+| paso 0 (zero-shot, p1_attributes) | 0.284 | 0.303 | 0.429 |
+
+**Ganadores** (anotados en `configs/train/models/<modelo>.yaml`):
+
+| Modelo | LR | r | Conector | `attr_mean` (paso 150) | Segunda combinación |
+|---|---|---|---|---|---|
+| InternVL3-1B | 1e-4 | 16 | ×5 | 0.7995 | 1e-4 · 64 · ×5, 0.7975 |
+| LLaVA-OV-0.5B | 2e-4 | 64 | ×5 | 0.7935 | 2e-4 · 16 · ×5, 0.7915 |
+| Qwen3.5-0.8B-Base | 1e-4 | 16 | ×1 | 0.7930 | 1e-4 · 64 · ×5, 0.7930 (**empate**; G4) |
+
+Lectura (lo medido y lo que es estimación):
+
+- **Las diferencias entre combinaciones son pequeñas.** Dentro de cada modelo, el rango de las 12 va de 0.014
+  (InternVL3, LLaVA-OV) a 0.017 (Qwen3.5), y el ganador supera a la segunda por 0.000–0.002. Como referencia
+  (estimación, no medida): con 500 imágenes y p ≈ 0.8, el error estándar binomial de la exactitud de un atributo es
+  ≈ 0.018. La comparación entre combinaciones es pareada (mismas imágenes), lo que reduce ese error, pero el
+  ganador **no se distingue con seguridad** de varias alternativas. La robustez se cuantifica con el bootstrap
+  pareado del notebook 03 §3 (`val_predictions` de cada corrida). Para el ajuste completo esto es poco grave:
+  cualquier combinación cercana al máximo daría resultados equivalentes.
+- **Qwen3.5:** empate exacto en 0.7930; se resolvió con la regla G4 (parsimonia), decidida por el usuario el
+  22-11-2026, después de ver la tabla. Se declara así.
+- **El ajuste satura pronto.** En 19 de las 36 corridas el mejor paso evaluado es el 50 (3 200 imágenes) y la pérdida de
+  entrenamiento final es ≈ 0.19–0.23 en todas. De 0.28–0.43 (zero-shot) se pasa a ≈ 0.79 en los tres modelos,
+  que quedan a ≤ 0.02 entre sí. La época completa (1 954 pasos) dirá si ese techo se mueve.
+- **Tendencias débiles:** el conector ×5 gana en InternVL3 y LLaVA-OV, y en Qwen3.5 LR 5e-4 es lo peor. Con el
+  ruido anterior son indicios, no conclusiones.
+- **Limitación declarada (G2):** cada combinación se compara tras un schedule corto completo (LR recocido a 0 en
+  150 pasos), no dentro de una época.

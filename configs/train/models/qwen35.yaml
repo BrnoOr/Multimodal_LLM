@@ -5,9 +5,10 @@
 
 train:
   micro_batch_size: 32      # solo memoria; ≈64 tokens visuales por imagen
-  # lr: <ganador de la grilla>   (configs/train/grid.yaml; scripts/summarize_train.py --winners)
-  # connector_lr_mult: <ganador de la grilla>
+  # GANADOR de la grilla (s2_grid_vlm, 21-11-2026; docs/resultados_etapa2.md §2): attr_mean 0.7930 en el paso 150, EMPATE exacto con r64·×5: desempate por parsimonia
+  lr: 1.0e-4
+  connector_lr_mult: 1.0
 
 lora:
-  # r: <ganador de la grilla>   (α = 16 queda común, budget.yaml)
+  r: 16                     # ganador de la grilla (α = 16 queda común, budget.yaml)
   connector_modules: [visual.merger]   # fusión 2×2 de parches + MLP hacia el LM (dentro del módulo visual)
