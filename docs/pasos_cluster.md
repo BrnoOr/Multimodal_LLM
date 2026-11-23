@@ -518,6 +518,8 @@ Resultado: `runs/final_test/tabla_final.csv`.
 
 ## Anexo — Traer resultados al laptop (solo archivos chicos)
 
+Para las figuras y tablas del informe hay un flujo propio y versionado: `scripts/collect_reports.py` + notebooks 02/03 → `reports/` → `scp` → commit en el laptop (`reports/README.md`). Lo que sigue es para material de trabajo que no va al repo.
+
 En el cluster, juntar lo pedido en una carpeta temporal (ejemplo: tablas y resúmenes):
 
 ```bash
