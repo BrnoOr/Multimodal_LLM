@@ -37,7 +37,7 @@ data:
   num_workers: 4
 
 train:
-  hparams_confirmed: false      # true tras P8 y con el ganador de la grilla anotado en configs/train/models/ (P5 ya confirmado)
+  hparams_confirmed: true       # 22-11-2026: P5′, P8, H1 y los 4 ganadores de la grilla anotados en configs/train/models/
   epochs: 1                     # CLAUDE.md §3
   # P8 (20-11-2026): 64 para los cuatro, por la regla acordada. La propuesta era 128 (comparación controlada de
   # [5] §4.5), pero VL-JEPA necesita lote FÍSICO = efectivo (InfoNCE toma los negativos del lote, M §2.3) y con

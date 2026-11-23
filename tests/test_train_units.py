@@ -15,8 +15,8 @@ from vlmfid.train.objectives import duplicate_mask, duplicate_stats, infonce_los
 MODELS = ["llava_ov", "internvl3", "qwen35", "vljepa"]
 SHORT = ["train.max_steps=10"]          # corrida corta: la única permitida mientras no se confirmen los valores
 # Ganadores de la grilla anotados en configs/train/models/ (docs/resultados_etapa2.md §2): (lr, r, multiplicador).
-# VL-JEPA aún sin ganador: hereda los de budget.yaml.
-WINNERS = {"internvl3": (1e-4, 16, 5.0), "llava_ov": (2e-4, 64, 5.0), "qwen35": (1e-4, 16, 1.0)}
+WINNERS = {"internvl3": (1e-4, 16, 5.0), "llava_ov": (2e-4, 64, 5.0), "qwen35": (1e-4, 16, 1.0),
+           "vljepa": (5e-4, 64, 1.0)}
 
 
 @pytest.mark.parametrize("m", MODELS)
@@ -32,7 +32,7 @@ def test_presupuesto_comun(m):
     assert c.model.quant == "nf4"                               # QLoRA, como la etapa 1
     assert c.lora.connector_modules                              # conector entrenable
     assert c.prompt.id == "p1_attributes"                        # el mismo prompt en los 4 (decisión del usuario)
-    lr, r, mult = WINNERS.get(m, (budget.train.lr, budget.lora.r, budget.train.connector_lr_mult))
+    lr, r, mult = WINNERS[m]
     assert (c.train.lr, c.lora.r, c.train.connector_lr_mult) == (lr, r, mult)
     tag = "" if mult == 1 else f"_c{mult:g}"
     assert c.exp_id == f"train_{c.model.name}_nf4_p1_attributes_r{r}_lr{lr:g}{tag}_e1_m10"
@@ -50,7 +50,7 @@ def test_seleccion_por_familia():
 
 def test_candado_de_hiperparametros():
     with pytest.raises(ValueError, match="sin confirmar"):
-        compose_train(["model=qwen35"])
+        compose_train(["model=qwen35", "train.hparams_confirmed=false"])
     c = compose_train(["model=qwen35", "train.hparams_confirmed=true"])
     assert c.exp_id == "train_qwen35_08b_base_nf4_p1_attributes_r16_lr0.0001_e1"
 

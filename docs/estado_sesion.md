@@ -4,19 +4,19 @@
 > este archivo primero. Los resultados medidos están en `docs/resultados_etapa1.md`; el protocolo, en
 > `docs/metodologia.md`; los comandos del cluster, paso a paso, en `docs/pasos_cluster.md`.
 
-## 0. Al retomar (22-11-2026)
+## 0. Al retomar (22-11-2026, tarde)
 
-**Grilla de los 3 VLM hecha** (job `s2_grid_vlm`, 36/36 completas; `docs/resultados_etapa2.md` §2). Ganadores
-anotados en `configs/train/models/`: InternVL3 lr 1e-4 · r16 · ×5 (0.7995); LLaVA-OV lr 2e-4 · r64 · ×5 (0.7935);
-Qwen3.5 lr 1e-4 · r16 · ×1 (0.7930, empate con r64 · ×5 resuelto por **G4**, parsimonia, usuario 22-11). Las
-diferencias entre combinaciones son del orden del ruido de 500 imágenes; todos saturan en ≈ 0.79.
+**Hecho:** grilla de los 4 (`resultados_etapa2.md` §2–3) y ajuste completo de los 3 VLM, NF4 y bf16 (§4: attr_mean
+0.82–0.83 en las 500 de val). Ganador de VL-JEPA lr 5e-4 · r64 · ×1, en el borde del eje de LR: aceptado y declarado
+(**G5**). `hparams_confirmed: true`. Adaptadores anotados en `final_test.yaml`, `stage2_val.txt`, `stage2_infoloss.txt`
+y `ydecoder_msrvtt.txt` §4 (exp_id esperados; comprobar con `ls -d runs/train_*_e1/adapter_best`).
 
-**Las dos GPU libres (22-11):** GPU 1 → grilla de VL-JEPA; GPU 0 → B5 de los 3 VLM (NF4 y bf16, job `s2_train_vlm`, `hparams_confirmed=true` por línea de comando; `pasos_cluster.md` B5). **Plan anterior:** `git pull` (no corre nada) → grilla de VL-JEPA (B4b, 12 corridas, GPU 1). Con su
-ganador anotado: `hparams_confirmed: true` → B5. `hparams_confirmed` es global, por eso no se activa antes (VL-JEPA
-correría con los valores por defecto). La GPU 0 seguía ocupada por un proceso ajeno.
+**Siguiente en el cluster** (`pasos_cluster.md` B5–B7): GPU 0 → ajuste de VL-JEPA (NF4 y luego bf16, job `s2_train_vj`);
+GPU 1 → val completo de los 6 VLM ajustados (job `s2_val_vlm`). Después: B6 (Y-Decoder de la etapa 2, NF4, 20 épocas)
+→ B7 de VL-JEPA → B8.
 
-**Pendientes del usuario:** P10 (Y-Decoder genérico bf16 para el control de la etapa 2; propuesto, sin aprobar);
-P4 (CLAUDE.md). Sin GPU: notebooks 02 (§11c-bis) y 03 §2–3 (bootstrap de robustez de la grilla).
+**Pendientes del usuario:** P10 (decodificador bf16 de VL-JEPA; bloquea solo su control bf16 en B6/B7) y P4
+(CLAUDE.md). Sin GPU: notebooks 02 (§11c-bis) y 03.
 
 ## 1. Dónde estamos
 

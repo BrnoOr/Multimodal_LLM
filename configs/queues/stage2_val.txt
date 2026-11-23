@@ -13,12 +13,12 @@
 #
 #   GPU=0 scripts/launch.sh s2_val scripts/run_queue.sh configs/queues/stage2_val.txt
 #   uv run --no-sync python scripts/score.py runs/finetuned_*_val --table etapa2_val
-model=qwen35     stage=finetuned prompt=p1_attributes model.adapter_path=runs/<TRAIN_QWEN>/adapter_best
-model=internvl3  stage=finetuned prompt=p1_attributes model.adapter_path=runs/<TRAIN_INTERNVL>/adapter_best
-model=llava_ov   stage=finetuned prompt=p1_attributes model.adapter_path=runs/<TRAIN_LLAVA>/adapter_best
-model=vljepa     stage=finetuned prompt=p1_attributes infer.save_embeddings=true model.adapter_path=runs/<TRAIN_VLJEPA>/adapter_best model.decoder_path=runs/<YDEC_FT>/decoder_best
+model=qwen35     stage=finetuned prompt=p1_attributes model.adapter_path=runs/train_qwen35_08b_base_nf4_p1_attributes_r16_lr0.0001_e1/adapter_best
+model=internvl3  stage=finetuned prompt=p1_attributes model.adapter_path=runs/train_internvl3_1b_nf4_p1_attributes_r16_lr0.0001_c5_e1/adapter_best
+model=llava_ov   stage=finetuned prompt=p1_attributes model.adapter_path=runs/train_llava_ov_05b_nf4_p1_attributes_r64_lr0.0002_c5_e1/adapter_best
+model=vljepa     stage=finetuned prompt=p1_attributes infer.save_embeddings=true model.adapter_path=runs/train_vljepa_open_msrvtt_nf4_p1_attributes_r64_lr0.0005_e1/adapter_best model.decoder_path=runs/ydec_vljepa_open_msrvtt_nf4_ft_nf4_k8_r64_e20_cont/decoder_best
 # Control bf16 (D6): adaptador bf16 sobre base bf16; en VL-JEPA, también su decodificador bf16 (P10).
-model=qwen35     stage=finetuned prompt=p1_attributes model.quant=bf16 model.adapter_path=runs/<TRAIN_QWEN_BF16>/adapter_best
-model=internvl3  stage=finetuned prompt=p1_attributes model.quant=bf16 model.adapter_path=runs/<TRAIN_INTERNVL_BF16>/adapter_best
-model=llava_ov   stage=finetuned prompt=p1_attributes model.quant=bf16 model.adapter_path=runs/<TRAIN_LLAVA_BF16>/adapter_best
-model=vljepa     stage=finetuned prompt=p1_attributes model.quant=bf16 infer.save_embeddings=true model.adapter_path=runs/<TRAIN_VLJEPA_BF16>/adapter_best model.decoder_path=runs/<YDEC_FT_BF16>/decoder_best
+model=qwen35     stage=finetuned prompt=p1_attributes model.quant=bf16 model.adapter_path=runs/train_qwen35_08b_base_bf16_p1_attributes_r16_lr0.0001_e1/adapter_best
+model=internvl3  stage=finetuned prompt=p1_attributes model.quant=bf16 model.adapter_path=runs/train_internvl3_1b_bf16_p1_attributes_r16_lr0.0001_c5_e1/adapter_best
+model=llava_ov   stage=finetuned prompt=p1_attributes model.quant=bf16 model.adapter_path=runs/train_llava_ov_05b_bf16_p1_attributes_r64_lr0.0002_c5_e1/adapter_best
+model=vljepa     stage=finetuned prompt=p1_attributes model.quant=bf16 infer.save_embeddings=true model.adapter_path=runs/train_vljepa_open_msrvtt_bf16_p1_attributes_r64_lr0.0005_e1/adapter_best model.decoder_path=runs/<YDEC_FT_BF16>/decoder_best

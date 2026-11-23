@@ -13,11 +13,13 @@ train:
   # P7 (decisión del usuario, 16-11-2026): durante el ajuste no hay Y-Decoder válido (el Y-Encoder cambia),
   # así que el paso se elige por la InfoNCE en val (mínima). Diferencia declarada frente a los VLM.
   selection_metric: val_loss
-  # lr: <ganador de la grilla>   (configs/train/grid.yaml; scripts/summarize_train.py --winners)
-  # connector_lr_mult: <ganador de la grilla>
+  # GANADOR de la grilla (s2_grid_vljepa, 22-11-2026; docs/resultados_etapa2.md §3): InfoNCE val 0.6326 en el paso 150.
+  # Queda en el BORDE del eje de LR (5e-4 es el máximo): aceptado y declarado (G5, usuario 22-11-2026).
+  lr: 5.0e-4
+  connector_lr_mult: 1.0
 
 lora:
-  # r: <ganador de la grilla>   (α = 16 queda común, budget.yaml)
+  r: 64                     # ganador de la grilla (α = 16 queda común, budget.yaml)
   connector_modules: [predictor.vis_proj, predictor.out_proj, y_encoder.projector]
 
 objective:

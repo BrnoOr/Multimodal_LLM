@@ -441,6 +441,16 @@ ls -d runs/train_*_e1/adapter_best
 **Mandar a Claude:** la tabla. Claude anota cada `adapter_best` en `configs/final_test.yaml` (`*_ft_*`) y llena los
 marcadores de `configs/queues/stage2_val.txt` y de las colas de VL-JEPA.
 
+**Estado (22-11-2026):** los 3 VLM hechos (NF4 y bf16, `resultados_etapa2.md` §4). VL-JEPA, con
+`hparams_confirmed: true` ya en `budget.yaml` (G5), en la GPU 0 mientras la GPU 1 hace el val completo de los VLM:
+
+```bash
+grep '^model=vljepa' configs/queues/stage2_train.txt > /tmp/s2_train_vj.txt              # 2 líneas: NF4, bf16
+SCRIPT=scripts/train.py GPU=0 scripts/launch.sh s2_train_vj scripts/run_queue.sh /tmp/s2_train_vj.txt
+grep '^model' configs/queues/stage2_val.txt | grep -v '^model=vljepa' > /tmp/s2_val_vlm.txt  # 6 líneas
+GPU=1 scripts/launch.sh s2_val_vlm scripts/run_queue.sh /tmp/s2_val_vlm.txt
+```
+
 ### B6. Y-Decoder de la etapa 2 (sobre el Y-Encoder ajustado)
 
 Requiere el adaptador de VL-JEPA (B5) y las épocas decididas (A6). Claude descomenta `configs/queues/ydecoder_msrvtt.txt`

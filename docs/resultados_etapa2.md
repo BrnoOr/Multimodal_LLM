@@ -4,7 +4,8 @@
 > decisiones: §6.1. Análisis: `notebooks/03_resultados_etapa2.ipynb`. Comparación válida: entre nuestros 4
 > modelos bajo el mismo protocolo, no contra cifras de los papers (modelos de 7B o más) [CLAUDE.md §2].
 >
-> Estado (22-11-2026): humo hecho; grilla de los 3 VLM hecha y ganadores anotados; grilla de VL-JEPA por lanzar.
+> Estado (22-11-2026): humo y grilla completos (los 4); ajuste completo de los 3 VLM hecho (NF4 y bf16);
+> ajuste de VL-JEPA y evaluación en val completo por lanzar.
 
 ## 1. Prueba de humo (paso 2.0, 20-11-2026)
 
@@ -103,3 +104,53 @@ Lectura (lo medido y lo que es estimación):
   ruido anterior son indicios, no conclusiones.
 - **Limitación declarada (G2):** cada combinación se compara tras un schedule corto completo (LR recocido a 0 en
   150 pasos), no dentro de una época.
+
+## 3. Grilla de VL-JEPA (paso B4b, job `s2_grid_vljepa`, 21/22-11-2026)
+
+12 corridas NF4, mismo protocolo; métrica: InfoNCE en val (500 imágenes, lote 64; menor es mejor; azar ≈ ln 64 =
+4.16). Las 12 terminaron; el paso 0 da 4.382 en todas. Tabla: `runs/_tablas/s2_grid_vljepa.csv`.
+
+| LR · r | ×1 | ×5 |
+|---|---|---|
+| 1e-4 · 16 | 1.607 | 1.237 |
+| 1e-4 · 64 | 1.615 | 1.240 |
+| 2e-4 · 16 | 1.030 | 0.927 |
+| 2e-4 · 64 | 1.011 | 0.891 |
+| 5e-4 · 16 | 0.641 | 0.853 |
+| 5e-4 · 64 | **0.633** | 0.781 |
+
+**Ganador:** lr 5e-4 · r64 · ×1 (`configs/train/models/vljepa.yaml`). Lectura:
+
+- **A diferencia de los VLM, aquí la grilla separa con claridad**: la InfoNCE va de 1.6 a 0.63, y el mejor paso es
+  el 150 en las 12 corridas (no hay meseta en 150 pasos).
+- **El LR domina.** El rango casi no importa (r16 frente a r64: ≤ 0.07). El multiplicador del conector interactúa
+  con el LR: ×5 ayuda con LR 1e-4 y 2e-4 y empeora con 5e-4. Lectura posible (no comprobada): el conector
+  rinde mejor con un LR efectivo de ≈ 5e-4–1e-3, que se alcanza con 1e-4 · ×5 o con 5e-4 · ×1, y 2.5e-3 (5e-4 · ×5)
+  ya es demasiado.
+- **El ganador está en el borde del eje de LR** (G5): podría haber un óptimo por encima de 5e-4, o la grilla corta
+  podría favorecer el LR alto porque avanza más en 150 pasos. Se acepta y se declara (usuario, 22-11-2026).
+- La InfoNCE de val mide discriminación en el espacio de embeddings, no la exactitud por atributo: el número
+  comparable con los VLM sale de B7, con el Y-Decoder de la etapa 2.
+
+## 4. Ajuste completo de los VLM (paso B5, job `s2_train_vlm`, 21/22-11-2026)
+
+1 época (1 954 pasos, lote 64) con el ganador de cada modelo; NF4 y control bf16. Las 6 terminaron
+(`runs/_tablas/s2_train.csv`). `attr_mean` en las 500 imágenes de val (P1):
+
+| Modelo | Precisión | Paso 0 | Paso 1 954 | Mejor paso | Mejor valor | Pico (GB) |
+|---|---|---|---|---|---|---|
+| InternVL3-1B | NF4 | 0.284 | 0.8115 | 400 | 0.8175 | 14.35 |
+| InternVL3-1B | bf16 | 0.229 | 0.8245 | 1 954 | 0.8245 | 12.27 |
+| LLaVA-OV-0.5B | NF4 | 0.303 | 0.8180 | 1 400 | 0.8245 | 13.08 |
+| LLaVA-OV-0.5B | bf16 | 0.275 | 0.8155 | 400 | 0.8305 | 12.15 |
+| Qwen3.5-0.8B-Base | NF4 | 0.429 | 0.8200 | 1 954 | 0.8200 | 4.24 |
+| Qwen3.5-0.8B-Base | bf16 | 0.455 | 0.8270 | 400 | 0.8270 | 5.03 |
+
+- **La época completa sube ≈ 0.02–0.03 sobre la grilla** (≈ 0.79–0.80 en 150 pasos), y los tres modelos quedan
+  entre 0.82 y 0.83. La curva se aplana pronto: en 3 de 6 el mejor paso es el 400 (≈ 20 % de la época).
+- **El "mejor valor" es optimista**: es el máximo de 11 evaluaciones sobre las mismas 500 imágenes con que se
+  elige. El número que se reporta en val es el de las 10 000 (B7, P1).
+- **bf16 frente a NF4:** en el mejor valor, bf16 queda 0.006–0.007 arriba en los tres. Es del orden del ruido de 500
+  imágenes; B7 (10 000) dirá si hay una diferencia real.
+- **El paso 0 difiere entre NF4 y bf16** (p. ej. InternVL3 0.284 frente a 0.229): es el zero-shot de cada precisión
+  sobre 500 imágenes, coherente con el control bf16 de la etapa 1.
