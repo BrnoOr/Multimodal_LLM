@@ -4,7 +4,17 @@
 > este archivo primero. Los resultados medidos están en `docs/resultados_etapa1.md`; el protocolo, en
 > `docs/metodologia.md`; los comandos del cluster, paso a paso, en `docs/pasos_cluster.md`.
 
-## 0. Al retomar (23-11-2026, noche)
+## 0. Al retomar (24-11-2026)
+
+**Test hecho, una sola vez** (job `final_test`, 14 condiciones; `docs/resultados_test.md`). Test reproduce val
+(todas las condiciones a ≤ 0.005, mismo orden): ajustados NF4 Qwen3.5 0.818, InternVL3 0.817, LLaVA-OV 0.817,
+VL-JEPA 0.809; zero-shot 0.416 / 0.269 / 0.311 / 0.004. **No volver a correr test.** Presentación actualizada.
+
+**Siguiente:** `collect_reports.py` (copia `tabla_final.csv` a `reports/tables/final/`) + notebooks 02 y 03 →
+scp → commit en el laptop; redactar el informe. **Decisión pendiente:** pruebas pareadas en test
+(`resultados_test.md` §4).
+
+### Antes del test (23-11-2026, noche)
 
 **Etapa 2 completa en val** (`resultados_etapa2.md` §5–8): VLM ajustados 0.815–0.816 y VL-JEPA ajustado 0.807 (NF4,
 val 10 000); forma y posición ≈ 1 en los cuatro, la diferencia está solo en el color. Y-Decoder de la etapa 2: techo

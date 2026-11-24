@@ -5,7 +5,7 @@
 > modelos bajo el mismo protocolo, no contra cifras de los papers (modelos de 7B o más) [CLAUDE.md §2].
 >
 > Estado (23-11-2026): etapa 2 completa en val (humo, grilla, ajuste, val completo de los 4, pérdida de información).
-> Falta solo el test final (una vez).
+> Test final hecho el 24-11-2026: `docs/resultados_test.md`.
 
 ## 1. Prueba de humo (paso 2.0, 20-11-2026)
 
