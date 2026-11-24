@@ -4,19 +4,17 @@
 > este archivo primero. Los resultados medidos están en `docs/resultados_etapa1.md`; el protocolo, en
 > `docs/metodologia.md`; los comandos del cluster, paso a paso, en `docs/pasos_cluster.md`.
 
-## 0. Al retomar (22-11-2026, tarde)
+## 0. Al retomar (23-11-2026, tarde)
 
-**Hecho:** grilla de los 4 (`resultados_etapa2.md` §2–3) y ajuste completo de los 3 VLM, NF4 y bf16 (§4: attr_mean
-0.82–0.83 en las 500 de val). Ganador de VL-JEPA lr 5e-4 · r64 · ×1, en el borde del eje de LR: aceptado y declarado
-(**G5**). `hparams_confirmed: true`. Adaptadores anotados en `final_test.yaml`, `stage2_val.txt`, `stage2_infoloss.txt`
-y `ydecoder_msrvtt.txt` §4 (exp_id esperados; comprobar con `ls -d runs/train_*_e1/adapter_best`).
+**Hecho:** `s2_cadena` (9/9 con código 0): ajuste de VL-JEPA NF4 y bf16 (InfoNCE val 0.233 / 0.235), Y-Decoder de la
+etapa 2 (20 épocas) y val completo de los 6 VLM ajustados (attr_mean NF4 0.815–0.816; forma y posición ≈ 1, el error
+que queda es de color). `resultados_etapa2.md` §5–6. P10′ = (a). Presentación en `docs/presentacion_avance.pptx`.
 
-**Siguiente en el cluster** (`pasos_cluster.md` B5–B7): GPU 0 → ajuste de VL-JEPA (NF4 y luego bf16, job `s2_train_vj`);
-GPU 1 → val completo de los 6 VLM ajustados (job `s2_val_vlm`). Después: B6 (Y-Decoder de la etapa 2, NF4, 20 épocas)
-→ B7 de VL-JEPA → B8.
+**Siguiente en el cluster (GPU 1):** `git pull` (apartando antes `reports/` generados ahí) → job `s2_cierre`: B7 de
+VL-JEPA (línea NF4 de `stage2_val.txt`) y B8 (`stage2_infoloss.txt`). Revisar la curva del Y-Decoder de la etapa 2.
+Después: `score.py`, `collect_reports.py`, notebooks 02 y 03 → `reports/`, y el test final (14 condiciones).
 
-**Pendientes del usuario:** P10 (decodificador bf16 de VL-JEPA; bloquea solo su control bf16 en B6/B7) y P4
-(CLAUDE.md). Sin GPU: notebooks 02 (§11c-bis) y 03.
+**Pendientes del usuario:** P4 (CLAUDE.md).
 
 ## 1. Dónde estamos
 

@@ -43,4 +43,5 @@ entries:
   # - {label: vljepa_zs_bf16,    model: vljepa,    quant: bf16, prompt: null, needs_decoder: true, decoder_path: null}
   # - {label: vljepa_zs_nf4_decm3di, model: vljepa, quant: nf4, prompt: null, needs_decoder: true, decoder_path: null}
   - {label: vljepa_ft_nf4,     model: vljepa,    quant: nf4,  prompt: p1_attributes, needs_adapter: true, adapter_path: runs/train_vljepa_open_msrvtt_nf4_p1_attributes_r64_lr0.0005_e1/adapter_best, needs_decoder: true, decoder_path: runs/ydec_vljepa_open_msrvtt_nf4_ft_nf4_k8_r64_e20_cont/decoder_best}
-  - {label: vljepa_ft_bf16,    model: vljepa,    quant: bf16, prompt: p1_attributes, needs_adapter: true, adapter_path: runs/train_vljepa_open_msrvtt_bf16_p1_attributes_r64_lr0.0005_e1/adapter_best, needs_decoder: true, decoder_path: null}
+  # P10′ (a), 23-11-2026: sin Y-Decoder bf16; el control bf16 de VL-JEPA se reporta solo en el espacio de embeddings.
+  # - {label: vljepa_ft_bf16,    model: vljepa,    quant: bf16, prompt: p1_attributes, needs_adapter: true, adapter_path: runs/train_vljepa_open_msrvtt_bf16_p1_attributes_r64_lr0.0005_e1/adapter_best, needs_decoder: true, decoder_path: null}

@@ -505,7 +505,7 @@ Solo cuando las etapas 1 y 2 estén aprobadas y `configs/final_test.yaml` no ten
 uv run --no-sync python scripts/final_test.py --dry-run
 ```
 
-**Bien si:** `plan válido: 17 runs. No se leyó test`. Revisar la lista con Claude **antes** de confirmar: al primer
+**Bien si:** `plan válido: 14 runs. No se leyó test`. Revisar la lista con Claude **antes** de confirmar: al primer
 lanzamiento el plan se congela (`runs/final_test/plan.lock.yaml`) y no puede cambiar.
 
 ```bash

@@ -17,8 +17,9 @@ model=qwen35     stage=finetuned prompt=p1_attributes model.adapter_path=runs/tr
 model=internvl3  stage=finetuned prompt=p1_attributes model.adapter_path=runs/train_internvl3_1b_nf4_p1_attributes_r16_lr0.0001_c5_e1/adapter_best
 model=llava_ov   stage=finetuned prompt=p1_attributes model.adapter_path=runs/train_llava_ov_05b_nf4_p1_attributes_r64_lr0.0002_c5_e1/adapter_best
 model=vljepa     stage=finetuned prompt=p1_attributes infer.save_embeddings=true model.adapter_path=runs/train_vljepa_open_msrvtt_nf4_p1_attributes_r64_lr0.0005_e1/adapter_best model.decoder_path=runs/ydec_vljepa_open_msrvtt_nf4_ft_nf4_k8_r64_e20_cont/decoder_best
-# Control bf16 (D6): adaptador bf16 sobre base bf16; en VL-JEPA, también su decodificador bf16 (P10).
+# Control bf16 (D6): adaptador bf16 sobre base bf16. VL-JEPA bf16 no va (P10′ a, 23-11-2026).
 model=qwen35     stage=finetuned prompt=p1_attributes model.quant=bf16 model.adapter_path=runs/train_qwen35_08b_base_bf16_p1_attributes_r16_lr0.0001_e1/adapter_best
 model=internvl3  stage=finetuned prompt=p1_attributes model.quant=bf16 model.adapter_path=runs/train_internvl3_1b_bf16_p1_attributes_r16_lr0.0001_c5_e1/adapter_best
 model=llava_ov   stage=finetuned prompt=p1_attributes model.quant=bf16 model.adapter_path=runs/train_llava_ov_05b_bf16_p1_attributes_r64_lr0.0002_c5_e1/adapter_best
-model=vljepa     stage=finetuned prompt=p1_attributes model.quant=bf16 infer.save_embeddings=true model.adapter_path=runs/train_vljepa_open_msrvtt_bf16_p1_attributes_r64_lr0.0005_e1/adapter_best model.decoder_path=runs/<YDEC_FT_BF16>/decoder_best
+# P10′ (a): sin decodificador bf16, no se evalúa en texto.
+# model=vljepa     stage=finetuned prompt=p1_attributes model.quant=bf16 infer.save_embeddings=true model.adapter_path=runs/train_vljepa_open_msrvtt_bf16_p1_attributes_r64_lr0.0005_e1/adapter_best model.decoder_path=runs/<YDEC_FT_BF16>/decoder_best

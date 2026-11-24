@@ -4,8 +4,8 @@
 > decisiones: §6.1. Análisis: `notebooks/03_resultados_etapa2.ipynb`. Comparación válida: entre nuestros 4
 > modelos bajo el mismo protocolo, no contra cifras de los papers (modelos de 7B o más) [CLAUDE.md §2].
 >
-> Estado (22-11-2026): humo y grilla completos (los 4); ajuste completo de los 3 VLM hecho (NF4 y bf16);
-> ajuste de VL-JEPA y evaluación en val completo por lanzar.
+> Estado (23-11-2026): humo, grilla y ajuste completo de los 4 hechos; val completo de los 3 VLM ajustados hecho;
+> VL-JEPA en val completo (B7) y pérdida de información (B8) por lanzar.
 
 ## 1. Prueba de humo (paso 2.0, 20-11-2026)
 
@@ -154,3 +154,60 @@ Lectura (lo medido y lo que es estimación):
   imágenes; B7 (10 000) dirá si hay una diferencia real.
 - **El paso 0 difiere entre NF4 y bf16** (p. ej. InternVL3 0.284 frente a 0.229): es el zero-shot de cada precisión
   sobre 500 imágenes, coherente con el control bf16 de la etapa 1.
+
+## 5. Ajuste completo de VL-JEPA (paso B5, job `s2_cadena`, 23-11-2026)
+
+1 época (1 954 pasos, lote 64) con el ganador de la grilla (lr 5e-4 · r64 · ×1). Métrica de selección: InfoNCE
+bidireccional en las 500 imágenes de val (P7; azar ≈ ln 64 = 4.16). `runs/_tablas/s2_train_vj.csv`.
+
+| Precisión | Pérdida train (primera → última) | InfoNCE val, paso 0 | InfoNCE val, paso 1 954 (= mejor) | Pico (GB) | Duración |
+|---|---|---|---|---|---|
+| NF4 | 4.133 → 0.177 | 4.382 | **0.2334** | 15.73 | 8 666 s |
+| bf16 | 4.062 → 0.179 | 4.306 | **0.2347** | 21.09 | 8 948 s |
+
+- **El ajuste lleva a VL-JEPA de no discriminar (InfoNCE sobre el azar) a discriminar con claridad** entre las 64
+  imágenes de cada lote. La grilla, con 150 pasos, había llegado a 0.63.
+- **El mejor paso es el último en ambas precisiones**: a diferencia de los VLM, no hay meseta dentro de la época.
+  Más pasos probablemente seguirían bajando la InfoNCE; el presupuesto es el mismo para los cuatro (1 época).
+- **Control bf16 (P10′, solo en embeddings): NF4 y bf16 quedan prácticamente iguales** (0.2334 frente a 0.2347).
+  Tras el ajuste, la desventaja de NF4 que dejaba el Y-Encoder cuantizado en zero-shot (coseno 0.876 contra bf16,
+  `resultados_etapa1.md` §7.4) no se ve en la InfoNCE. Es una comparación sobre 500 imágenes y una sola semilla.
+- La InfoNCE mide discriminación en el espacio de embeddings, no exactitud por atributo: la cifra comparable con los
+  VLM sale de B7 (val completo con el Y-Decoder de la etapa 2).
+
+Y-Decoder de la etapa 2 (B6, 20 épocas sobre el Y-Encoder ajustado): terminó (código 0, 2 988 s); su curva y su
+mejor paso, pendientes de revisar (`runs/ydec_vljepa_open_msrvtt_nf4_ft_nf4_k8_r64_e20_cont`).
+
+## 6. Val completo de los VLM ajustados (paso B7, job `s2_cadena`, 23-11-2026)
+
+`adapter_best` de cada ajuste sobre las 10 000 imágenes de val, prompt `p1_attributes`, mismo `infer.py` y
+`score.py` que la etapa 1 (P1). `runs/_tablas/etapa2_val.csv`. 0 respuestas cortadas; mediana de 20–22 tokens.
+
+| Modelo | Precisión | forma | x | y | color | attr_mean | Bleu-4 | ROUGE-L | CIDEr | Zero-shot p1 (NF4) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Qwen3.5-0.8B-Base | NF4 | 0.999 | 1.000 | 0.999 | 0.266 | **0.8159** | 0.467 | 0.560 | 2.485 | 0.416 |
+| | bf16 | 0.994 | 1.000 | 0.983 | 0.298 | 0.8186 | 0.420 | 0.543 | 2.716 | |
+| InternVL3-1B | NF4 | 0.996 | 1.000 | 0.987 | 0.278 | **0.8152** | 0.421 | 0.543 | 2.718 | 0.274 |
+| | bf16 | 1.000 | 1.000 | 1.000 | 0.249 | 0.8120 | 0.468 | 0.560 | 2.442 | |
+| LLaVA-OV-0.5B | NF4 | 1.000 | 1.000 | 1.000 | 0.259 | **0.8147** | 0.461 | 0.557 | 2.462 | 0.306 |
+| | bf16 | 1.000 | 1.000 | 0.995 | 0.310 | 0.8259 | 0.410 | 0.560 | 2.479 | |
+
+Lectura (lo medido; las pruebas pareadas están en el notebook 03 §5 y §7):
+
+- **Forma y posición quedan resueltas** (≥ 0.983 en las seis condiciones; ≥ 0.987 en NF4). **Todo el error que
+  queda es de color** (0.25–0.31).
+- **El color está acotado por el dataset.** El nombre depende de una paleta elegida al azar que la imagen no
+  muestra; el mejor lector posible acierta 0.410 (techo del color, `resultados_etapa1.md` §2). Con forma y posición
+  perfectas, el techo de `attr_mean` es (1 + 1 + 1 + 0.410) / 4 ≈ 0.853. Los VLM ajustados quedan a 0.03–0.04 de ese
+  techo. Los `peek` muestran el mecanismo: aciertan el matiz y eligen un nombre de una paleta frecuente (sobre todo
+  `tab:`: cyan, olive, red), que coincide con la referencia solo cuando el caption usó esa misma paleta.
+- **Los tres VLM quedan empatados en NF4** (0.8147–0.8159, a 0.0012 entre sí). El ajuste borra la diferencia del
+  zero-shot (0.27–0.42): +0.40 a +0.54 de `attr_mean`.
+- **El mejor valor en 500 imágenes era optimista** en 0.002–0.010 (NF4: 0.8175 / 0.8245 / 0.8200 en el ajuste,
+  frente a 0.8152 / 0.8147 / 0.8159 aquí), como se esperaba de elegir el máximo de 11 evaluaciones.
+- **bf16 frente a NF4** (attr_mean): LLaVA-OV +0.011, Qwen3.5 +0.003, InternVL3 −0.003. Las diferencias están en el
+  color (LLaVA-OV 0.310 frente a 0.259); forma y posición no cambian. Su significancia, con McNemar por atributo, en
+  el notebook 03 §7.
+- **Las métricas de texto no ordenan igual que la fidelidad**: InternVL3 NF4 tiene el CIDEr más alto (2.718) con la
+  misma `attr_mean` que LLaVA-OV NF4 (2.462). Dependen de cuál de las 5 plantillas de M3DI imita cada modelo
+  (InternVL3 usa casi siempre "At the … of the picture is a …"), no de si la descripción es correcta.
