@@ -4,17 +4,19 @@
 > este archivo primero. Los resultados medidos están en `docs/resultados_etapa1.md`; el protocolo, en
 > `docs/metodologia.md`; los comandos del cluster, paso a paso, en `docs/pasos_cluster.md`.
 
-## 0. Al retomar (23-11-2026, tarde)
+## 0. Al retomar (23-11-2026, noche)
 
-**Hecho:** `s2_cadena` (9/9 con código 0): ajuste de VL-JEPA NF4 y bf16 (InfoNCE val 0.233 / 0.235), Y-Decoder de la
-etapa 2 (20 épocas) y val completo de los 6 VLM ajustados (attr_mean NF4 0.815–0.816; forma y posición ≈ 1, el error
-que queda es de color). `resultados_etapa2.md` §5–6. P10′ = (a). Presentación en `docs/presentacion_avance.pptx`.
+**Etapa 2 completa en val** (`resultados_etapa2.md` §5–8): VLM ajustados 0.815–0.816 y VL-JEPA ajustado 0.807 (NF4,
+val 10 000); forma y posición ≈ 1 en los cuatro, la diferencia está solo en el color. Y-Decoder de la etapa 2: techo
+0.998 (paso 10 800). Pérdida de información (B8): el color pierde 2.41 bits entre caption e imagen (paleta);
+forma y posición sin pérdida. Presentación: `docs/presentacion_avance.pptx` (19 diapositivas).
 
-**Siguiente en el cluster (GPU 1):** `git pull` (apartando antes `reports/` generados ahí) → job `s2_cierre`: B7 de
-VL-JEPA (línea NF4 de `stage2_val.txt`) y B8 (`stage2_infoloss.txt`). Revisar la curva del Y-Decoder de la etapa 2.
-Después: `score.py`, `collect_reports.py`, notebooks 02 y 03 → `reports/`, y el test final (14 condiciones).
+**Siguiente:** (1) en el cluster, `collect_reports.py` + notebooks 02 y 03 → `reports/` → scp → commit en el laptop;
+(2) `final_test.py --dry-run` y revisar el plan (14 condiciones) con Claude; (3) test, una sola vez, con
+confirmación explícita del usuario.
 
-**Pendientes del usuario:** P4 (CLAUDE.md).
+**Pendientes del usuario:** P4 (CLAUDE.md); opcional: pérdida de información de la etapa 1 (`stage1_infoloss.txt`,
+cancelada en CE1).
 
 ## 1. Dónde estamos
 

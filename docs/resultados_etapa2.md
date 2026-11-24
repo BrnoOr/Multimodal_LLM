@@ -4,8 +4,8 @@
 > decisiones: §6.1. Análisis: `notebooks/03_resultados_etapa2.ipynb`. Comparación válida: entre nuestros 4
 > modelos bajo el mismo protocolo, no contra cifras de los papers (modelos de 7B o más) [CLAUDE.md §2].
 >
-> Estado (23-11-2026): humo, grilla y ajuste completo de los 4 hechos; val completo de los 3 VLM ajustados hecho;
-> VL-JEPA en val completo (B7) y pérdida de información (B8) por lanzar.
+> Estado (23-11-2026): etapa 2 completa en val (humo, grilla, ajuste, val completo de los 4, pérdida de información).
+> Falta solo el test final (una vez).
 
 ## 1. Prueba de humo (paso 2.0, 20-11-2026)
 
@@ -175,8 +175,25 @@ bidireccional en las 500 imágenes de val (P7; azar ≈ ln 64 = 4.16). `runs/_ta
 - La InfoNCE mide discriminación en el espacio de embeddings, no exactitud por atributo: la cifra comparable con los
   VLM sale de B7 (val completo con el Y-Decoder de la etapa 2).
 
-Y-Decoder de la etapa 2 (B6, 20 épocas sobre el Y-Encoder ajustado): terminó (código 0, 2 988 s); su curva y su
-mejor paso, pendientes de revisar (`runs/ydec_vljepa_open_msrvtt_nf4_ft_nf4_k8_r64_e20_cont`).
+Y-Decoder de la etapa 2 (B6, job `s2_cadena`, 2 988 s): 20 épocas sobre el Y-Encoder ajustado, partiendo del genérico
+(`runs/ydec_vljepa_open_msrvtt_nf4_ft_nf4_k8_r64_e20_cont`). Techo en val (decodificar el `S_Y` del caption
+verdadero, 500 imágenes), paso elegido y últimas evaluaciones:
+
+| Paso | forma | x | y | color | attr_mean | caption exacto |
+|---|---|---|---|---|---|---|
+| **10 800 (elegido, `decoder_best`)** | 1.000 | 1.000 | 1.000 | 0.992 | **0.9980** | 0.822 |
+| 13 600 | 1.000 | 1.000 | 1.000 | 0.950 | 0.9875 | 0.816 |
+| 13 680 (último) | 1.000 | 1.000 | 1.000 | 0.966 | 0.9915 | 0.826 |
+
+- **El lector deja de ser el cuello de botella**: el techo pasa de ≈ 0.12 con el genérico (`resultados_etapa1.md`
+  §7c) a ≈ 0.99. Decodificado desde el `S_Y` del caption, recupera los cuatro atributos y el 82 % de los captions
+  palabra por palabra.
+- **Este techo no es alcanzable desde la imagen en el color**: `S_Y` codifica el caption, que incluye el nombre de
+  la paleta; la predicción Ŝ_Y sale de la imagen, que no la muestra. El color de VL-JEPA en B7 queda acotado por el
+  mismo techo de 0.410 que los VLM.
+- **Paso elegido: 10 800** (máximo de `attr_mean` en val, `is_best` en `val_log.jsonl`; el run no escribe
+  `best.json`). Después baja un poco (0.988–0.992): leve sobreajuste en las últimas épocas, sin efecto porque se
+  usa `decoder_best`.
 
 ## 6. Val completo de los VLM ajustados (paso B7, job `s2_cadena`, 23-11-2026)
 
@@ -211,3 +228,56 @@ Lectura (lo medido; las pruebas pareadas están en el notebook 03 §5 y §7):
 - **Las métricas de texto no ordenan igual que la fidelidad**: InternVL3 NF4 tiene el CIDEr más alto (2.718) con la
   misma `attr_mean` que LLaVA-OV NF4 (2.462). Dependen de cuál de las 5 plantillas de M3DI imita cada modelo
   (InternVL3 usa casi siempre "At the … of the picture is a …"), no de si la descripción es correcta.
+
+## 7. VL-JEPA ajustado en val completo (paso B7, job `s2_val_vj`, 23-11-2026)
+
+`adapter_best` de VL-JEPA NF4 (InfoNCE) + Y-Decoder de la etapa 2 (`decoder_best`, paso 10 800), 10 000 imágenes,
+`p1_attributes` (795 s). Misma puntuación que los VLM (`runs/_tablas/etapa2_val.csv`).
+
+| Modelo (NF4) | forma | x | y | color | attr_mean | Bleu-4 | ROUGE-L | CIDEr | Zero-shot |
+|---|---|---|---|---|---|---|---|---|---|
+| Qwen3.5-0.8B-Base | 0.999 | 1.000 | 0.999 | 0.266 | 0.8159 | 0.467 | 0.560 | 2.485 | 0.416 |
+| InternVL3-1B | 0.996 | 1.000 | 0.987 | 0.278 | 0.8152 | 0.421 | 0.543 | 2.718 | 0.274 |
+| LLaVA-OV-0.5B | 1.000 | 1.000 | 1.000 | 0.259 | 0.8147 | 0.461 | 0.557 | 2.462 | 0.306 |
+| **VL-JEPA** | 0.999 | 0.997 | 1.000 | **0.234** | **0.8073** | 0.436 | 0.554 | 2.345 | 0.0039 |
+
+- **El ajuste cambia la conclusión de la etapa 1.** VL-JEPA pasa de 0.004 (zero-shot, lector genérico) a **0.807**,
+  a 0.007–0.009 de los VLM. Forma y posición quedan resueltas igual que en los VLM (≥ 0.997).
+- **Toda la diferencia con los VLM está en el color** (0.234 frente a 0.259–0.278). Diferencia medida; su
+  significancia, con McNemar pareado, en el notebook 03 §5.
+- **Por qué el color:** el `peek` muestra que VL-JEPA reparte el nombre entre muchas paletas (`xkcd:`, CSS:
+  `deeppink`, `lawngreen`, `azure`), mientras los VLM se concentran en nombres `tab:` frecuentes. Acierta el
+  matiz y elige un nombre plausible, pero de una paleta que la imagen no permite deducir. Lectura sobre 8 ejemplos;
+  la distribución completa, en el notebook 03 §6.
+- La comparación es la del protocolo, pero con diferencias declaradas: VL-JEPA se elige por InfoNCE (P7) y su
+  texto lo escribe un decodificador propio (§2.4), no el modelo.
+- `peek` reporta `tokens: mediana=0` en VL-JEPA porque su inferencia no registra el conteo de tokens generados
+  (el texto lo produce el Y-Decoder): no indica respuestas vacías (0 omisiones en los 4 atributos).
+
+## 8. Pérdida de información por etapa, VL-JEPA ajustado (paso B8, job `infoloss_ft`, 23-11-2026)
+
+Sondas por factor (`scripts/info_loss.py`, `docs/metodologia.md` §2.5) sobre el modelo ajustado con su Y-Decoder:
+E1 X-Encoder, E2 Predictor, E3 Ŝ_Y, E4 texto decodificado desde Ŝ_Y; T1 S_Y del caption, T2 texto decodificado
+desde S_Y. Información en bits (recortada a [0, H]). `runs/infoloss_vljepa_open_msrvtt_nf4_p1_attributes_ft/tabla_discretos.csv`.
+
+| Factor | H (bits) | E1 | E2 | E3 | E4 | T1 | T2 |
+|---|---|---|---|---|---|---|---|
+| forma (exactitud) | 2.81 | 0.998 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
+| x | 1.58 | 1.000 | 1.000 | 1.000 | 0.999 | 1.000 | 1.000 |
+| y | 1.58 | 0.999 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
+| color (exactitud) | 5.69 | 0.313 | 0.383 | 0.375 | 0.222 | 0.989 | 0.991 |
+| color (información, bits) | 5.69 | 2.27 | 3.23 | 3.21 | 3.35 | 5.62 | 5.65 |
+
+- **Forma y posición no pierden información en ninguna etapa** (≥ 0.998 de exactitud de sonda desde E1).
+- **El color es el único factor con pérdida, y está antes del texto:**
+  - Del lado de la imagen hay 2.3–3.4 bits de los 5.7 del nombre del color; del lado del caption (T1, T2), ≈ 5.6.
+    La **brecha T1 − E3 = 2.41 bits** se interpreta como la paleta, que está en el caption y no en la imagen (es el
+    mismo límite que el techo del color, 0.410, en los VLM; interpretación, no medición separada).
+  - **El Predictor agrega información** respecto del X-Encoder congelado (E1 → E3: +0.94 bits; exactitud de sonda
+    0.31 → 0.37–0.38, cerca del techo de 0.41).
+  - **El Y-Decoder no pierde bits pero sí exactitud:** E3 → E4 da +0.14 bits y la exactitud baja de 0.375 (sonda
+    sobre Ŝ_Y) a 0.222 (texto). Leído junto con el `peek`: el texto conserva el matiz (información) pero no elige el
+    nombre exacto que una sonda lineal elegiría. T1 → T2 ≈ 0: el decodificador es casi sin pérdida sobre S_Y.
+- **Sin contraparte de la etapa 1** (cancelada en CE1): no se puede medir cuánto de esto cambió el ajuste. El comando
+  sigue en `configs/queues/stage1_infoloss.txt` (solo inferencia).
+- Diferencias negativas pequeñas (p. ej. −0.03 bits en T1 → T2) son ruido de estimación.
