@@ -209,7 +209,7 @@ verdadero, 500 imágenes), paso elegido y últimas evaluaciones:
 | LLaVA-OV-0.5B | NF4 | 1.000 | 1.000 | 1.000 | 0.259 | **0.8147** | 0.461 | 0.557 | 2.462 | 0.306 |
 | | bf16 | 1.000 | 1.000 | 0.995 | 0.310 | 0.8259 | 0.410 | 0.560 | 2.479 | |
 
-Lectura (lo medido; las pruebas pareadas están en el notebook 03 §5 y §7):
+Lectura (lo medido; pruebas pareadas en §9):
 
 - **Forma y posición quedan resueltas** (≥ 0.983 en las seis condiciones; ≥ 0.987 en NF4). **Todo el error que
   queda es de color** (0.25–0.31).
@@ -223,8 +223,8 @@ Lectura (lo medido; las pruebas pareadas están en el notebook 03 §5 y §7):
 - **El mejor valor en 500 imágenes era optimista** en 0.002–0.010 (NF4: 0.8175 / 0.8245 / 0.8200 en el ajuste,
   frente a 0.8152 / 0.8147 / 0.8159 aquí), como se esperaba de elegir el máximo de 11 evaluaciones.
 - **bf16 frente a NF4** (attr_mean): LLaVA-OV +0.011, Qwen3.5 +0.003, InternVL3 −0.003. Las diferencias están en el
-  color (LLaVA-OV 0.310 frente a 0.259); forma y posición no cambian. Su significancia, con McNemar por atributo, en
-  el notebook 03 §7.
+  color (LLaVA-OV 0.310 frente a 0.259); la de LLaVA-OV es significativa (IC95 [+0.008, +0.014]); las de Qwen3.5 e
+  InternVL3 quedan en el borde (§9).
 - **Las métricas de texto no ordenan igual que la fidelidad**: InternVL3 NF4 tiene el CIDEr más alto (2.718) con la
   misma `attr_mean` que LLaVA-OV NF4 (2.462). Dependen de cuál de las 5 plantillas de M3DI imita cada modelo
   (InternVL3 usa casi siempre "At the … of the picture is a …"), no de si la descripción es correcta.
@@ -243,8 +243,8 @@ Lectura (lo medido; las pruebas pareadas están en el notebook 03 §5 y §7):
 
 - **El ajuste cambia la conclusión de la etapa 1.** VL-JEPA pasa de 0.004 (zero-shot, lector genérico) a **0.807**,
   a 0.007–0.009 de los VLM. Forma y posición quedan resueltas igual que en los VLM (≥ 0.997).
-- **Toda la diferencia con los VLM está en el color** (0.234 frente a 0.259–0.278). Diferencia medida; su
-  significancia, con McNemar pareado, en el notebook 03 §5.
+- **Toda la diferencia con los VLM está en el color** (0.234 frente a 0.259–0.278). Diferencia medida; aún
+  sin prueba pareada entre modelos (§9).
 - **Por qué el color:** el `peek` muestra que VL-JEPA reparte el nombre entre muchas paletas (`xkcd:`, CSS:
   `deeppink`, `lawngreen`, `azure`), mientras los VLM se concentran en nombres `tab:` frecuentes. Acierta el
   matiz y elige un nombre plausible, pero de una paleta que la imagen no permite deducir. Lectura sobre 8 ejemplos;
@@ -281,3 +281,35 @@ desde S_Y. Información en bits (recortada a [0, H]). `runs/infoloss_vljepa_open
 - **Sin contraparte de la etapa 1** (cancelada en CE1): no se puede medir cuánto de esto cambió el ajuste. El comando
   sigue en `configs/queues/stage1_infoloss.txt` (solo inferencia).
 - Diferencias negativas pequeñas (p. ej. −0.03 bits en T1 → T2) son ruido de estimación.
+
+## 9. Pruebas pareadas en val (notebook 03, ejecutado en el cluster el 24-11-2026)
+
+Sobre las mismas 10 000 imágenes de val: McNemar con corrección de continuidad por atributo y bootstrap del IC95 de
+la diferencia de `attr_mean`. Tablas: `reports/tables/etapa2/zeroshot_vs_ajustado.csv` y `control_bf16.csv`.
+
+**Zero-shot → ajustado (NF4, `p1_attributes`).** Todas las mejoras son significativas:
+
+| Modelo | zero-shot | ajustado | Δ attr_mean [IC95] | Δ color | p McNemar (color) |
+|---|---|---|---|---|---|
+| Qwen3.5 | 0.416 | 0.816 | +0.400 [+0.395, +0.404] | +0.142 | 1e-146 |
+| InternVL3 | 0.274 | 0.815 | +0.541 [+0.536, +0.546] | +0.061 | 5e-29 |
+| LLaVA-OV | 0.306 | 0.815 | +0.509 [+0.504, +0.513] | +0.049 | 4e-19 |
+| VL-JEPA | 0.003 | 0.807 | +0.804 [+0.802, +0.806] | +0.224 | < 1e-300 |
+
+En forma, x e y casi no hay imágenes que el zero-shot acierte y el ajustado falle (c ≤ 36 de 10 000). En color sí
+las hay en los VLM (801–1 239), aunque el ajuste gana en neto. El zero-shot de VL-JEPA aquí es con `p1_attributes`
+(0.003), no el prompt elegido en la etapa 1 (`p4m`, 0.004).
+
+**NF4 frente a bf16** (nf4 − bf16, attr_mean):
+
+| Modelo | Condición | Δ [IC95] | Lectura |
+|---|---|---|---|
+| LLaVA-OV | ajustado | −0.011 [−0.014, −0.008] | NF4 peor; significativo en y y color |
+| Qwen3.5 | ajustado | −0.003 [−0.005, +0.000] | en el borde |
+| InternVL3 | ajustado | +0.003 [+0.000, +0.006] | en el borde; y y color significativos en sentidos que se compensan |
+| Qwen3.5 | zero-shot | −0.027 [−0.031, −0.022] | NF4 peor |
+| InternVL3 | zero-shot | +0.056 [+0.052, +0.061] | NF4 mejor (bf16 omite la posición, `resultados_etapa1.md` §4b) |
+
+**Falta: comparación pareada entre modelos ajustados** (VL-JEPA frente a cada VLM, y los VLM entre sí). El notebook 03
+no la calculaba; ya está escrita en su §7b (tabla `entre_modelos_ajustados.csv`), falta ejecutarla en el cluster. En test solo hay la aproximación no pareada
+(`resultados_test.md` §3).
