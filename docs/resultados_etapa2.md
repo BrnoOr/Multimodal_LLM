@@ -243,8 +243,8 @@ Lectura (lo medido; pruebas pareadas en §9):
 
 - **El ajuste cambia la conclusión de la etapa 1.** VL-JEPA pasa de 0.004 (zero-shot, lector genérico) a **0.807**,
   a 0.007–0.009 de los VLM. Forma y posición quedan resueltas igual que en los VLM (≥ 0.997).
-- **Toda la diferencia con los VLM está en el color** (0.234 frente a 0.259–0.278). Diferencia medida; aún
-  sin prueba pareada entre modelos (§9).
+- **La diferencia con los VLM está casi toda en el color** (0.234 frente a 0.259–0.278), más 0.003 en x. Con
+  prueba pareada: VL-JEPA queda bajo cada VLM con IC 95 % que excluye el 0 (§9).
 - **Por qué el color:** el `peek` muestra que VL-JEPA reparte el nombre entre muchas paletas (`xkcd:`, CSS:
   `deeppink`, `lawngreen`, `azure`), mientras los VLM se concentran en nombres `tab:` frecuentes. Acierta el
   matiz y elige un nombre plausible, pero de una paleta que la imagen no permite deducir. Lectura sobre 8 ejemplos;
@@ -310,6 +310,25 @@ las hay en los VLM (801–1 239), aunque el ajuste gana en neto. El zero-shot de
 | Qwen3.5 | zero-shot | −0.027 [−0.031, −0.022] | NF4 peor |
 | InternVL3 | zero-shot | +0.056 [+0.052, +0.061] | NF4 mejor (bf16 omite la posición, `resultados_etapa1.md` §4b) |
 
-**Falta: comparación pareada entre modelos ajustados** (VL-JEPA frente a cada VLM, y los VLM entre sí). El notebook 03
-no la calculaba; ya está escrita en su §7b (tabla `entre_modelos_ajustados.csv`), falta ejecutarla en el cluster. En test solo hay la aproximación no pareada
-(`resultados_test.md` §3).
+**Entre modelos ajustados (NF4, notebook 03 §7b, 24-11-2026).** 6 pares sobre las mismas 10 000 imágenes; McNemar con
+Bonferroni (p < 0.0083). Tabla: `reports/tables/etapa2/entre_modelos_ajustados.csv`.
+
+| A − B | Δ attr_mean [IC95] | Δ forma | Δ x | Δ y | Δ color |
+|---|---|---|---|---|---|
+| LLaVA-OV − InternVL3 | −0.0005 [−0.0034, +0.0024] | +0.004* | 0 | +0.013* | −0.019* |
+| LLaVA-OV − Qwen3.5 | −0.0012 [−0.0038, +0.0016] | +0.001* | 0 | +0.001* | −0.007 |
+| InternVL3 − Qwen3.5 | −0.0007 [−0.0035, +0.0021] | −0.003* | 0 | −0.012* | +0.012 (p = 0.038) |
+| LLaVA-OV − VL-JEPA | **+0.0074 [+0.0045, +0.0103]** | +0.001* | +0.003* | 0.000 | **+0.025*** |
+| InternVL3 − VL-JEPA | **+0.0079 [+0.0046, +0.0110]** | −0.003* | +0.003* | −0.013* | **+0.044*** |
+| Qwen3.5 − VL-JEPA | **+0.0086 [+0.0054, +0.0116]** | 0.000 | +0.003* | −0.001 | **+0.032*** |
+
+\* significativo con Bonferroni.
+
+- **Los tres VLM ajustados no se distinguen en `attr_mean`** (los tres IC incluyen el 0). Sí difieren por atributo, en
+  sentidos que se compensan: InternVL3 falla más en y (−0.012/−0.013) y en forma, y acierta más en color que LLaVA-OV
+  (+0.019).
+- **VL-JEPA queda bajo cada VLM, con IC que excluye el 0** (−0.007 a −0.009). La diferencia es casi toda de color
+  (+0.025 a +0.044 a favor de los VLM; su aporte a `attr_mean`, Δcolor/4 = 0.006–0.011, cubre la mayor parte o toda la brecha), más un 0.003 en x, significativo frente
+  a los tres. En y, VL-JEPA supera a InternVL3 (+0.013).
+- Esto confirma con prueba pareada la lectura de las §6–7 y la aproximación no pareada de test (`resultados_test.md`
+  §3). En test no hay prueba pareada (decisión pendiente).
