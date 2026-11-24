@@ -1,0 +1,4 @@
+modelo,elegido,attr_mean,segundo,attr_mean_2,margen,IC95_lo,IC95_hi,robusto,coincide_con_doc,rango_entre_prompts
+LLaVA-OV-0.5B,p3_json,0.309475,p1_attributes,0.306,0.003475,-0.0023,0.009825,False,True,0.24762499999999998
+InternVL3-1B,p1_attributes,0.274275,p4_dataset_format,0.2176,0.056675,0.05114875,0.06217687499999999,True,True,0.195
+Qwen3.5-0.8B-Base,p1_attributes,0.415925,p4m_multiexample,0.3553,0.060625,0.056175,0.065275,True,True,0.211975

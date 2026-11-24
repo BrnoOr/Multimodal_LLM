@@ -1,0 +1,104 @@
+{
+ "ajuste_completo": {
+  "origen": "notebook 03 §4",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:28:37-08:00"
+ },
+ "control_bf16": {
+  "origen": "notebook 03 §7",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:16-08:00"
+ },
+ "etapa2_val": {
+  "origen": "runs/_tablas/etapa2_val.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "etapa2_val_resumen": {
+  "origen": "runs/_tablas/etapa2_val_resumen.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "grilla_ganadores": {
+  "origen": "notebook 03 §2",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:28:32-08:00"
+ },
+ "grilla_robustez": {
+  "origen": "notebook 03 §3",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:28:37-08:00"
+ },
+ "grilla_sensibilidad": {
+  "origen": "notebook 03 §2",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:28:34-08:00"
+ },
+ "infoloss_etapa2": {
+  "origen": "notebook 03 §8b",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:17-08:00"
+ },
+ "omision_vs_error": {
+  "origen": "notebook 03 §6",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:12-08:00"
+ },
+ "s2_grid": {
+  "origen": "runs/_tablas/s2_grid.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "s2_grid_vljepa": {
+  "origen": "runs/_tablas/s2_grid_vljepa.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "s2_smoke": {
+  "origen": "runs/_tablas/s2_smoke.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "s2_train": {
+  "origen": "runs/_tablas/s2_train.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "s2_train_vj": {
+  "origen": "runs/_tablas/s2_train_vj.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "vljepa_condiciones": {
+  "origen": "notebook 03 §5",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:12-08:00"
+ },
+ "ydecoder_etapa2": {
+  "origen": "notebook 03 §8a",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:16-08:00"
+ },
+ "zeroshot_vs_ajustado": {
+  "origen": "notebook 03 §5",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:11-08:00"
+ }
+}

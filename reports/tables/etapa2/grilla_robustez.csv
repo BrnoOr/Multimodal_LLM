@@ -1,0 +1,5 @@
+modelo,ganador,segundo,métrica,ganador_v,segundo_v,margen,n,IC95_lo,IC95_hi,robusto
+InternVL3-1B,lr 0.0001 r16 c×5,lr 0.0001 r64 c×5,attr_mean,0.7995,0.7975,0.0020000000000000018,500.0,-0.004,0.008,False
+LLaVA-OV-0.5B,lr 0.0002 r64 c×5,lr 0.0002 r16 c×5,attr_mean,0.7935,0.7915,0.0020000000000000018,500.0,-0.004,0.0085,False
+Qwen3.5-0.8B-Base,lr 0.0001 r16 c×1,lr 0.0001 r64 c×5,attr_mean,0.793,0.793,0.0,500.0,-0.009,0.0095,False
+VL-JEPA,lr 0.0005 r64 c×1,lr 0.0005 r16 c×1,val_loss,0.63261,0.6409,-0.00829000000000002,,,,

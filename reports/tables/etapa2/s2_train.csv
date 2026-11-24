@@ -1,0 +1,7 @@
+exp_id,model,quant,lr,lora_r,connector_lr_mult,max_steps,status,steps,loss_first,loss_last,peak_mem_gb,micro_batch,sel_metric,sel_mode,val_step0,val_last_step,val_last,best_step,best_value,trainable_connector,trainable_lora_llm,trainable_total,lora_layers_llm
+train_internvl3_1b_bf16_p1_attributes_r16_lr0.0001_c5_e1,internvl3_1b,bf16,0.0001,16,5.0,,completed,1954,3.92955,0.1664,12.27,16,attr_mean,max,0.229,1954,0.8245,1954,0.8245,4482816,8798208,13281024,168
+train_internvl3_1b_nf4_p1_attributes_r16_lr0.0001_c5_e1,internvl3_1b,nf4,0.0001,16,5.0,,completed,1954,3.98328,0.16661,14.35,16,attr_mean,max,0.284,1954,0.8115,400,0.8175,4482816,8798208,13281024,168
+train_llava_ov_05b_bf16_p1_attributes_r64_lr0.0002_c5_e1,llava_ov_05b,bf16,0.0002,64,5.0,,completed,1954,3.27068,0.15978,12.15,8,attr_mean,max,0.275,1954,0.8155,400,0.8305,1836800,35192832,37029632,168
+train_llava_ov_05b_nf4_p1_attributes_r64_lr0.0002_c5_e1,llava_ov_05b,nf4,0.0002,64,5.0,,completed,1954,3.30089,0.16286,13.08,8,attr_mean,max,0.303,1954,0.818,1400,0.8245,1836800,35192832,37029632,168
+train_qwen35_08b_base_bf16_p1_attributes_r16_lr0.0001_e1,qwen35_08b_base,bf16,0.0001,16,1.0,,completed,1954,3.64916,0.16568,5.03,32,attr_mean,max,0.455,1954,0.82,400,0.827,12588544,10822656,23411200,186
+train_qwen35_08b_base_nf4_p1_attributes_r16_lr0.0001_e1,qwen35_08b_base,nf4,0.0001,16,1.0,,completed,1954,3.60788,0.16766,4.24,32,attr_mean,max,0.429,1954,0.82,1954,0.82,12588544,10822656,23411200,186

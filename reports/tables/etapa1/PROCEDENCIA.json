@@ -1,0 +1,134 @@
+{
+ "control_bf16": {
+  "origen": "notebook 02 §7",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:14-08:00"
+ },
+ "etapa1_bf16": {
+  "origen": "runs/_tablas/etapa1_bf16.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "etapa1_resumen": {
+  "origen": "notebook 02 §12",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:23-08:00"
+ },
+ "etapa1_val": {
+  "origen": "runs/_tablas/etapa1_val.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "exactitud_condicional": {
+  "origen": "notebook 02 §4",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:10-08:00"
+ },
+ "lineas_base": {
+  "origen": "notebook 02 §1",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:02-08:00"
+ },
+ "modelo_x_prompt_nf4": {
+  "origen": "notebook 02 §2",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:02-08:00"
+ },
+ "piloto": {
+  "origen": "runs/_tablas/piloto.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "piloto_256": {
+  "origen": "runs/_tablas/piloto_256.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "piloto_256_v2": {
+  "origen": "runs/_tablas/piloto_256_v2.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "piloto_v2": {
+  "origen": "runs/_tablas/piloto_v2.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "piloto_v3": {
+  "origen": "runs/_tablas/piloto_v3.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "piloto_vs_val": {
+  "origen": "notebook 02 §9",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:18-08:00"
+ },
+ "seleccion_prompt": {
+  "origen": "notebook 02 §3",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:09-08:00"
+ },
+ "texto_vs_atributos": {
+  "origen": "notebook 02 §8",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:14-08:00"
+ },
+ "texto_vs_atributos_spearman": {
+  "origen": "notebook 02 §8",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:14-08:00"
+ },
+ "vljepa_diag_cuantizacion": {
+  "origen": "notebook 02 §11c",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:19-08:00"
+ },
+ "vljepa_piloto": {
+  "origen": "runs/_tablas/vljepa_piloto.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "vljepa_propio_vs_otros": {
+  "origen": "notebook 02 §11c-bis",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:23-08:00"
+ },
+ "vljepa_val": {
+  "origen": "runs/_tablas/vljepa_val.csv",
+  "commit": "072b20d93f2abc93e4c144dfdc1ff0718f73d0bc",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T09:38:43-08:00"
+ },
+ "vljepa_zeroshot_prompts": {
+  "origen": "notebook 02 §11a",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:19-08:00"
+ },
+ "ydecoder_generico": {
+  "origen": "notebook 02 §10",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:19-08:00"
+ }
+}

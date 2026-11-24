@@ -1,0 +1,4 @@
+modelo,Spearman,elegido_piloto,elegido_val
+InternVL3-1B,0.9428571428571428,p1_attributes,p1_attributes
+LLaVA-OV-0.5B,1.0,p3_json,p3_json
+Qwen3.5-0.8B-Base,0.9428571428571428,p1_attributes,p1_attributes

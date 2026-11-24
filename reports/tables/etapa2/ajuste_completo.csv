@@ -1,0 +1,9 @@
+modelo,quant,status,lr,lora_r,connector_lr_mult,steps,peak_mem_gb,loss_first,loss_last,sel_metric,val_step0,best_step,best_value,val_last
+InternVL3-1B,bf16,completed,0.0001,16,5.0,1954,12.27,3.92955,0.1664,attr_mean,0.229,1954,0.8245,0.8245
+InternVL3-1B,nf4,completed,0.0001,16,5.0,1954,14.35,3.98328,0.16661,attr_mean,0.284,400,0.8175,0.8115
+LLaVA-OV-0.5B,bf16,completed,0.0002,64,5.0,1954,12.15,3.27068,0.15978,attr_mean,0.275,400,0.8305,0.8155
+LLaVA-OV-0.5B,nf4,completed,0.0002,64,5.0,1954,13.08,3.30089,0.16286,attr_mean,0.303,1400,0.8245,0.818
+Qwen3.5-0.8B-Base,bf16,completed,0.0001,16,1.0,1954,5.03,3.64916,0.16568,attr_mean,0.455,400,0.827,0.82
+Qwen3.5-0.8B-Base,nf4,completed,0.0001,16,1.0,1954,4.24,3.60788,0.16766,attr_mean,0.429,1954,0.82,0.82
+VL-JEPA,bf16,completed,0.0005,64,1.0,1954,21.09,4.06168,0.17924,val_loss,4.30592,1954,0.23472,0.23472
+VL-JEPA,nf4,completed,0.0005,64,1.0,1954,15.73,4.13258,0.17736,val_loss,4.38246,1954,0.23343,0.23343

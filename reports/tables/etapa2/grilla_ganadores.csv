@@ -1,0 +1,5 @@
+modelo,train.lr,lora.r,train.connector_lr_mult,métrica,valor (paso 150),empata con,val_step0,exp_id
+InternVL3-1B,0.0001,16,5.0,attr_mean,0.7995,,0.284,train_internvl3_1b_nf4_p1_attributes_r16_lr0.0001_c5_e1_m150
+LLaVA-OV-0.5B,0.0002,64,5.0,attr_mean,0.7935,,0.303,train_llava_ov_05b_nf4_p1_attributes_r64_lr0.0002_c5_e1_m150
+Qwen3.5-0.8B-Base,0.0001,16,1.0,attr_mean,0.793,train_qwen35_08b_base_nf4_p1_attributes_r64_lr0.0001_c5_e1_m150,0.429,train_qwen35_08b_base_nf4_p1_attributes_r16_lr0.0001_e1_m150
+VL-JEPA,0.0005,64,1.0,val_loss,0.63261,,4.38246,train_vljepa_open_msrvtt_nf4_p1_attributes_r64_lr0.0005_e1_m150

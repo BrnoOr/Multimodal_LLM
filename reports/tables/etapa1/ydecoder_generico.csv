@@ -1,0 +1,5 @@
+run,mejor_paso,cider,bleu4,m3di_shape,m3di_x,m3di_y,m3di_color,m3di_attr_mean
+ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k1_r64_e1,7000,1.32145,0.11807,0.442,0.0,0.0,0.016,0.1145
+ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k4_r64_e1,7000,1.38388,0.12343,0.462,0.0,0.002,0.024,0.122
+ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e1,7000,1.43876,0.12785,0.46,0.0,0.0,0.018,0.1195
+ydec_vljepa_open_msrvtt_nf4_zs_nf4_msrvtt_k8_r64_e3,22000,1.82713,0.1491,0.44,0.006,0.0,0.034,0.12

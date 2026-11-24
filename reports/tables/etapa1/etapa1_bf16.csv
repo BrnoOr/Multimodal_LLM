@@ -1,0 +1,4 @@
+exp_id,model,quant,stage,prompt_id,split,json_mode,complete,shape,x,y,color,pos,attr_mean,n,missing_shape,missing_x,missing_y,missing_color,mean_words,bleu1,bleu4,rouge_l,cider,json_ok
+zeroshot_qwen35_08b_base_bf16_p1_attributes_val,qwen35_08b_base,bf16,zeroshot,p1_attributes,val,False,True,0.1768,0.7872,0.6722,0.1336,0.5292,0.44245,10000,0.736,0.0021,0.02,0.0,80.0345,0.0900985478363315,0.0032269333406828964,0.15209078946391943,3.1701678937164917e-07,
+zeroshot_llava_ov_05b_bf16_p3_json_val,llava_ov_05b,bf16,zeroshot,p3_json,val,True,True,0.3908,0.323,0.345,0.2158,0.1084,0.31865,10000,0.0125,0.0,0.0,0.0001,8.002,0.08379573461014764,4.881346704458226e-16,0.07782293281575105,0.06559396463778701,1.0
+zeroshot_internvl3_1b_bf16_p1_attributes_val,internvl3_1b,bf16,zeroshot,p1_attributes,val,False,True,0.2269,0.291,0.1352,0.219,0.0565,0.218025,10000,0.7235,0.303,0.6095,0.0074,50.8715,0.14883246696606406,0.003978486502091651,0.22597741227955712,0.00031780884899621783,

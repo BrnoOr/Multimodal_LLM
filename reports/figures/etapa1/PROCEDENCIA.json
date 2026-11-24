@@ -1,0 +1,50 @@
+{
+ "confusion_shape": {
+  "origen": "notebook 02 §5",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:11-08:00"
+ },
+ "confusion_x": {
+  "origen": "notebook 02 §5",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:12-08:00"
+ },
+ "confusion_y": {
+  "origen": "notebook 02 §5",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:13-08:00"
+ },
+ "modelo_x_prompt_mapas": {
+  "origen": "notebook 02 §2",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:03-08:00"
+ },
+ "omision_vs_error": {
+  "origen": "notebook 02 §4",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:10-08:00"
+ },
+ "piloto_vs_val": {
+  "origen": "notebook 02 §9",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:18-08:00"
+ },
+ "texto_vs_atributos": {
+  "origen": "notebook 02 §8",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:15-08:00"
+ },
+ "ydecoder_generico": {
+  "origen": "notebook 02 §10",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:18-08:00"
+ }
+}

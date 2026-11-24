@@ -1,0 +1,74 @@
+{
+ "ajuste_curvas": {
+  "origen": "notebook 03 §4",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:28:39-08:00"
+ },
+ "ajuste_val_atributos_internvl3_1b": {
+  "origen": "notebook 03 §4",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:28:41-08:00"
+ },
+ "ajuste_val_atributos_llava_ov_05b": {
+  "origen": "notebook 03 §4",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:28:41-08:00"
+ },
+ "ajuste_val_atributos_qwen35_08b_base": {
+  "origen": "notebook 03 §4",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:28:41-08:00"
+ },
+ "ajuste_val_atributos_vljepa_open_msrvtt": {
+  "origen": "notebook 03 §4",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:28:42-08:00"
+ },
+ "confusion_shape": {
+  "origen": "notebook 03 §6",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:13-08:00"
+ },
+ "confusion_x": {
+  "origen": "notebook 03 §6",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:14-08:00"
+ },
+ "confusion_y": {
+  "origen": "notebook 03 §6",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:14-08:00"
+ },
+ "grilla_curvas_val": {
+  "origen": "notebook 03 §2",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:28:35-08:00"
+ },
+ "grilla_mapas": {
+  "origen": "notebook 03 §2",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:28:33-08:00"
+ },
+ "ydecoder_etapa2": {
+  "origen": "notebook 03 §8a",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:16-08:00"
+ },
+ "zeroshot_vs_ajustado": {
+  "origen": "notebook 03 §5",
+  "commit": "8ab9045794760ca93a4b05b51b38449e575169e0",
+  "sin_commitear": true,
+  "fecha": "2026-11-24T06:30:11-08:00"
+ }
+}
